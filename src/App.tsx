@@ -3,13 +3,14 @@ import {
   addRecord,
   clearLab,
   exportVault,
+  getOpfsDiagnostics,
   getRecords,
   getStorageStatus,
   importVault,
-  removeOpfsProbe,
   requestPersistentStorage,
-  writeOpfsProbe,
+  appendOpfsProbe,
   type LabRecord,
+  type OpfsDiagnostics,
 } from './storage-lab'
 
 type Status = Awaited<ReturnType<typeof getStorageStatus>>
@@ -31,9 +32,12 @@ const initialStatus: Status = {
   online: navigator.onLine,
 }
 
+const initialOpfs: OpfsDiagnostics = { files: 0, bytes: 0, expectedBytes: 0, filesDetail: [] }
+
 export default function App() {
   const [status, setStatus] = useState<Status>(initialStatus)
   const [records, setRecords] = useState<LabRecord[]>([])
+  const [opfs, setOpfs] = useState<OpfsDiagnostics>(initialOpfs)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [password, setPassword] = useState('duranti-test')
@@ -41,6 +45,7 @@ export default function App() {
   const refresh = useCallback(async () => {
     setStatus(await getStorageStatus())
     setRecords(await getRecords())
+    try { setOpfs(await getOpfsDiagnostics()) } catch { setOpfs(initialOpfs) }
   }, [])
 
   useEffect(() => {
@@ -79,8 +84,8 @@ export default function App() {
   })
 
   const add100Mb = () => run(async () => {
-    await writeOpfsProbe(100 * 1024 * 1024)
-    setMessage('100 MB OPFS probe written.')
+    const result = await appendOpfsProbe()
+    setMessage(`Wrote 100 MB. OPFS files: ${result.files}; exact bytes: ${fmt(result.bytes)}.`)
   })
 
   const requestPersist = () => run(async () => {
@@ -90,8 +95,7 @@ export default function App() {
 
   const clear = () => run(async () => {
     await clearLab()
-    await removeOpfsProbe()
-    setMessage('Lab storage cleared.')
+    setMessage('Lab storage cleared. OPFS diagnostic files and IndexedDB records removed.')
   })
 
   const exportTestVault = () => run(async () => {
@@ -147,11 +151,17 @@ export default function App() {
           <strong>{fmt(status.usage)} / {fmt(status.quota)}</strong>
         </div>
         <div className="meter"><span style={{ width: `${status.quota ? Math.min(100, (status.usage / status.quota) * 100) : 0}%` }} /></div>
+        <div className="diagnostics-grid">
+          <div><span>OPFS diagnostic files</span><strong>{opfs.files}</strong></div>
+          <div><span>Exact OPFS bytes</span><strong>{fmt(opfs.bytes)}</strong></div>
+          <div><span>Expected bytes</span><strong>{fmt(opfs.expectedBytes)}</strong></div>
+          <div><span>Size check</span><strong className={opfs.bytes === opfs.expectedBytes ? 'ok' : 'warn'}>{opfs.bytes === opfs.expectedBytes ? 'MATCH' : 'MISMATCH'}</strong></div>
+        </div>
       </section>
 
       <section className="panel">
         <div className="section-heading">
-          <div><span className="label">1 — Baseline</span><h2>Storage operativo</h2></div>
+          <div><span className="label">1 — Baseline + OPFS diagnostics</span><h2>Storage operativo</h2></div>
           <span className="badge">{records.length} record</span>
         </div>
         <div className="actions">
@@ -160,7 +170,7 @@ export default function App() {
           <button onClick={requestPersist} disabled={busy || !status.persistApi}>Request persistent storage</button>
           <button className="danger" onClick={clear} disabled={busy}>Clear lab storage</button>
         </div>
-        <p className="hint">Dopo aver creato dati, chiudi/riapri la Web App e verifica che il record resti. Il test di cancellazione Safari va eseguito manualmente dalle impostazioni di iOS.</p>
+        <p className="hint">Ogni click crea un file OPFS distinto da esattamente 100 MB. Così possiamo distinguere la dimensione reale dei file dalla stima di StorageManager.</p>
       </section>
 
       <section className="panel vault-panel">
@@ -183,13 +193,14 @@ export default function App() {
           <li>Installa Duranti sulla Home Screen.</li>
           <li>Create test data → chiudi e riapri.</li>
           <li>Request persistent storage → verifica Persistent grant.</li>
-          <li>Add 100 MB → osserva usage/quota e stabilità.</li>
+          <li>Add 100 MB ripetuto → verifica file count, exact bytes e MATCH.</li>
+          <li>Chiudi/riapri → verifica che i file OPFS abbiano ancora le stesse dimensioni.</li>
+          <li>Clear lab storage → verifica che i file OPFS diagnostic e i record spariscano.</li>
           <li>Export encrypted vault → salva il file in Files.</li>
           <li>Conserva il file fuori da Safari.</li>
           <li>Impostazioni → Safari → Cancella cronologia e dati dei siti web.</li>
-          <li>Riapri Duranti: lo storage interno dovrebbe risultare vuoto.</li>
+          <li>Riapri Duranti → verifica lo storage interno.</li>
           <li>Import vault → verifica il ripristino.</li>
-          <li>Ripeti con foto/video reali quando implementeremo il media layer.</li>
         </ol>
       </section>
 
