@@ -1,7 +1,9 @@
 const DB_NAME = 'DurantiStorageLab'
 const STORE_NAME = 'test-records'
 const DB_VERSION = 1
-const PROBE_FILENAME = 'storage-lab.bin'
+const PROBE_PREFIX = 'storage-lab-'
+const CHUNK_SIZE = 1024 * 1024
+const PROBE_CHUNK_BYTES = 100 * 1024 * 1024
 
 type OpfsStorageManager = StorageManager & {
   getDirectory?: () => Promise<FileSystemDirectoryHandle>
@@ -12,6 +14,13 @@ export type LabRecord = {
   createdAt: string
   label: string
   payload: string
+}
+
+export type OpfsDiagnostics = {
+  files: number
+  bytes: number
+  expectedBytes: number
+  filesDetail: Array<{ name: string; bytes: number }>
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -97,29 +106,54 @@ export async function requestPersistentStorage() {
   return storage.persist()
 }
 
-export async function writeOpfsProbe(sizeBytes: number): Promise<void> {
+export async function getOpfsDiagnostics(): Promise<OpfsDiagnostics> {
   const root = await getOpfsRoot()
-  const fileHandle = await root.getFileHandle(PROBE_FILENAME, { create: true })
-  const writable = await fileHandle.createWritable()
-  const chunk = new Uint8Array(1024 * 1024)
-  let remaining = sizeBytes
-  while (remaining > 0) {
-    const length = Math.min(remaining, chunk.byteLength)
-    await writable.write(chunk.subarray(0, length))
-    remaining -= length
+  const filesDetail: Array<{ name: string; bytes: number }> = []
+  for await (const [name, handle] of root.entries()) {
+    if (handle.kind !== 'file' || !name.startsWith(PROBE_PREFIX)) continue
+    const file = await (handle as FileSystemFileHandle).getFile()
+    filesDetail.push({ name, bytes: file.size })
   }
-  await writable.close()
+  filesDetail.sort((a, b) => a.name.localeCompare(b.name))
+  const bytes = filesDetail.reduce((total, file) => total + file.bytes, 0)
+  return {
+    files: filesDetail.length,
+    bytes,
+    expectedBytes: filesDetail.length * PROBE_CHUNK_BYTES,
+    filesDetail,
+  }
+}
+
+export async function appendOpfsProbe(): Promise<OpfsDiagnostics> {
+  const root = await getOpfsRoot()
+  const diagnostics = await getOpfsDiagnostics()
+  const index = diagnostics.files + 1
+  const filename = `${PROBE_PREFIX}${String(index).padStart(4, '0')}.bin`
+  const fileHandle = await root.getFileHandle(filename, { create: true })
+  const writable = await fileHandle.createWritable()
+  const chunk = new Uint8Array(CHUNK_SIZE)
+  let remaining = PROBE_CHUNK_BYTES
+  try {
+    while (remaining > 0) {
+      const length = Math.min(remaining, chunk.byteLength)
+      await writable.write(chunk.subarray(0, length))
+      remaining -= length
+    }
+    await writable.close()
+  } catch (error) {
+    try { await writable.abort() } catch { /* best effort */ }
+    throw error
+  }
+  return getOpfsDiagnostics()
 }
 
 async function clearOpfsLab(): Promise<void> {
-  const storage = storageManager()
-  if (!storage || typeof storage.getDirectory !== 'function') return
-  const root = await storage.getDirectory()
-  try {
-    await root.removeEntry(PROBE_FILENAME)
-  } catch (error) {
-    if (error instanceof DOMException && error.name !== 'NotFoundError') throw error
+  const root = await getOpfsRoot()
+  const names: string[] = []
+  for await (const [name, handle] of root.entries()) {
+    if (handle.kind === 'file' && name.startsWith(PROBE_PREFIX)) names.push(name)
   }
+  await Promise.all(names.map((name) => root.removeEntry(name)))
 }
 
 export async function removeOpfsProbe(): Promise<void> {
