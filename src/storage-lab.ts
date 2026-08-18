@@ -74,7 +74,7 @@ export async function getStorageStatus() {
   if (storage?.persisted) persisted = await storage.persisted()
   return {
     indexedDb: 'indexedDB' in window,
-    opfs: !!storage?.getDirectory,
+    opfs: typeof storage?.getDirectory === 'function',
     persistApi: !!storage?.persist,
     persisted,
     usage: estimate?.usage ?? 0,
@@ -90,9 +90,9 @@ export async function requestPersistentStorage() {
 }
 
 export async function writeOpfsProbe(sizeBytes: number): Promise<void> {
-  const getDirectory = storageManager()?.getDirectory
-  if (!getDirectory) throw new Error('OPFS is not available')
-  const root = await getDirectory()
+  const storage = storageManager()
+  if (!storage?.getDirectory) throw new Error('OPFS is not available')
+  const root = await storage.getDirectory()
   const fileHandle = await root.getFileHandle('storage-lab.bin', { create: true })
   const writable = await fileHandle.createWritable()
   const chunk = new Uint8Array(Math.min(sizeBytes, 1024 * 1024))
@@ -106,9 +106,9 @@ export async function writeOpfsProbe(sizeBytes: number): Promise<void> {
 }
 
 export async function removeOpfsProbe(): Promise<void> {
-  const getDirectory = storageManager()?.getDirectory
-  if (!getDirectory) return
-  const root = await getDirectory()
+  const storage = storageManager()
+  if (!storage?.getDirectory) return
+  const root = await storage.getDirectory()
   try {
     await root.removeEntry('storage-lab.bin')
   } catch {
