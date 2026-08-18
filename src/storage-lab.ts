@@ -2,6 +2,10 @@ const DB_NAME = 'DurantiStorageLab'
 const STORE_NAME = 'test-records'
 const DB_VERSION = 1
 
+type OpfsStorageManager = StorageManager & {
+  getDirectory?: () => Promise<FileSystemDirectoryHandle>
+}
+
 export type LabRecord = {
   id: string
   createdAt: string
@@ -59,16 +63,18 @@ export async function clearLab(): Promise<void> {
   db.close()
 }
 
+function storageManager(): OpfsStorageManager | undefined {
+  return navigator.storage as OpfsStorageManager | undefined
+}
+
 export async function getStorageStatus() {
-  const storage = navigator.storage
+  const storage = storageManager()
   const estimate = storage?.estimate ? await storage.estimate() : undefined
   let persisted: boolean | null = null
-  if (storage?.persisted) {
-    persisted = await storage.persisted()
-  }
+  if (storage?.persisted) persisted = await storage.persisted()
   return {
     indexedDb: 'indexedDB' in window,
-    opfs: !!storage && 'getDirectory' in (navigator.storage as StorageManager),
+    opfs: !!storage?.getDirectory,
     persistApi: !!storage?.persist,
     persisted,
     usage: estimate?.usage ?? 0,
@@ -78,13 +84,15 @@ export async function getStorageStatus() {
 }
 
 export async function requestPersistentStorage() {
-  if (!navigator.storage?.persist) return false
-  return navigator.storage.persist()
+  const storage = storageManager()
+  if (!storage?.persist) return false
+  return storage.persist()
 }
 
 export async function writeOpfsProbe(sizeBytes: number): Promise<void> {
-  if (!navigator.storage?.getDirectory) throw new Error('OPFS is not available')
-  const root = await navigator.storage.getDirectory()
+  const getDirectory = storageManager()?.getDirectory
+  if (!getDirectory) throw new Error('OPFS is not available')
+  const root = await getDirectory()
   const fileHandle = await root.getFileHandle('storage-lab.bin', { create: true })
   const writable = await fileHandle.createWritable()
   const chunk = new Uint8Array(Math.min(sizeBytes, 1024 * 1024))
@@ -98,8 +106,9 @@ export async function writeOpfsProbe(sizeBytes: number): Promise<void> {
 }
 
 export async function removeOpfsProbe(): Promise<void> {
-  if (!navigator.storage?.getDirectory) return
-  const root = await navigator.storage.getDirectory()
+  const getDirectory = storageManager()?.getDirectory
+  if (!getDirectory) return
+  const root = await getDirectory()
   try {
     await root.removeEntry('storage-lab.bin')
   } catch {
