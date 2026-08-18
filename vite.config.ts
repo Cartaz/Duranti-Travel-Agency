@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  base: '/Duranti-Travel-Agency/',
   plugins: [
     react(),
     VitePWA({
@@ -19,7 +20,7 @@ export default defineConfig({
         icons: [],
       },
       workbox: {
-        navigateFallback: '/index.html',
+        navigateFallback: '/Duranti-Travel-Agency/index.html',
       },
     }),
   ],
