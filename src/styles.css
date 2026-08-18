@@ -1,0 +1,51 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  background: #100e0b;
+  color: #f3eadc;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: radial-gradient(circle at top, #2b2118 0, #100e0b 52%); }
+button, input { font: inherit; }
+button { border: 1px solid #65513d; background: #261d16; color: #f7eee1; border-radius: 12px; padding: 12px 14px; cursor: pointer; }
+button:hover:not(:disabled) { background: #34271c; border-color: #967552; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.danger { border-color: #7e4139; }
+
+.lab-shell { width: min(980px, calc(100% - 28px)); margin: 0 auto; padding: 36px 0 70px; }
+.hero { padding: 18px 4px 28px; }
+.eyebrow, .label { text-transform: uppercase; letter-spacing: .14em; font-size: 11px; color: #bda98e; }
+h1 { margin: 6px 0 8px; font-family: Georgia, serif; font-size: clamp(42px, 9vw, 72px); font-weight: 500; }
+h2 { margin: 4px 0 0; font-family: Georgia, serif; font-size: 27px; font-weight: 500; }
+.hero p:last-child { max-width: 700px; color: #c6b9aa; line-height: 1.6; }
+
+.status-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 12px; }
+.status-card, .panel { border: 1px solid #3e3329; background: rgba(25, 20, 16, .88); border-radius: 18px; box-shadow: 0 16px 40px rgba(0,0,0,.18); }
+.status-card { padding: 15px; min-height: 84px; }
+.status-card span { display: block; color: #988a7b; font-size: 12px; margin-bottom: 8px; }
+.status-card strong { font-size: 14px; letter-spacing: .06em; }
+.ok { color: #a9d6b1; } .warn { color: #e4b879; }
+
+.panel { padding: 20px; margin-top: 12px; }
+.storage-panel { display: grid; gap: 12px; }
+.storage-panel strong { display: block; margin-top: 5px; font-size: 20px; }
+.meter { height: 8px; border-radius: 20px; overflow: hidden; background: #332920; }
+.meter span { display: block; height: 100%; border-radius: inherit; background: #b99b70; }
+.section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.badge { border: 1px solid #4d4034; border-radius: 999px; padding: 6px 9px; font-size: 11px; color: #bca990; white-space: nowrap; }
+.badge.secure { color: #b8d6bf; border-color: #46604d; }
+.actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.hint, .panel > p { color: #a99b8d; font-size: 13px; line-height: 1.55; }
+.password { display: grid; gap: 7px; margin: 16px 0; color: #b9aa9b; font-size: 13px; }
+.password input { width: 100%; max-width: 420px; background: #15110e; border: 1px solid #4b3d31; color: #f3eadc; border-radius: 10px; padding: 11px 12px; outline: none; }
+.password input:focus { border-color: #967552; }
+.checklist ol { margin: 0; padding-left: 22px; color: #c4b7a8; line-height: 1.8; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: calc(100% - 28px); padding: 12px 15px; border-radius: 12px; border: 1px solid #66513d; background: #211a14; color: #f3eadc; box-shadow: 0 15px 35px rgba(0,0,0,.4); }
+
+@media (max-width: 760px) {
+  .status-grid { grid-template-columns: repeat(2, 1fr); }
+  .status-card:last-child { grid-column: span 2; }
+  .lab-shell { padding-top: 18px; }
+}
