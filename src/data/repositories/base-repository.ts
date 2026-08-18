@@ -2,10 +2,12 @@ import type { EntityBase } from '../../domain/entities'
 import type { EntityTable } from 'dexie'
 import { assertEntityBase } from '../db/validate'
 
+type EntityId = EntityBase['id']
+
 export class Repository<T extends EntityBase> {
   constructor(protected readonly table: EntityTable<T, 'id'>) {}
 
-  async get(id: string): Promise<T | undefined> {
+  async get(id: EntityId): Promise<T | undefined> {
     return this.table.get(id)
   }
 
@@ -19,7 +21,7 @@ export class Repository<T extends EntityBase> {
     return entity.id
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: EntityId): Promise<void> {
     await this.table.delete(id)
   }
 
