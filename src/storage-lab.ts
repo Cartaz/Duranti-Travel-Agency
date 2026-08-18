@@ -27,9 +27,7 @@ function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
     request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME, { keyPath: 'id' })
-      }
+      if (!request.result.objectStoreNames.contains(STORE_NAME)) request.result.createObjectStore(STORE_NAME, { keyPath: 'id' })
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error ?? new Error('IndexedDB open failed'))
@@ -106,22 +104,27 @@ export async function requestPersistentStorage() {
   return storage.persist()
 }
 
+async function getDirectoryEntries(root: FileSystemDirectoryHandle): Promise<Array<[string, FileSystemHandle]>> {
+  const directory = root as FileSystemDirectoryHandle & {
+    entries?: () => AsyncIterableIterator<[string, FileSystemHandle]>
+  }
+  if (typeof directory.entries !== 'function') throw new Error('OPFS directory iteration is not available in this browser build')
+  const entries: Array<[string, FileSystemHandle]> = []
+  for await (const entry of directory.entries()) entries.push(entry)
+  return entries
+}
+
 export async function getOpfsDiagnostics(): Promise<OpfsDiagnostics> {
   const root = await getOpfsRoot()
   const filesDetail: Array<{ name: string; bytes: number }> = []
-  for await (const [name, handle] of root.entries()) {
+  for (const [name, handle] of await getDirectoryEntries(root)) {
     if (handle.kind !== 'file' || !name.startsWith(PROBE_PREFIX)) continue
     const file = await (handle as FileSystemFileHandle).getFile()
     filesDetail.push({ name, bytes: file.size })
   }
   filesDetail.sort((a, b) => a.name.localeCompare(b.name))
   const bytes = filesDetail.reduce((total, file) => total + file.bytes, 0)
-  return {
-    files: filesDetail.length,
-    bytes,
-    expectedBytes: filesDetail.length * PROBE_CHUNK_BYTES,
-    filesDetail,
-  }
+  return { files: filesDetail.length, bytes, expectedBytes: filesDetail.length * PROBE_CHUNK_BYTES, filesDetail }
 }
 
 export async function appendOpfsProbe(): Promise<OpfsDiagnostics> {
@@ -150,10 +153,10 @@ export async function appendOpfsProbe(): Promise<OpfsDiagnostics> {
 async function clearOpfsLab(): Promise<void> {
   const root = await getOpfsRoot()
   const names: string[] = []
-  for await (const [name, handle] of root.entries()) {
+  for (const [name, handle] of await getDirectoryEntries(root)) {
     if (handle.kind === 'file' && name.startsWith(PROBE_PREFIX)) names.push(name)
   }
-  await Promise.all(names.map((name) => root.removeEntry(name)))
+  for (const name of names) await root.removeEntry(name)
 }
 
 export async function removeOpfsProbe(): Promise<void> {
@@ -162,13 +165,7 @@ export async function removeOpfsProbe(): Promise<void> {
 
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey'])
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 250_000, hash: 'SHA-256' },
-    material,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
-  )
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 250_000, hash: 'SHA-256' }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
 }
 
 export async function exportVault(password: string): Promise<Blob> {
@@ -178,14 +175,7 @@ export async function exportVault(password: string): Promise<Blob> {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const key = await deriveKey(password, salt)
   const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, payload)
-  const envelope = {
-    magic: 'DURANTI-VAULT-TEST',
-    version: 1,
-    algorithm: 'PBKDF2-SHA256-250000 + AES-256-GCM',
-    salt: bytesToBase64(salt),
-    iv: bytesToBase64(iv),
-    ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
-  }
+  const envelope = { magic: 'DURANTI-VAULT-TEST', version: 1, algorithm: 'PBKDF2-SHA256-250000 + AES-256-GCM', salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(ciphertext)) }
   return new Blob([JSON.stringify(envelope)], { type: 'application/vnd.duranti.vault+json' })
 }
 
