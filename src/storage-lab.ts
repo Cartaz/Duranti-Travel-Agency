@@ -1,6 +1,7 @@
 const DB_NAME = 'DurantiStorageLab'
 const STORE_NAME = 'test-records'
 const DB_VERSION = 1
+const PROBE_FILENAME = 'storage-lab.bin'
 
 type OpfsStorageManager = StorageManager & {
   getDirectory?: () => Promise<FileSystemDirectoryHandle>
@@ -61,10 +62,17 @@ export async function clearLab(): Promise<void> {
     tx.onerror = () => reject(tx.error ?? new Error('IndexedDB clear failed'))
   })
   db.close()
+  await clearOpfsLab()
 }
 
 function storageManager(): OpfsStorageManager | undefined {
   return navigator.storage as OpfsStorageManager | undefined
+}
+
+async function getOpfsRoot(): Promise<FileSystemDirectoryHandle> {
+  const storage = storageManager()
+  if (!storage || typeof storage.getDirectory !== 'function') throw new Error('OPFS is not available')
+  return storage.getDirectory()
 }
 
 export async function getStorageStatus() {
@@ -90,12 +98,10 @@ export async function requestPersistentStorage() {
 }
 
 export async function writeOpfsProbe(sizeBytes: number): Promise<void> {
-  const storage = storageManager()
-  if (!storage?.getDirectory) throw new Error('OPFS is not available')
-  const root = await storage.getDirectory()
-  const fileHandle = await root.getFileHandle('storage-lab.bin', { create: true })
+  const root = await getOpfsRoot()
+  const fileHandle = await root.getFileHandle(PROBE_FILENAME, { create: true })
   const writable = await fileHandle.createWritable()
-  const chunk = new Uint8Array(Math.min(sizeBytes, 1024 * 1024))
+  const chunk = new Uint8Array(1024 * 1024)
   let remaining = sizeBytes
   while (remaining > 0) {
     const length = Math.min(remaining, chunk.byteLength)
@@ -105,15 +111,19 @@ export async function writeOpfsProbe(sizeBytes: number): Promise<void> {
   await writable.close()
 }
 
-export async function removeOpfsProbe(): Promise<void> {
+async function clearOpfsLab(): Promise<void> {
   const storage = storageManager()
-  if (!storage?.getDirectory) return
+  if (!storage || typeof storage.getDirectory !== 'function') return
   const root = await storage.getDirectory()
   try {
-    await root.removeEntry('storage-lab.bin')
-  } catch {
-    // Nothing to remove.
+    await root.removeEntry(PROBE_FILENAME)
+  } catch (error) {
+    if (error instanceof DOMException && error.name !== 'NotFoundError') throw error
   }
+}
+
+export async function removeOpfsProbe(): Promise<void> {
+  await clearOpfsLab()
 }
 
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
