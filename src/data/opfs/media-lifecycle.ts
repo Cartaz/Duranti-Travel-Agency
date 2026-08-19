@@ -1,4 +1,10 @@
-import { opfsStore } from './opfs-store'
+import {
+  buildMediaPath,
+  deleteMediaFile,
+  mediaFileExists,
+  readMediaFile,
+  writeMediaFile,
+} from './opfs-store'
 
 export interface MediaFileInfo {
   id: string
@@ -9,21 +15,29 @@ export interface MediaFileInfo {
 
 export class MediaLifecycle {
   async writeOriginal(id: string, source: Blob): Promise<MediaFileInfo> {
-    const path = `media/${id}/original`
-    await opfsStore.write(path, source)
-    return { id, path, sizeBytes: source.size, mimeType: source.type || 'application/octet-stream' }
+    const path = await writeMediaFile(id, source)
+    return {
+      id,
+      path,
+      sizeBytes: source.size,
+      mimeType: source.type || 'application/octet-stream',
+    }
   }
 
-  async readOriginal(id: string): Promise<File | null> {
-    return opfsStore.readFile(`media/${id}/original`)
+  async readOriginal(id: string): Promise<File> {
+    return readMediaFile(id)
   }
 
   async deleteMedia(id: string): Promise<void> {
-    await opfsStore.remove(`media/${id}`)
+    await deleteMediaFile(id)
   }
 
   async exists(id: string): Promise<boolean> {
-    return opfsStore.exists(`media/${id}/original`)
+    return mediaFileExists(id)
+  }
+
+  pathForOriginal(id: string): string {
+    return buildMediaPath(id)
   }
 }
 
