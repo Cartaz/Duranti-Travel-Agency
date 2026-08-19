@@ -38,7 +38,7 @@ export async function writeMediaFile(mediaId: string, source: Blob): Promise<str
       // Preserve the original write failure.
     }
     try {
-      await itemDirectory.remove({ recursive: true })
+      await mediaDirectory.removeEntry(mediaId, { recursive: true })
     } catch {
       // Best-effort cleanup only.
     }
