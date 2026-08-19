@@ -1,11 +1,11 @@
 import type { EntityBase } from '../../domain/entities'
-import type { EntityTable } from 'dexie'
+import type { Table } from 'dexie'
 import { assertEntityBase } from '../db/validate'
 
 type EntityId = EntityBase['id']
 
 export class Repository<T extends EntityBase> {
-  constructor(protected readonly table: EntityTable<T, 'id'>) {}
+  constructor(protected readonly table: Table<T, EntityId>) {}
 
   async get(id: EntityId): Promise<T | undefined> {
     return this.table.get(id)
@@ -15,7 +15,7 @@ export class Repository<T extends EntityBase> {
     return this.table.toArray()
   }
 
-  async put(entity: T): Promise<string> {
+  async put(entity: T): Promise<EntityId> {
     assertEntityBase(entity, 'Entity')
     await this.table.put(entity)
     return entity.id
