@@ -1,24 +1,24 @@
-import Dexie, { type EntityTable } from 'dexie'
+import Dexie, { type Table } from 'dexie'
 import type { DatabaseTables } from './schema'
 
 export const DB_NAME = 'duranti'
 export const DB_VERSION = 1
 
 export class DurantiDatabase extends Dexie {
-  trips!: EntityTable<DatabaseTables['trips'], 'id'>
-  travelers!: EntityTable<DatabaseTables['travelers'], 'id'>
-  travelerDocuments!: EntityTable<DatabaseTables['travelerDocuments'], 'id'>
-  tripTravelers!: EntityTable<DatabaseTables['tripTravelers'], 'id'>
-  days!: EntityTable<DatabaseTables['days'], 'id'>
-  blocks!: EntityTable<DatabaseTables['blocks'], 'id'>
-  places!: EntityTable<DatabaseTables['places'], 'id'>
-  media!: EntityTable<DatabaseTables['media'], 'id'>
-  links!: EntityTable<DatabaseTables['links'], 'id'>
-  itineraries!: EntityTable<DatabaseTables['itineraries'], 'id'>
-  templates!: EntityTable<DatabaseTables['templates'], 'id'>
-  expenses!: EntityTable<DatabaseTables['expenses'], 'id'>
-  reservations!: EntityTable<DatabaseTables['reservations'], 'id'>
-  auditLog!: EntityTable<DatabaseTables['auditLog'], 'id'>
+  trips!: Table<DatabaseTables['trips'], string>
+  travelers!: Table<DatabaseTables['travelers'], string>
+  travelerDocuments!: Table<DatabaseTables['travelerDocuments'], string>
+  tripTravelers!: Table<DatabaseTables['tripTravelers'], string>
+  days!: Table<DatabaseTables['days'], string>
+  blocks!: Table<DatabaseTables['blocks'], string>
+  places!: Table<DatabaseTables['places'], string>
+  media!: Table<DatabaseTables['media'], string>
+  links!: Table<DatabaseTables['links'], string>
+  itineraries!: Table<DatabaseTables['itineraries'], string>
+  templates!: Table<DatabaseTables['templates'], string>
+  expenses!: Table<DatabaseTables['expenses'], string>
+  reservations!: Table<DatabaseTables['reservations'], string>
+  auditLog!: Table<DatabaseTables['auditLog'], string>
 
   constructor() {
     super(DB_NAME)
