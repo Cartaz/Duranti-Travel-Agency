@@ -3,6 +3,7 @@ import { formatMinorCurrency } from './currency'
 import {
   getTripExpenseSummary,
   type ExpenseCurrencySummary,
+  type TripBudgetSummary,
   type TripExpenseSummary as TripExpenseSummaryData,
 } from './expense-summary-service'
 import './expenses.css'
@@ -29,6 +30,43 @@ function Breakdown({ title, summary, kind }: {
         </ul>
       )}
     </div>
+  )
+}
+
+function BudgetCard({ budget }: { budget: TripBudgetSummary }) {
+  const exceeded = budget.exceededMinor > 0
+  const balanceMinor = exceeded ? budget.exceededMinor : budget.remainingMinor
+
+  return (
+    <article className={`expense-budget-card${exceeded ? ' expense-budget-card-over' : ''}`}>
+      <div className="expense-budget-main">
+        <span>Budget · {budget.currency}</span>
+        <strong>{formatMinorCurrency(budget.budgetMinor, budget.currency)}</strong>
+      </div>
+
+      <div className="expense-budget-metrics">
+        <div>
+          <span>Speso</span>
+          <strong>{formatMinorCurrency(budget.spentMinor, budget.currency)}</strong>
+        </div>
+        <div>
+          <span>{exceeded ? 'Superato di' : 'Residuo'}</span>
+          <strong>{formatMinorCurrency(balanceMinor, budget.currency)}</strong>
+        </div>
+      </div>
+
+      <progress
+        className="expense-budget-progress"
+        max={budget.budgetMinor}
+        value={Math.min(budget.spentMinor, budget.budgetMinor)}
+        aria-label={`Avanzamento budget ${budget.currency}`}
+      />
+
+      <p className="expense-budget-note">
+        Il budget considera {budget.includedExpenseCount} {budget.includedExpenseCount === 1 ? 'spesa' : 'spese'} in {budget.currency}.
+        {budget.excludedExpenseCount > 0 && ` ${budget.excludedExpenseCount} ${budget.excludedExpenseCount === 1 ? 'spesa in altra valuta resta esclusa' : 'spese in altre valute restano escluse'}.`}
+      </p>
+    </article>
   )
 }
 
@@ -64,13 +102,15 @@ export default function TripExpenseSummary({ tripId }: { tripId: string }) {
         <div>
           <p className="eyebrow">Conti del capitolo</p>
           <h2 id="trip-expense-summary-title">Riepilogo spese</h2>
-          <p>I totali restano separati per valuta e ora includono anche la distribuzione per giorno, senza conversioni o tassi di cambio impliciti.</p>
+          <p>Budget e totali restano legati alla loro valuta: nessuna conversione o tasso di cambio viene applicato implicitamente.</p>
         </div>
         {summary && <span className="expense-summary-count">{summary.expenseCount} spese</span>}
       </div>
 
       {loading && <p className="trip-feedback" role="status">Calcolo i totali locali…</p>}
       {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
+
+      {!loading && summary?.budget && <BudgetCard budget={summary.budget} />}
 
       {!loading && summary?.expenseCount === 0 && (
         <p className="expense-summary-empty">Nessuna spesa registrata nel viaggio.</p>
