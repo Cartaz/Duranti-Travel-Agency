@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -42,13 +42,16 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Upload generated lockfile
-        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-package-lock-${{ github.sha }}
-          path: package-lock.json
-          retention-days: 1
+      - name: Commit validated lockfile
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/chatgpt/')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: refresh npm lockfile"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
 
       - name: Configure Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
