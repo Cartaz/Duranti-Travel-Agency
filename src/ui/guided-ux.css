@@ -3,7 +3,9 @@
 .day-itinerary-title-row strong,
 .planner-block-error,
 .day-itinerary-error,
-.day-itinerary-warning {
+.day-itinerary-warning,
+.reservation-attachment-current strong,
+.reservation-attachment-current span {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
@@ -14,7 +16,8 @@
   line-height: 1.35;
 }
 
-.trip-form-optional {
+.trip-form-optional,
+.reservation-optional {
   grid-column: 1 / -1;
   overflow: hidden;
   border: 1px solid #46392b;
@@ -22,7 +25,8 @@
   background: rgba(18, 14, 11, .62);
 }
 
-.trip-form-optional > summary {
+.trip-form-optional > summary,
+.reservation-optional > summary {
   min-height: 54px;
   display: flex;
   align-items: center;
@@ -34,23 +38,28 @@
   list-style-position: inside;
 }
 
-.trip-form-optional > summary > span:first-child {
+.trip-form-optional > summary > span:first-child,
+.reservation-optional > summary > span:first-child {
   min-width: 0;
   display: grid;
   gap: 3px;
 }
 
 .trip-form-optional > summary strong,
-.trip-form-optional > summary small {
+.trip-form-optional > summary small,
+.reservation-optional > summary strong,
+.reservation-optional > summary small {
   display: block;
 }
 
-.trip-form-optional > summary small {
+.trip-form-optional > summary small,
+.reservation-optional > summary small {
   color: #938473;
   line-height: 1.35;
 }
 
-.trip-form-optional-state {
+.trip-form-optional-state,
+.reservation-optional-state {
   flex: 0 0 auto;
   border: 1px solid #536245;
   border-radius: 999px;
@@ -67,6 +76,18 @@
   gap: 15px;
   padding: 15px;
   border-top: 1px solid #3a2f25;
+}
+
+.reservation-optional-grid {
+  padding: 13px;
+  border-top: 1px solid #3a2f25;
+}
+
+.reservation-attachment-details .reservation-attachment {
+  border: 0;
+  border-top: 1px solid #3a2f25;
+  border-radius: 0;
+  background: transparent;
 }
 
 @media (max-width: 700px) {
