@@ -1,0 +1,243 @@
+.trip-itinerary-overview {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid #3e342a;
+  border-radius: 20px;
+  background: #15110d;
+}
+
+.trip-itinerary-overview-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.trip-itinerary-overview-heading h2,
+.trip-itinerary-overview-heading p {
+  margin: 0;
+}
+
+.trip-itinerary-overview-heading > div:first-child {
+  display: grid;
+  gap: 6px;
+}
+
+.trip-itinerary-overview-heading > div:first-child > p:last-child {
+  color: #9d8e7c;
+  line-height: 1.5;
+}
+
+.trip-itinerary-overview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.trip-itinerary-overview-stats span,
+.trip-itinerary-overview-stats strong {
+  border: 1px solid #493d32;
+  border-radius: 999px;
+  padding: 6px 9px;
+  color: #c9b59e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trip-itinerary-overview-stats .trip-itinerary-overview-warning {
+  border-color: #6a5530;
+  color: #d5b875;
+}
+
+.trip-itinerary-days,
+.trip-itinerary-stops {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.trip-itinerary-days {
+  display: grid;
+  gap: 14px;
+}
+
+.trip-itinerary-day {
+  overflow: hidden;
+  border: 1px solid #3b3128;
+  border-radius: 16px;
+  background: #110d0a;
+}
+
+.trip-itinerary-day-heading {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid #302820;
+}
+
+.trip-itinerary-day-number {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #594936;
+  border-radius: 13px;
+  color: #dcc7ad;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.trip-itinerary-day-heading > div:nth-child(2) {
+  display: grid;
+  gap: 3px;
+}
+
+.trip-itinerary-day-heading span,
+.trip-itinerary-day-heading p {
+  color: #9d8e7c;
+  font-size: 12px;
+}
+
+.trip-itinerary-day-heading h3,
+.trip-itinerary-day-heading p {
+  margin: 0;
+}
+
+.trip-itinerary-day-heading a {
+  border: 1px solid #594936;
+  border-radius: 10px;
+  padding: 7px 9px;
+  color: #d9c6ae;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.trip-itinerary-day-heading a:hover,
+.trip-itinerary-day-heading a:focus-visible {
+  border-color: #967552;
+  outline: none;
+}
+
+.trip-itinerary-day-empty {
+  margin: 0;
+  padding: 13px 14px;
+  color: #877866;
+  font-size: 12px;
+}
+
+.trip-itinerary-stops {
+  display: grid;
+}
+
+.trip-itinerary-stops li {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 14px;
+  border-top: 1px solid #28211b;
+}
+
+.trip-itinerary-stops li:first-child {
+  border-top: 0;
+}
+
+.trip-itinerary-stops time {
+  color: #bba589;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.trip-itinerary-stop-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.trip-itinerary-stop-copy > strong {
+  color: #efe2d2;
+  overflow-wrap: anywhere;
+}
+
+.trip-itinerary-stop-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  color: #978775;
+  font-size: 11px;
+}
+
+.trip-itinerary-state {
+  border: 1px solid #4a4034;
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+.trip-itinerary-state-synced {
+  border-color: #4b5b3e;
+  color: #a9b991;
+}
+
+.trip-itinerary-state-needs-sync {
+  border-color: #6a5530;
+  color: #d5b875;
+}
+
+.trip-itinerary-state-orphaned {
+  border-color: #70443c;
+  color: #d99d91;
+}
+
+.trip-itinerary-state-manual {
+  color: #b9a58d;
+}
+
+.trip-itinerary-stop-cancelled {
+  opacity: .58;
+}
+
+.trip-itinerary-stop-cancelled .trip-itinerary-stop-copy > strong {
+  text-decoration: line-through;
+}
+
+.trip-itinerary-overview-empty {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px dashed #493c30;
+  border-radius: 14px;
+  color: #9d8e7c;
+}
+
+.trip-itinerary-overview-empty strong {
+  color: #d6c4ad;
+}
+
+@media (max-width: 700px) {
+  .trip-itinerary-overview-heading {
+    display: grid;
+  }
+
+  .trip-itinerary-overview-stats {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .trip-itinerary-day-heading {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .trip-itinerary-day-heading a {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .trip-itinerary-stops li {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 9px;
+  }
+}
