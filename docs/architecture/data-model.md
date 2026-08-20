@@ -64,7 +64,7 @@ Blocks are intentionally extensible. Examples:
 - `checklist`
 - `place`
 - `activity`
-- `reservation`
+- `restaurant`
 - `transport`
 - `accommodation`
 - `media`
@@ -90,15 +90,15 @@ The referenced `place` entity owns the name, address, optional coordinates, cate
 
 Removing a place block tombstones only the block. The `place` entity remains available for future reuse by other days, itinerary items, reservations or the planned place library.
 
-### Transport and accommodation blocks
+### Reservation blocks
 
-`transport` and `accommodation` blocks keep only a stable reservation relationship in block content:
+`transport`, `accommodation`, `restaurant` and `activity` blocks keep only a stable reservation relationship in block content:
 
 ```ts
 { reservationId: string }
 ```
 
-The referenced `reservation` owns provider, confirmation code, status, optional saved `placeId`, booking URL, notes and local start/end values. Block and reservation linkage is written in one IndexedDB transaction. Removing one of these planner blocks tombstones both the block and its owned reservation in the same transaction.
+The referenced `reservation` owns its matching reservation type, provider, confirmation code, status, optional saved `placeId`, booking URL, notes and local start/end values. Block and reservation linkage is written in one IndexedDB transaction. Removing one of these planner blocks tombstones both the block and its owned reservation in the same transaction. The repository verifies that the block type and reservation type match, so a restaurant block cannot silently own a transport reservation, for example.
 
 `startsAt` and `endsAt` are wall-clock local date/time strings such as `2026-08-20T18:30`; they are not converted through the device timezone. `timezone` is stored separately as an optional IANA identifier such as `Europe/Paris`. The planner requires a reservation start to fall on the day that owns the block and prevents an end from exceeding the trip return date when that boundary is known.
 
