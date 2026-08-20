@@ -1,4 +1,4 @@
-import type { Block, Itinerary, Reservation } from '../../domain/entities'
+import type { Block, Itinerary, Media, Reservation } from '../../domain/entities'
 import { db } from '../db/duranti-db'
 
 function readReservationId(block: Block): string | undefined {
@@ -49,6 +49,15 @@ function assertReservationContext(
     reservation.type !== expectedType
   ) {
     throw new Error('La prenotazione collegata non appartiene a questo blocco.')
+  }
+}
+
+function assertMediaContext(media: Media, tripId: string, dayId: string, blockId: string): void {
+  if (media.tripId !== tripId || media.dayId !== dayId || media.blockId !== blockId) {
+    throw new Error('L’allegato non appartiene a questa prenotazione.')
+  }
+  if (media.kind !== 'image' && media.kind !== 'document') {
+    throw new Error('Il media collegato non è un allegato supportato.')
   }
 }
 
@@ -177,8 +186,56 @@ export class ReservationBlockRepository {
     })
   }
 
+  async setReservationAttachment(
+    blockId: string,
+    tripId: string,
+    dayId: string,
+    reservationId: string,
+    mediaId?: string,
+  ): Promise<Reservation> {
+    return db.transaction('rw', db.blocks, db.reservations, db.media, async () => {
+      const block = await db.blocks.get(blockId)
+      if (!block || block.deletedAt || block.tripId !== tripId || block.dayId !== dayId) {
+        throw new Error('Il blocco prenotazione non appartiene a questa giornata.')
+      }
+
+      const expectedType = expectedReservationType(block)
+      if (!expectedType || readReservationId(block) !== reservationId) {
+        throw new Error('La prenotazione non è collegata a questo blocco.')
+      }
+
+      const reservation = await db.reservations.get(reservationId)
+      if (!reservation || reservation.deletedAt) throw new Error('La prenotazione non esiste più.')
+      assertReservationContext(reservation, tripId, dayId, expectedType)
+
+      if (mediaId) {
+        const media = await db.media.get(mediaId)
+        if (!media || media.deletedAt) throw new Error('Il nuovo allegato non esiste più.')
+        assertMediaContext(media, tripId, dayId, blockId)
+      }
+
+      const now = new Date().toISOString()
+      const previousMediaId = reservation.attachmentMediaId
+      if (previousMediaId && previousMediaId !== mediaId) {
+        const previous = await db.media.get(previousMediaId)
+        if (previous && !previous.deletedAt) {
+          assertMediaContext(previous, tripId, dayId, blockId)
+          await db.media.put({ ...previous, deletedAt: now, updatedAt: now })
+        }
+      }
+
+      const updated: Reservation = {
+        ...reservation,
+        attachmentMediaId: mediaId,
+        updatedAt: now,
+      }
+      await db.reservations.put(updated)
+      return updated
+    })
+  }
+
   async softDeleteReservationBlock(blockId: string, tripId: string, dayId: string): Promise<void> {
-    await db.transaction('rw', db.blocks, db.reservations, db.itineraries, async () => {
+    await db.transaction('rw', db.blocks, db.reservations, db.itineraries, db.media, async () => {
       const block = await db.blocks.get(blockId)
       if (!block || block.deletedAt) return
       if (block.tripId !== tripId || block.dayId !== dayId) {
@@ -194,6 +251,13 @@ export class ReservationBlockRepository {
         const reservation = await db.reservations.get(reservationId)
         if (reservation && !reservation.deletedAt) {
           assertReservationContext(reservation, tripId, dayId, expectedType)
+          if (reservation.attachmentMediaId) {
+            const media = await db.media.get(reservation.attachmentMediaId)
+            if (media && !media.deletedAt) {
+              assertMediaContext(media, tripId, dayId, blockId)
+              await db.media.put({ ...media, deletedAt: now, updatedAt: now })
+            }
+          }
           await db.reservations.put({
             ...reservation,
             deletedAt: now,
