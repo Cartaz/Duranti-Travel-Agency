@@ -114,6 +114,20 @@ The referenced `expense` owns `amountMinor`, ISO currency, category, description
 
 Persisted money never uses a floating-point major-unit value. User input is converted to integer minor units according to the currency fraction digits exposed by `Intl.NumberFormat` (for example 2 for EUR and 0 for JPY). New payer assignments are restricted to active `tripTraveler` participants. If a payer is later detached from the trip, an existing expense may retain that historical `paidByTravelerId`; changing to a different payer again requires an active membership.
 
+A trip may optionally define `budgetMinor` in its own `currency`. Foreign-currency expenses remain excluded from that budget unless the user explicitly stores an FX conversion on that expense:
+
+```ts
+fx?: {
+  targetCurrency: string
+  rate: string
+  convertedAmountMinor: number
+}
+```
+
+`rate` means `1 source currency unit = rate target currency units`. The app never fetches or silently refreshes exchange rates. Rate input is normalized as a decimal string with at most 12 decimal places; conversion uses integer/`BigInt` arithmetic and rounds half-up once, to the target currency minor unit. `convertedAmountMinor` is persisted so later budget summaries reproduce the conversion the user explicitly accepted even if market rates change. The source-currency expense amount and source-currency reports are never replaced by the converted value.
+
+If the expense currency later becomes the trip currency, the FX record is cleared on save. If the expense remains foreign but the user removes the rate, it remains a normal foreign-currency expense and is excluded from the trip budget until another explicit conversion is saved.
+
 ## Media
 
 IndexedDB stores metadata only. Ordinary photo/video/audio media bytes are kept in OPFS. Blob URLs are runtime-only and must never be persisted.
