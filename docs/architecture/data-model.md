@@ -1,6 +1,6 @@
 # Domain Data Model
 
-The model is intentionally relational-by-reference inside IndexedDB. IDs are stable UUIDs. Large media are stored in OPFS and referenced by `mediaId`.
+The model is intentionally relational-by-reference inside IndexedDB. IDs are stable UUIDs. Large non-sensitive media are stored in OPFS and referenced by `mediaId`.
 
 ## Core entities
 
@@ -11,12 +11,11 @@ The model is intentionally relational-by-reference inside IndexedDB. IDs are sta
 - `block`: generic content unit; type identifies template/domain behavior.
 - `place`: saved place with provider metadata, address, coordinates, Google Maps URL and notes.
 - `activity`: planned/reserved activity linked to a place and/or day.
-- `media`: metadata for a photo/video/document stored in OPFS.
+- `media`: metadata for ordinary photo/video/audio/document assets stored in OPFS.
 - `link`: external URL with title, source and optional relation to another entity.
-- `document`: sensitive travel document metadata linked to a media asset; content remains local.
+- `travelerDocument`: sensitive identity-document record whose secret fields are encrypted at rest.
 - `template`: reusable day/block template such as museum, day trip or travel day.
-- `vaultMetadata`: local bookkeeping for vault format/version and last export; never stores the password.
-- `appSetting`: small non-sensitive preferences and UI state.
+- `appMeta`: local installation, schema, Vault and wrapped encryption-key metadata; never stores the passphrase or an unwrapped key.
 
 ## Common fields
 
@@ -24,13 +23,14 @@ The model is intentionally relational-by-reference inside IndexedDB. IDs are sta
 id: string
 createdAt: string
 updatedAt: string
+deletedAt?: string
 ```
 
-Timestamps are ISO 8601 UTC strings. IDs are immutable. Records should carry a `schemaVersion` when their shape is expected to evolve independently.
+Timestamps are ISO 8601 UTC strings. IDs are immutable. User-facing entities use tombstones before physical purge.
 
 ## Trip lifecycle
 
-`planned -> active -> completed`
+`planned -> ongoing -> completed -> archived`
 
 The lifecycle is a domain invariant, not merely a UI filter. A trip can be edited in every state unless a future feature explicitly introduces locking.
 
@@ -44,37 +44,36 @@ Blocks are intentionally extensible. Examples:
 - `activity`
 - `reservation`
 - `transport`
-- `lodging`
-- `meal`
+- `accommodation`
 - `media`
 - `link`
 - `document`
 - `map`
-- `budget`
+- `expense`
 - `weatherSnapshot`
 
 Templates compose blocks and define defaults; they do not own the underlying data.
 
 ## Media
 
-IndexedDB stores metadata only:
+IndexedDB stores metadata only. Ordinary photo/video/audio media bytes are kept in OPFS. Blob URLs are runtime-only and must never be persisted.
 
-```text
-media.id
-media.kind = photo | video | document | audio | generated
-media.mimeType
-media.byteSize
-media.width?
-media.height?
-durationMs?
-opfsPath
-sha256?
-createdAt
-updatedAt
-```
-
-The OPFS file is the canonical binary. Blob URLs are runtime-only and must never be persisted.
+Traveler passport/identity scans are **not ordinary media**. They must not use the plaintext media OPFS path; they will use the encrypted private-file layer defined by the security architecture.
 
 ## Sensitive documents
 
-Passport/ID data should be separated from ordinary trip notes. Store only the minimum metadata required for the UI, keep scans in OPFS, and never include document contents in analytics, logs or crash reports. Vault export must encrypt both metadata and binary assets.
+A persisted `travelerDocument` keeps only non-secret relationship/query data in plaintext:
+
+```text
+id
+travelerId
+type
+encryptedPayload
+createdAt
+updatedAt
+deletedAt?
+```
+
+The AES-GCM `encryptedPayload` contains fields such as document number, issuing country, issue/expiry dates, holder name and notes. The secure repository is the only application persistence boundary for these records.
+
+The key hierarchy is defined by ADR-003. Legacy plaintext rows are detected and blocked from normal use until an explicit unlocked migration can encrypt them. Document scans are not enabled until encrypted OPFS storage is available.

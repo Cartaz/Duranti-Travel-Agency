@@ -11,6 +11,7 @@ Rules:
 5. Migrations must be deterministic and atomic from the perspective of application state.
 6. Do not perform network, OPFS, Web Crypto, media decoding or other unrelated asynchronous work inside an IndexedDB upgrade transaction.
 7. Imported Vault data is validated before it reaches the live database.
+8. Never discard legacy sensitive plaintext during a schema upgrade merely because a new encrypted shape exists. Encryption requires an unlocked user secret and therefore belongs in an explicit user-mediated migration flow.
 
 ## Version history
 
@@ -33,3 +34,11 @@ This declaration is frozen.
 - adds `placeId` for reservations.
 
 No row payload is rewritten in v2, so there is intentionally no `upgrade()` callback. The non-unique `[tripId+travelerId]` index remains unchanged in v2; enforcing uniqueness requires a dedicated migration that first detects and resolves any historical duplicates.
+
+### v3
+
+- removes the `expiryDate` index from `travelerDocuments` because expiry dates are sensitive document data and are no longer stored as plaintext query fields;
+- keeps only `id`, `travelerId`, `type` and `updatedAt` indexed/plain for document records;
+- does not rewrite existing document rows.
+
+Existing v1/v2 rows may still physically contain legacy plaintext properties. The secure traveler-document repository detects those rows and refuses to expose them as normal encrypted records. A future explicit migration, run only after local encryption is unlocked, must encrypt the legacy values before any plaintext fields are removed.

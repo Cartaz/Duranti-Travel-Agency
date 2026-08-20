@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie'
 import type { DatabaseTables } from './schema'
 
 export const DB_NAME = 'duranti'
-export const DB_VERSION = 2
+export const DB_VERSION = 3
 
 const V1_STORES = {
   trips: 'id, status, startDate, endDate, updatedAt',
@@ -39,6 +39,24 @@ const V2_STORES = {
   auditLog: 'id, entityType, entityId, action, timestamp',
 } as const
 
+const V3_STORES = {
+  appMeta: 'key',
+  trips: 'id, status, startDate, endDate, updatedAt',
+  travelers: 'id, displayName, lastName, updatedAt',
+  travelerDocuments: 'id, travelerId, type, updatedAt',
+  tripTravelers: 'id, tripId, travelerId, [tripId+travelerId], updatedAt',
+  days: 'id, tripId, date, [tripId+date], [tripId+sequence], updatedAt',
+  blocks: 'id, tripId, dayId, parentBlockId, [dayId+position], updatedAt',
+  places: 'id, providerPlaceId, city, category, updatedAt',
+  media: 'id, tripId, dayId, blockId, kind, sha256, updatedAt',
+  links: 'id, tripId, dayId, blockId, domain, source, updatedAt',
+  itineraries: 'id, tripId, dayId, placeId, [dayId+startsAt], status, updatedAt',
+  templates: 'id, category, name, updatedAt',
+  expenses: 'id, tripId, dayId, paidByTravelerId, category, occurredAt, updatedAt',
+  reservations: 'id, tripId, dayId, type, placeId, startsAt, status, updatedAt',
+  auditLog: 'id, entityType, entityId, action, timestamp',
+} as const
+
 export class DurantiDatabase extends Dexie {
   appMeta!: Table<DatabaseTables['appMeta'], string>
   trips!: Table<DatabaseTables['trips'], string>
@@ -59,12 +77,13 @@ export class DurantiDatabase extends Dexie {
   constructor() {
     super(DB_NAME)
 
-    // V1 is frozen because existing installations may still be on it.
+    // Historical declarations are frozen because installed clients may upgrade through them.
     this.version(1).stores(V1_STORES)
+    this.version(2).stores(V2_STORES)
 
-    // V2 changes only stores/indexes. Dexie can apply this schema diff atomically;
-    // no row-level upgrade callback is needed because no persisted values are rewritten.
-    this.version(DB_VERSION).stores(V2_STORES)
+    // V3 removes the plaintext expiry-date index. Existing rows are intentionally not
+    // rewritten here because encrypting legacy sensitive fields requires a user secret.
+    this.version(DB_VERSION).stores(V3_STORES)
   }
 }
 

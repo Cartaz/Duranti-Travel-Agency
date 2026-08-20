@@ -12,6 +12,14 @@ export interface AppMeta {
   value: unknown
 }
 
+export interface EncryptedPayloadV1 {
+  version: 1
+  algorithm: 'AES-GCM'
+  tagLength: 128
+  ivB64: string
+  ciphertextB64: string
+}
+
 export interface Trip extends EntityBase {
   title: string
   subtitle?: string
@@ -49,16 +57,19 @@ export interface Traveler extends EntityBase {
   notes?: string
 }
 
-export interface TravelerDocument extends EntityBase {
-  travelerId: string
-  type: 'passport' | 'identityCard' | 'drivingLicense' | 'visa' | 'other'
+export interface TravelerDocumentSecret {
   documentNumber?: string
   issuingCountryCode?: string
   issueDate?: string
   expiryDate?: string
   holderName?: string
-  mediaId?: string
   notes?: string
+}
+
+export interface TravelerDocument extends EntityBase {
+  travelerId: string
+  type: 'passport' | 'identityCard' | 'drivingLicense' | 'visa' | 'other'
+  encryptedPayload: EncryptedPayloadV1
 }
 
 export interface TripTraveler extends EntityBase {

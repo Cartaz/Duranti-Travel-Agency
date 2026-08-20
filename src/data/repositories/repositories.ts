@@ -1,11 +1,12 @@
 import { db } from '../db/duranti-db'
 import { Repository } from './base-repository'
 import { mediaFileRepository } from './media-repository'
+import { secureTravelerDocumentRepository } from './traveler-document-repository'
 import type { DatabaseTables } from '../db/schema'
 
 export const tripRepository = new Repository<DatabaseTables['trips']>(db.trips)
 export const travelerRepository = new Repository<DatabaseTables['travelers']>(db.travelers)
-export const travelerDocumentRepository = new Repository<DatabaseTables['travelerDocuments']>(db.travelerDocuments)
+export const travelerDocumentRepository = secureTravelerDocumentRepository
 export const tripTravelerRepository = new Repository<DatabaseTables['tripTravelers']>(db.tripTravelers)
 export const dayRepository = new Repository<DatabaseTables['days']>(db.days)
 export const blockRepository = new Repository<DatabaseTables['blocks']>(db.blocks)
