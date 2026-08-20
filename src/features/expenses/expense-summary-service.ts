@@ -1,4 +1,5 @@
-import { expenseRepository, travelerRepository } from '../../data/repositories/repositories'
+import { dayRepository, expenseRepository, travelerRepository } from '../../data/repositories/repositories'
+import type { Day } from '../../domain/entities'
 
 export interface ExpenseSummarySlice {
   key: string
@@ -13,6 +14,7 @@ export interface ExpenseCurrencySummary {
   count: number
   categories: ExpenseSummarySlice[]
   payers: ExpenseSummarySlice[]
+  days: ExpenseSummarySlice[]
 }
 
 export interface TripExpenseSummary {
@@ -31,7 +33,11 @@ interface MutableCurrencySummary {
   count: number
   categories: Map<string, MutableSlice>
   payers: Map<string, MutableSlice>
+  days: Map<string, MutableSlice>
 }
+
+const UNASSIGNED_DAY_KEY = '__unassigned__'
+const MISSING_DAY_PREFIX = '__missing__:'
 
 function addMinor(left: number, right: number): number {
   if (!Number.isSafeInteger(left) || !Number.isSafeInteger(right) || right < 0) {
@@ -58,15 +64,48 @@ function finalizeSlices(map: Map<string, MutableSlice>): ExpenseSummarySlice[] {
     .sort((left, right) => right.totalMinor - left.totalMinor || left.label.localeCompare(right.label, 'it'))
 }
 
+function formatDayLabel(day: Day): string {
+  const detail = day.title?.trim() || day.date
+  return `Giorno ${day.sequence} · ${detail}`
+}
+
+function finalizeDaySlices(map: Map<string, MutableSlice>, dayById: Map<string, Day>): ExpenseSummarySlice[] {
+  return Array.from(map.entries())
+    .map(([key, value]) => ({ key, ...value }))
+    .sort((left, right) => {
+      const leftDay = dayById.get(left.key)
+      const rightDay = dayById.get(right.key)
+
+      if (leftDay && rightDay) {
+        return leftDay.sequence - rightDay.sequence
+          || leftDay.date.localeCompare(rightDay.date)
+          || left.label.localeCompare(right.label, 'it')
+      }
+      if (leftDay) return -1
+      if (rightDay) return 1
+
+      const leftUnassigned = left.key === UNASSIGNED_DAY_KEY
+      const rightUnassigned = right.key === UNASSIGNED_DAY_KEY
+      if (leftUnassigned !== rightUnassigned) return leftUnassigned ? 1 : -1
+
+      return left.label.localeCompare(right.label, 'it')
+    })
+}
+
 export async function getTripExpenseSummary(tripId: string): Promise<TripExpenseSummary> {
   const expenses = (await expenseRepository.list()).filter((expense) => expense.tripId === tripId)
   if (expenses.length === 0) return { expenseCount: 0, currencies: [] }
 
-  const payerIds = Array.from(new Set(
-    expenses
-      .map((expense) => expense.paidByTravelerId)
-      .filter((travelerId): travelerId is string => Boolean(travelerId)),
-  ))
+  const [tripDays, payerIds] = await Promise.all([
+    dayRepository.list().then((days) => days.filter((day) => day.tripId === tripId)),
+    Promise.resolve(Array.from(new Set(
+      expenses
+        .map((expense) => expense.paidByTravelerId)
+        .filter((travelerId): travelerId is string => Boolean(travelerId)),
+    ))),
+  ])
+  const dayById = new Map(tripDays.map((day) => [day.id, day]))
+
   const payerNames = new Map<string, string>()
   await Promise.all(payerIds.map(async (travelerId) => {
     const traveler = await travelerRepository.get(travelerId)
@@ -86,6 +125,7 @@ export async function getTripExpenseSummary(tripId: string): Promise<TripExpense
         count: 0,
         categories: new Map(),
         payers: new Map(),
+        days: new Map(),
       }
       grouped.set(expense.currency, currency)
     }
@@ -106,6 +146,22 @@ export async function getTripExpenseSummary(tripId: string): Promise<TripExpense
     } else {
       addSlice(currency.payers, '__unspecified__', 'Non specificato', expense.amountMinor)
     }
+
+    if (expense.dayId) {
+      const day = dayById.get(expense.dayId)
+      if (day) {
+        addSlice(currency.days, day.id, formatDayLabel(day), expense.amountMinor)
+      } else {
+        addSlice(
+          currency.days,
+          `${MISSING_DAY_PREFIX}${expense.dayId}`,
+          'Giorno non disponibile',
+          expense.amountMinor,
+        )
+      }
+    } else {
+      addSlice(currency.days, UNASSIGNED_DAY_KEY, 'Senza giorno', expense.amountMinor)
+    }
   }
 
   const currencies = Array.from(grouped.entries())
@@ -115,6 +171,7 @@ export async function getTripExpenseSummary(tripId: string): Promise<TripExpense
       count: value.count,
       categories: finalizeSlices(value.categories),
       payers: finalizeSlices(value.payers),
+      days: finalizeDaySlices(value.days, dayById),
     }))
     .sort((left, right) => left.currency.localeCompare(right.currency))
 
