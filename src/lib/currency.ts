@@ -69,6 +69,59 @@ export function minorAmountToMajor(amountMinor: number, currencyInput: string): 
   return `${whole}.${fraction}`
 }
 
+export function normalizeFxRate(value: string): string {
+  const cleaned = value.trim().replace(',', '.')
+  if (!/^\d+(?:\.\d{1,12})?$/.test(cleaned)) {
+    throw new Error('Inserisci un tasso di cambio valido, con massimo 12 decimali.')
+  }
+
+  const [whole, fraction = ''] = cleaned.split('.')
+  const normalizedFraction = fraction.replace(/0+$/, '')
+  const normalized = normalizedFraction ? `${BigInt(whole)}.${normalizedFraction}` : String(BigInt(whole))
+  const digits = normalized.replace('.', '')
+  if (BigInt(digits) <= 0n) throw new Error('Il tasso di cambio deve essere maggiore di zero.')
+  return normalized
+}
+
+export function convertMinorByRate(
+  amountMinor: number,
+  sourceCurrencyInput: string,
+  targetCurrencyInput: string,
+  rateInput: string,
+): { rate: string; convertedAmountMinor: number } {
+  if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) {
+    throw new Error('Importo sorgente non valido per la conversione.')
+  }
+
+  const sourceCurrency = normalizeCurrencyCode(sourceCurrencyInput)
+  const targetCurrency = normalizeCurrencyCode(targetCurrencyInput)
+  if (sourceCurrency === targetCurrency) {
+    throw new Error('La conversione FX richiede due valute diverse.')
+  }
+
+  const rate = normalizeFxRate(rateInput)
+  const [rateWhole, rateFraction = ''] = rate.split('.')
+  const rateScale = 10n ** BigInt(rateFraction.length)
+  const rateNumerator = BigInt(`${rateWhole}${rateFraction}`)
+  const sourceScale = 10n ** BigInt(currencyFractionDigits(sourceCurrency))
+  const targetScale = 10n ** BigInt(currencyFractionDigits(targetCurrency))
+
+  const numerator = BigInt(amountMinor) * rateNumerator * targetScale
+  const denominator = sourceScale * rateScale
+  let converted = numerator / denominator
+  const remainder = numerator % denominator
+  if (remainder * 2n >= denominator) converted += 1n
+
+  if (converted <= 0n) {
+    throw new Error(`Il tasso produce meno della minima unità di ${targetCurrency}.`)
+  }
+  if (converted > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error('L’importo convertito è troppo grande.')
+  }
+
+  return { rate, convertedAmountMinor: Number(converted) }
+}
+
 export function formatMinorCurrency(
   amountMinor: number,
   currencyInput: string,
