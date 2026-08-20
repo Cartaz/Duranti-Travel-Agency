@@ -1,6 +1,6 @@
-import type { Block, Place, Reservation } from '../../domain/entities'
+import type { Block, Media, Place, Reservation } from '../../domain/entities'
 import { reservationBlockRepository } from '../../data/repositories/reservation-block-repository'
-import { blockRepository, placeRepository, reservationRepository } from '../../data/repositories/repositories'
+import { blockRepository, mediaRepository, placeRepository, reservationRepository } from '../../data/repositories/repositories'
 import { getTripDay } from '../days/day-service'
 import { assertPlannerDayContext } from '../planner/block-service'
 import { getTrip } from '../trips/trip-service'
@@ -21,12 +21,29 @@ export interface ReservationDraft {
   status: PlannerReservationStatus
 }
 
+export interface ReservationAttachmentResult {
+  reservation: Reservation
+  media: Media
+}
+
 export const EMPTY_RESERVATION_DRAFT: ReservationDraft = {
   title: '',
   status: 'planned',
 }
 
+export const MAX_RESERVATION_ATTACHMENT_BYTES = 25 * 1024 * 1024
+export const RESERVATION_ATTACHMENT_ACCEPT = 'application/pdf,image/jpeg,image/png,image/webp,image/gif'
+
 const statuses = new Set<PlannerReservationStatus>(['planned', 'booked', 'completed', 'cancelled'])
+const allowedAttachmentMimeTypes = new Set(RESERVATION_ATTACHMENT_ACCEPT.split(','))
+const attachmentMimeByExtension: Record<string, string> = {
+  pdf: 'application/pdf',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+}
 
 function cleanOptional(value: string | undefined): string | undefined {
   const cleaned = value?.trim()
@@ -116,6 +133,44 @@ function assertReservationContext(
     reservation.type !== type
   ) {
     throw new Error('La prenotazione collegata non appartiene a questo blocco.')
+  }
+}
+
+function assertAttachmentContext(media: Media, tripId: string, dayId: string, blockId: string): void {
+  if (media.tripId !== tripId || media.dayId !== dayId || media.blockId !== blockId) {
+    throw new Error('L’allegato non appartiene a questa prenotazione.')
+  }
+  if (media.kind !== 'image' && media.kind !== 'document') {
+    throw new Error('Il media collegato non è un allegato supportato.')
+  }
+}
+
+function attachmentDescriptor(file: File): { mimeType: string; kind: Media['kind']; originalName: string } {
+  if (file.size <= 0) throw new Error('Il file selezionato è vuoto.')
+  if (file.size > MAX_RESERVATION_ATTACHMENT_BYTES) {
+    throw new Error('L’allegato supera il limite di 25 MiB.')
+  }
+
+  const originalName = file.name.trim()
+  if (!originalName) throw new Error('Il file deve avere un nome.')
+  if (originalName.length > 255) throw new Error('Il nome del file è troppo lungo.')
+
+  const declaredMime = file.type.trim().toLowerCase().split(';')[0]
+  const extension = originalName.includes('.') ? originalName.split('.').pop()!.toLowerCase() : ''
+  const extensionMime = attachmentMimeByExtension[extension]
+  const mimeType = declaredMime || extensionMime
+
+  if (!mimeType || !allowedAttachmentMimeTypes.has(mimeType)) {
+    throw new Error('Formato non supportato. Usa PDF, JPEG, PNG, WebP o GIF.')
+  }
+  if (declaredMime && extensionMime && declaredMime !== extensionMime) {
+    throw new Error('Il tipo del file non corrisponde alla sua estensione.')
+  }
+
+  return {
+    mimeType,
+    kind: mimeType.startsWith('image/') ? 'image' : 'document',
+    originalName,
   }
 }
 
@@ -209,6 +264,101 @@ export async function getPlannerReservation(
   if (!reservation) return undefined
   assertReservationContext(reservation, tripId, dayId, type)
   return reservation
+}
+
+export async function getPlannerReservationAttachment(
+  tripId: string,
+  dayId: string,
+  blockId: string,
+  reservation: Reservation,
+): Promise<Media | undefined> {
+  if (!reservation.attachmentMediaId) return undefined
+  assertReservationContext(reservation, tripId, dayId, reservation.type as PlannerReservationType)
+  const media = await mediaRepository.get(reservation.attachmentMediaId)
+  if (!media) throw new Error('I metadati dell’allegato non sono più disponibili.')
+  assertAttachmentContext(media, tripId, dayId, blockId)
+  return media
+}
+
+export async function readPlannerReservationAttachment(media: Media): Promise<File> {
+  return mediaRepository.getFile(media.id)
+}
+
+export async function attachPlannerReservationFile(
+  tripId: string,
+  dayId: string,
+  blockId: string,
+  file: File,
+): Promise<ReservationAttachmentResult> {
+  await assertPlannerDayContext(tripId, dayId, true)
+  const reservation = await getPlannerReservation(tripId, dayId, blockId)
+  if (!reservation) throw new Error('Salva prima la prenotazione, poi aggiungi l’allegato.')
+
+  const descriptor = attachmentDescriptor(file)
+  const previousMediaId = reservation.attachmentMediaId
+  const media = await mediaRepository.create({
+    tripId,
+    dayId,
+    blockId,
+    kind: descriptor.kind,
+    mimeType: descriptor.mimeType,
+    originalName: descriptor.originalName,
+  }, file)
+
+  try {
+    const updated = await reservationBlockRepository.setReservationAttachment(
+      blockId,
+      tripId,
+      dayId,
+      reservation.id,
+      media.id,
+    )
+
+    if (previousMediaId && previousMediaId !== media.id) {
+      try {
+        await mediaRepository.purge(previousMediaId)
+      } catch {
+        // The old metadata is already tombstoned. A later integrity cleanup can purge the OPFS file.
+      }
+    }
+
+    return { reservation: updated, media }
+  } catch (error) {
+    try {
+      await mediaRepository.softDelete(media.id)
+      await mediaRepository.purge(media.id)
+    } catch {
+      // Best-effort rollback. A tombstoned/orphan media entry is safer than losing the original error.
+    }
+    throw error
+  }
+}
+
+export async function removePlannerReservationAttachment(
+  tripId: string,
+  dayId: string,
+  blockId: string,
+): Promise<Reservation> {
+  await assertPlannerDayContext(tripId, dayId, true)
+  const reservation = await getPlannerReservation(tripId, dayId, blockId)
+  if (!reservation) throw new Error('La prenotazione non esiste ancora.')
+  if (!reservation.attachmentMediaId) return reservation
+
+  const previousMediaId = reservation.attachmentMediaId
+  const updated = await reservationBlockRepository.setReservationAttachment(
+    blockId,
+    tripId,
+    dayId,
+    reservation.id,
+    undefined,
+  )
+
+  try {
+    await mediaRepository.purge(previousMediaId)
+  } catch {
+    // The metadata tombstone is authoritative; physical file cleanup can be retried later.
+  }
+  return updated
 }
 
 export async function savePlannerReservation(
