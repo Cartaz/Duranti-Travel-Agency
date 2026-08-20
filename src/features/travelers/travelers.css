@@ -1,0 +1,254 @@
+.travelers-page,
+.traveler-form-page {
+  display: grid;
+  gap: 22px;
+}
+
+.travelers-heading,
+.trip-travelers-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.travelers-heading h1,
+.trip-travelers-heading h2 {
+  margin: 4px 0 8px;
+  font-family: Georgia, serif;
+  font-weight: 500;
+}
+
+.travelers-heading h1 { font-size: clamp(34px, 8vw, 58px); }
+.trip-travelers-heading h2 { font-size: clamp(24px, 5vw, 34px); }
+
+.travelers-heading p,
+.trip-travelers-heading p {
+  max-width: 680px;
+  margin: 0;
+  color: #b4a594;
+  line-height: 1.55;
+}
+
+.travelers-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.traveler-privacy-note {
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+  border: 1px solid #45503c;
+  border-radius: 16px;
+  background: rgba(38, 47, 32, .48);
+}
+
+.traveler-privacy-note strong { color: #d6dcb8; }
+.traveler-privacy-note span { color: #aebc9b; line-height: 1.45; font-size: 13px; }
+
+.travelers-empty,
+.trip-travelers-empty,
+.trip-travelers-create-first {
+  padding: 20px;
+  border: 1px dashed #55483a;
+  border-radius: 18px;
+  color: #a99986;
+}
+
+.travelers-empty,
+.trip-travelers-create-first {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.travelers-empty span { color: #938472; }
+
+.traveler-card-list,
+.trip-participant-list {
+  display: grid;
+  gap: 10px;
+}
+
+.traveler-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #43372c;
+  border-radius: 18px;
+  background: rgba(29, 24, 19, .84);
+}
+
+.traveler-avatar {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid #657153;
+  border-radius: 50%;
+  background: #22291d;
+  color: #d7dcbd;
+  font-family: Georgia, serif;
+  letter-spacing: .04em;
+}
+
+.traveler-avatar-small {
+  width: 38px;
+  height: 38px;
+  font-size: 12px;
+}
+
+.traveler-card-copy,
+.trip-participant-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.traveler-card-copy > strong,
+.trip-participant-copy > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #f2e7d6;
+}
+
+.traveler-card-copy > span,
+.trip-participant-copy > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #9f907f;
+  font-size: 12px;
+}
+
+.traveler-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 5px;
+  color: #b0a08c;
+  font-size: 11px;
+}
+
+.traveler-form {
+  display: grid;
+  gap: 22px;
+  padding: 20px;
+  border: 1px solid #43372c;
+  border-radius: 22px;
+  background: rgba(28, 23, 18, .84);
+}
+
+.traveler-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.traveler-form label,
+.trip-traveler-add label {
+  display: grid;
+  gap: 7px;
+  color: #c6b6a2;
+  font-size: 12px;
+}
+
+.traveler-form input,
+.traveler-form textarea,
+.trip-traveler-add select,
+.trip-participant-row select {
+  width: 100%;
+  border: 1px solid #554538;
+  border-radius: 12px;
+  background: #17130f;
+  color: #f3eadc;
+  padding: 12px;
+  font: inherit;
+}
+
+.traveler-form textarea { resize: vertical; }
+.traveler-form-wide { grid-column: 1 / -1; }
+
+.traveler-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.trip-travelers-panel {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #43372c;
+  border-radius: 22px;
+  background: rgba(26, 22, 17, .76);
+}
+
+.trip-participant-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(140px, 190px) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid #3c3229;
+  border-radius: 15px;
+  background: rgba(14, 12, 10, .34);
+}
+
+.trip-participant-row button {
+  padding: 10px 12px;
+}
+
+.trip-traveler-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(130px, .7fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid #3b3229;
+}
+
+@media (max-width: 720px) {
+  .travelers-heading,
+  .trip-travelers-heading {
+    display: grid;
+  }
+
+  .travelers-heading-actions { justify-content: flex-start; }
+
+  .traveler-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .traveler-card > .trip-secondary-action {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+
+  .traveler-form-grid { grid-template-columns: 1fr; }
+  .traveler-form-wide { grid-column: auto; }
+
+  .trip-participant-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .trip-participant-row select,
+  .trip-participant-row button {
+    grid-column: 1 / -1;
+  }
+
+  .trip-traveler-add { grid-template-columns: 1fr; }
+
+  .travelers-empty,
+  .trip-travelers-create-first {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

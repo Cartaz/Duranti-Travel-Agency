@@ -88,6 +88,7 @@ export default function TravelIndexPage() {
         </div>
         <div className="book-intro-actions">
           <div className="trip-index-actions">
+            <Link className="trip-secondary-action" to="/travelers">Viaggiatori</Link>
             <Link className="trip-secondary-action" to="/archive">Archivio</Link>
             <Link className="trip-primary-action" to="/trips/new">Nuovo viaggio</Link>
           </div>

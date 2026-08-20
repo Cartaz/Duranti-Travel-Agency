@@ -40,6 +40,22 @@ A trip may be moved from any active state to `archived`. Archiving is a reversib
 
 The lifecycle is a domain invariant, not merely a UI filter. Active trips remain editable; archived trips must be restored before editing.
 
+## Travelers and trip membership
+
+A `traveler` is system-level rather than owned by one trip. The profile can therefore be created once and reused across many chapters. The first product surface exposes name/display name, birth details, nationality, gender, email, phone and notes. These profile fields remain local IndexedDB data and are included in Vault backup/restore; identity-document secrets and scans are deliberately excluded from this ordinary profile surface and remain behind the encrypted `travelerDocument` boundary described below.
+
+Participation in a trip is represented by `tripTraveler`, not by duplicating traveler data into the trip:
+
+```ts
+{
+  tripId: string
+  travelerId: string
+  role?: 'owner' | 'companion' | 'child' | 'other'
+}
+```
+
+The pair `[tripId+travelerId]` is indexed. The current schema does not yet declare that compound index unique, so the specialized membership repository enforces at most one active membership for the pair, restores a single tombstoned membership when re-attaching, and blocks ambiguous legacy duplicate sets instead of guessing which row is authoritative. Detaching a traveler tombstones only the membership; the reusable traveler profile remains active.
+
 ## Content blocks
 
 Blocks are intentionally extensible. Examples:
@@ -96,7 +112,7 @@ An `expense` block contains only the owned record relationship:
 
 The referenced `expense` owns `amountMinor`, ISO currency, category, description, optional local occurrence time, payer reference and notes. Block and expense writes are committed together in one IndexedDB transaction; removing the block tombstones both owned records atomically.
 
-Persisted money never uses a floating-point major-unit value. User input is converted to integer minor units according to the currency fraction digits exposed by `Intl.NumberFormat` (for example 2 for EUR and 0 for JPY). The first planner UI leaves `paidByTravelerId` untouched/reserved until traveler profiles are exposed in the product.
+Persisted money never uses a floating-point major-unit value. User input is converted to integer minor units according to the currency fraction digits exposed by `Intl.NumberFormat` (for example 2 for EUR and 0 for JPY). `paidByTravelerId` is reserved for the next integration step that will connect expense editing to active trip participants.
 
 ## Media
 

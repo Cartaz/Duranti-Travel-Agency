@@ -6,6 +6,8 @@ import ArchivedTripsPage from './features/trips/ArchivedTripsPage'
 import TravelIndexPage from './features/trips/TravelIndexPage'
 import TripDetailPage from './features/trips/TripDetailPage'
 import TripFormPage from './features/trips/TripFormPage'
+import TravelerFormPage from './features/travelers/TravelerFormPage'
+import TravelersPage from './features/travelers/TravelersPage'
 import AppShell from './ui/layout/AppShell'
 
 export default function App() {
@@ -15,6 +17,9 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<TravelIndexPage />} />
           <Route path="archive" element={<ArchivedTripsPage />} />
+          <Route path="travelers" element={<TravelersPage />} />
+          <Route path="travelers/new" element={<TravelerFormPage mode="create" />} />
+          <Route path="travelers/:travelerId/edit" element={<TravelerFormPage mode="edit" />} />
           <Route path="trips/new" element={<TripFormPage mode="create" />} />
           <Route path="trips/:tripId" element={<TripDetailPage />} />
           <Route path="trips/:tripId/edit" element={<TripFormPage mode="edit" />} />

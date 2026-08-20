@@ -11,6 +11,7 @@ Implemented / active:
 - `places/` — manually saved local places linked from planner blocks with universal Google Maps URLs; no Google API key or automatic geocoding required.
 - `reservations/` — transport and accommodation records linked atomically to planner blocks, with local wall-clock date/time, separate IANA timezone, optional saved place and booking link.
 - `expenses/` — exact minor-unit expense records linked atomically to planner blocks, with ISO currency-aware decimal handling and optional local occurrence time.
+- `travelers/` — reusable system-level traveler profiles and trip memberships with role management and duplicate-membership protection; identity documents remain behind the encrypted document boundary.
 
 Planned next:
 
@@ -19,7 +20,7 @@ Planned next:
 - `reservations/` — restaurant/activity workflows, attachments and richer itinerary integration.
 - `expenses/` — traveler payer assignment, trip/day totals and category summaries.
 - `media/` — capture/import/organize photos and videos.
-- `travelers/` — reusable companion profiles and secure document references.
+- `travelers/` — encrypted identity-document UI, addresses/preferences and membership reconciliation tooling.
 - `templates/` — museum, day trip, travel day and custom templates.
 - `vault/` — production encrypted export/import UI.
 - `book/` — book/chapter/page presentation state and page-turn interaction.
