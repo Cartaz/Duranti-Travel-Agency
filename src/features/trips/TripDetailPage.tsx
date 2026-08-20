@@ -8,6 +8,7 @@ import TripTravelersPanel from '../travelers/TripTravelersPanel'
 import { archiveTrip, getTrip } from './trip-service'
 import './trips.css'
 import './trip-lifecycle.css'
+import './trip-detail-simple.css'
 
 const statusLabel: Record<Exclude<Trip['status'], 'archived'>, string> = {
   planned: 'Pianificato',
@@ -76,13 +77,13 @@ export default function TripDetailPage() {
     }
   }
 
-  if (loading) return <p className="trip-feedback" role="status">Apro il capitolo…</p>
+  if (loading) return <p className="trip-feedback" role="status">Apro il viaggio…</p>
 
   if (!trip || trip.status === 'archived') {
     return (
       <section className="trip-detail-page">
         <p className="trip-feedback trip-feedback-error" role="alert">{error || 'Viaggio non trovato.'}</p>
-        <Link className="trip-text-link" to="/">Torna all’indice</Link>
+        <Link className="trip-text-link" to="/">Torna ai viaggi</Link>
       </section>
     )
   }
@@ -91,7 +92,7 @@ export default function TripDetailPage() {
     <article className="trip-detail-page" aria-labelledby="trip-detail-title">
       <div className="trip-page-heading">
         <div>
-          <p className="eyebrow">Capitolo</p>
+          <p className="eyebrow">Viaggio</p>
           <h1 id="trip-detail-title">{trip.title}</h1>
           {trip.subtitle && <p className="trip-detail-subtitle">{trip.subtitle}</p>}
         </div>
@@ -105,7 +106,7 @@ export default function TripDetailPage() {
 
       {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
 
-      <div className="trip-detail-grid">
+      <div className="trip-detail-grid trip-detail-grid-essential">
         <section className="trip-detail-panel">
           <p className="eyebrow">Stato</p>
           <strong>{statusLabel[trip.status]}</strong>
@@ -118,32 +119,42 @@ export default function TripDetailPage() {
           <p className="eyebrow">Ritorno</p>
           <strong>{formatDate(trip.endDate)}</strong>
         </section>
-        <section className="trip-detail-panel">
-          <p className="eyebrow">Valuta</p>
-          <strong>{trip.currency ?? 'Da definire'}</strong>
-        </section>
       </div>
 
-      <section className="trip-summary-panel">
-        <p className="eyebrow">Appunti del capitolo</p>
-        <p>{trip.summary ?? 'Nessun riepilogo ancora. Puoi aggiungere le prime idee modificando il viaggio.'}</p>
-      </section>
-
-      <TripTravelersPanel tripId={trip.id} />
-      <TripItineraryOverview tripId={trip.id} />
-      <TripExpenseSummary tripId={trip.id} />
       <TripDaysPanel trip={trip} />
 
-      <section className="trip-next-panel">
-        <div>
-          <p className="eyebrow">Capitolo operativo</p>
-          <h2>Persone, itinerario, giornate, planner e conti ora vivono nello stesso viaggio.</h2>
-          <p>La scheda viaggio mostra la sequenza completa delle tappe; ogni giornata resta la pagina operativa per modificare planner, prenotazioni, luoghi e spese offline.</p>
-        </div>
-        <span className="trip-next-mark" aria-hidden="true">04</span>
-      </section>
+      <details className="trip-progressive-section">
+        <summary>
+          <span>
+            <strong>Itinerario completo</strong>
+            <small>Vedi tutte le tappe del viaggio in sequenza</small>
+          </span>
+        </summary>
+        <TripItineraryOverview tripId={trip.id} />
+      </details>
 
-      <Link className="trip-text-link" to="/">← Torna all’indice</Link>
+      <details className="trip-progressive-section">
+        <summary>
+          <span>
+            <strong>Dettagli e organizzazione</strong>
+            <small>Partecipanti, budget, valuta e appunti</small>
+          </span>
+        </summary>
+        <div className="trip-progressive-content">
+          <section className="trip-summary-panel">
+            <p className="eyebrow">Appunti</p>
+            <p>{trip.summary ?? 'Nessun appunto ancora.'}</p>
+          </section>
+          <section className="trip-detail-panel trip-currency-panel">
+            <p className="eyebrow">Valuta</p>
+            <strong>{trip.currency ?? 'Da definire'}</strong>
+          </section>
+          <TripTravelersPanel tripId={trip.id} />
+          <TripExpenseSummary tripId={trip.id} />
+        </div>
+      </details>
+
+      <Link className="trip-text-link" to="/">← Torna ai viaggi</Link>
     </article>
   )
 }
