@@ -5,7 +5,7 @@ import { getTripDay } from '../days/day-service'
 import { getTrip } from '../trips/trip-service'
 
 export type BasicPlannerBlockType = Extract<BlockType, 'text' | 'heading' | 'checklist' | 'divider'>
-export type PlannerBlockType = BasicPlannerBlockType | Extract<BlockType, 'place'>
+export type PlannerBlockType = BasicPlannerBlockType | Extract<BlockType, 'place' | 'transport' | 'accommodation'>
 
 export interface ChecklistItemDraft {
   id: string
@@ -19,7 +19,7 @@ export type PlannerBlockDraft =
   | { type: 'checklist'; items: ChecklistItemDraft[] }
   | { type: 'divider' }
 
-const plannerBlockTypes = new Set<BlockType>(['text', 'heading', 'checklist', 'divider', 'place'])
+const plannerBlockTypes = new Set<BlockType>(['text', 'heading', 'checklist', 'divider', 'place', 'transport', 'accommodation'])
 const basicPlannerBlockTypes = new Set<BlockType>(['text', 'heading', 'checklist', 'divider'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -131,7 +131,9 @@ export async function createPlannerBlock(
     .filter((block) => block.tripId === tripId && block.dayId === dayId)
   const position = siblings.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
   const now = new Date().toISOString()
-  const content = type === 'place' ? {} : contentFromDraft(defaultDraft(type))
+  const content = type === 'place' || type === 'transport' || type === 'accommodation'
+    ? {}
+    : contentFromDraft(defaultDraft(type))
 
   const block: Block = {
     id: crypto.randomUUID(),

@@ -10,6 +10,7 @@ import {
   savePlannerPlace,
   type PlaceDraft,
 } from '../places/place-service'
+import ReservationBlockEditor from '../reservations/ReservationBlockEditor'
 import { getTrip } from '../trips/trip-service'
 import {
   createPlannerBlock,
@@ -30,6 +31,8 @@ const blockLabels: Record<PlannerBlockType, string> = {
   checklist: 'Checklist',
   divider: 'Separatore',
   place: 'Luogo',
+  transport: 'Trasporto',
+  accommodation: 'Alloggio',
 }
 
 type MoveDirection = 'up' | 'down'
@@ -194,7 +197,7 @@ export default function DayPlannerPage() {
         {blocks.length === 0 && (
           <div className="planner-empty">
             <strong>Questa pagina è ancora bianca.</strong>
-            <span>Aggiungi testo, checklist, separatori o un luogo da visitare.</span>
+            <span>Aggiungi testo, luoghi, trasporti, alloggi o checklist.</span>
           </div>
         )}
 
@@ -204,6 +207,8 @@ export default function DayPlannerPage() {
             block={block}
             tripId={trip.id}
             dayId={day.id}
+            dayDate={day.date}
+            tripEndDate={trip.endDate}
             readOnly={readOnly}
             canMoveUp={index > 0}
             canMoveDown={index < blocks.length - 1}
@@ -219,6 +224,8 @@ interface PlannerBlockEditorProps {
   block: Block
   tripId: string
   dayId: string
+  dayDate: string
+  tripEndDate?: string
   readOnly: boolean
   canMoveUp: boolean
   canMoveDown: boolean
@@ -226,6 +233,9 @@ interface PlannerBlockEditorProps {
 }
 
 function PlannerBlockEditor(props: PlannerBlockEditorProps) {
+  if (props.block.type === 'transport' || props.block.type === 'accommodation') {
+    return <ReservationBlockEditor {...props} />
+  }
   if (props.block.type === 'place') return <PlannerPlaceBlockEditor {...props} />
   return <PlannerBasicBlockEditor {...props} />
 }
