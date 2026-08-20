@@ -124,8 +124,9 @@ export class TravelerDocumentRepository {
 
     for (const raw of records) {
       if (!options.includeDeleted && raw.deletedAt) continue
-      if (!isSecureRecord(raw)) throw new LegacyTravelerDocumentError(raw.id)
-      result.push(await decryptRecord(raw))
+      const candidate: unknown = raw
+      if (!isSecureRecord(candidate)) throw new LegacyTravelerDocumentError(raw.id)
+      result.push(await decryptRecord(candidate))
     }
 
     return result
@@ -190,7 +191,10 @@ export class TravelerDocumentRepository {
   async listLegacyPlaintextIds(): Promise<string[]> {
     const rawRecords = await db.travelerDocuments.toArray()
     return rawRecords
-      .filter((record) => !isSecureRecord(record))
+      .filter((record) => {
+        const candidate: unknown = record
+        return !isSecureRecord(candidate)
+      })
       .map((record) => record.id)
       .filter((id): id is string => typeof id === 'string' && id.length > 0)
   }
