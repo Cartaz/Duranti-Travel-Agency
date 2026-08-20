@@ -1,6 +1,7 @@
 import type { Trip, TripStatus } from '../../domain/entities'
 import { isDayDateWithinTripRange } from '../../domain/trip-calendar'
 import { dayRepository, tripRepository } from '../../data/repositories/repositories'
+import { normalizeCurrencyCode } from '../../lib/currency'
 
 export type EditableTripStatus = Exclude<TripStatus, 'archived'>
 
@@ -12,6 +13,7 @@ export interface TripDraft {
   endDate?: string
   summary?: string
   currency?: string
+  budgetMinor?: number
 }
 
 const editableStatuses = new Set<TripStatus>(['planned', 'ongoing', 'completed'])
@@ -38,6 +40,15 @@ function validateDraft(input: TripDraft): TripDraft {
     throw new Error('La valuta deve essere un codice ISO di tre lettere, ad esempio EUR.')
   }
 
+  const budgetMinor = input.budgetMinor
+  if (budgetMinor !== undefined) {
+    if (!currency) throw new Error('Imposta una valuta prima di definire il budget.')
+    normalizeCurrencyCode(currency)
+    if (!Number.isSafeInteger(budgetMinor) || budgetMinor <= 0) {
+      throw new Error('Il budget deve essere un importo valido maggiore di zero.')
+    }
+  }
+
   return {
     title,
     subtitle: cleanOptional(input.subtitle),
@@ -46,6 +57,7 @@ function validateDraft(input: TripDraft): TripDraft {
     endDate,
     summary: cleanOptional(input.summary),
     currency,
+    budgetMinor,
   }
 }
 
