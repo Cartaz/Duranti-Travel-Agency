@@ -135,6 +135,7 @@ export interface Itinerary extends EntityBase {
   dayId?: string
   placeId?: string
   blockId?: string
+  reservationId?: string
   type?: 'transport' | 'activity' | 'meal' | 'reservation' | 'free-time' | 'custom'
   startsAt?: string
   endsAt?: string
