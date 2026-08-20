@@ -1,6 +1,7 @@
+import { VAULT_FORMAT_VERSION } from '../lib/versions'
 import { DB_VERSION, db } from './db/duranti-db'
 
-export const VAULT_FORMAT_VERSION = 1 as const
+export { VAULT_FORMAT_VERSION }
 
 export interface InstallationMetadata {
   installationId: string
