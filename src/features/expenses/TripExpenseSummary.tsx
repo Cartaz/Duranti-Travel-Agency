@@ -10,7 +10,7 @@ import './expenses.css'
 function Breakdown({ title, summary, kind }: {
   title: string
   summary: ExpenseCurrencySummary
-  kind: 'categories' | 'payers'
+  kind: 'categories' | 'payers' | 'days'
 }) {
   const items = summary[kind]
   return (
@@ -39,6 +39,9 @@ export default function TripExpenseSummary({ tripId }: { tripId: string }) {
 
   useEffect(() => {
     let cancelled = false
+    setLoading(true)
+    setError('')
+
     void getTripExpenseSummary(tripId)
       .then((value) => {
         if (!cancelled) setSummary(value)
@@ -61,7 +64,7 @@ export default function TripExpenseSummary({ tripId }: { tripId: string }) {
         <div>
           <p className="eyebrow">Conti del capitolo</p>
           <h2 id="trip-expense-summary-title">Riepilogo spese</h2>
-          <p>I totali restano separati per valuta: Duranti non applica conversioni o tassi di cambio impliciti.</p>
+          <p>I totali restano separati per valuta e ora includono anche la distribuzione per giorno, senza conversioni o tassi di cambio impliciti.</p>
         </div>
         {summary && <span className="expense-summary-count">{summary.expenseCount} spese</span>}
       </div>
@@ -82,6 +85,7 @@ export default function TripExpenseSummary({ tripId }: { tripId: string }) {
               <small>{currency.count} {currency.count === 1 ? 'spesa' : 'spese'}</small>
             </div>
             <div className="expense-summary-grid">
+              <Breakdown title="Per giorno" summary={currency} kind="days" />
               <Breakdown title="Per categoria" summary={currency} kind="categories" />
               <Breakdown title="Pagato da" summary={currency} kind="payers" />
             </div>
