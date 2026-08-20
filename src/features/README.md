@@ -7,15 +7,17 @@ Implemented / active:
 - `storage-lab/` — regression UI for IndexedDB, OPFS and the legacy diagnostic Vault.
 - `trips/` — travel-book index backed by local persistence, trip creation/editing, status grouping, chapter detail navigation and archive/restore lifecycle.
 - `days/` — ordered trip-day pages with local create/edit workflows, trip ownership validation and travel-date range enforcement.
-- `planner/` — persistent day editor with text, heading, checklist, divider, place, transport and accommodation blocks, atomic up/down reordering, soft-delete and read-only archived trips.
+- `planner/` — persistent day editor with text, heading, checklist, divider, place, transport, accommodation and expense blocks, atomic up/down reordering, soft-delete and read-only archived trips.
 - `places/` — manually saved local places linked from planner blocks with universal Google Maps URLs; no Google API key or automatic geocoding required.
 - `reservations/` — transport and accommodation records linked atomically to planner blocks, with local wall-clock date/time, separate IANA timezone, optional saved place and booking link.
+- `expenses/` — exact minor-unit expense records linked atomically to planner blocks, with ISO currency-aware decimal handling and optional local occurrence time.
 
 Planned next:
 
 - `planner/` — richer block types and guided planning.
 - `places/` — reusable place library, richer map UI and provider-assisted lookup only when explicitly enabled.
 - `reservations/` — restaurant/activity workflows, attachments and richer itinerary integration.
+- `expenses/` — traveler payer assignment, trip/day totals and category summaries.
 - `media/` — capture/import/organize photos and videos.
 - `travelers/` — reusable companion profiles and secure document references.
 - `templates/` — museum, day trip, travel day and custom templates.

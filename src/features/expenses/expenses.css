@@ -1,0 +1,76 @@
+.expense-block {
+  display: grid;
+  gap: 12px;
+}
+
+.expense-total {
+  font-family: Georgia, serif;
+  font-size: 28px;
+  font-weight: 500;
+  color: #dfc7a4;
+}
+
+.expense-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.expense-grid label {
+  display: grid;
+  gap: 6px;
+  color: #b9a58d;
+  font-size: 12px;
+}
+
+.expense-grid input,
+.expense-grid textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #493b30;
+  border-radius: 11px;
+  background: #14100d;
+  color: #f1e7da;
+  padding: 10px 11px;
+  outline: none;
+}
+
+.expense-grid textarea {
+  resize: vertical;
+  min-height: 88px;
+  line-height: 1.5;
+}
+
+.expense-grid input:focus,
+.expense-grid textarea:focus {
+  border-color: #967552;
+}
+
+.expense-wide {
+  grid-column: 1 / -1;
+}
+
+.expense-loading,
+.expense-hint {
+  color: #a59482;
+  font-size: 12px;
+}
+
+.expense-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .expense-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-wide {
+    grid-column: auto;
+  }
+
+  .expense-actions button {
+    width: 100%;
+  }
+}

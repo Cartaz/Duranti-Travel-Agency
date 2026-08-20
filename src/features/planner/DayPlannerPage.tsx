@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Block, Day, Place, Trip } from '../../domain/entities'
 import { getTripDay } from '../days/day-service'
+import ExpenseBlockEditor from '../expenses/ExpenseBlockEditor'
 import { googleMapsUrlForPlace } from '../places/maps-url'
 import {
   EMPTY_PLACE_DRAFT,
@@ -33,6 +34,7 @@ const blockLabels: Record<PlannerBlockType, string> = {
   place: 'Luogo',
   transport: 'Trasporto',
   accommodation: 'Alloggio',
+  expense: 'Spesa',
 }
 
 type MoveDirection = 'up' | 'down'
@@ -197,7 +199,7 @@ export default function DayPlannerPage() {
         {blocks.length === 0 && (
           <div className="planner-empty">
             <strong>Questa pagina è ancora bianca.</strong>
-            <span>Aggiungi testo, luoghi, trasporti, alloggi o checklist.</span>
+            <span>Aggiungi testo, luoghi, trasporti, alloggi, spese o checklist.</span>
           </div>
         )}
 
@@ -209,6 +211,7 @@ export default function DayPlannerPage() {
             dayId={day.id}
             dayDate={day.date}
             tripEndDate={trip.endDate}
+            tripCurrency={trip.currency}
             readOnly={readOnly}
             canMoveUp={index > 0}
             canMoveDown={index < blocks.length - 1}
@@ -226,6 +229,7 @@ interface PlannerBlockEditorProps {
   dayId: string
   dayDate: string
   tripEndDate?: string
+  tripCurrency?: string
   readOnly: boolean
   canMoveUp: boolean
   canMoveDown: boolean
@@ -233,6 +237,7 @@ interface PlannerBlockEditorProps {
 }
 
 function PlannerBlockEditor(props: PlannerBlockEditorProps) {
+  if (props.block.type === 'expense') return <ExpenseBlockEditor {...props} />
   if (props.block.type === 'transport' || props.block.type === 'accommodation') {
     return <ReservationBlockEditor {...props} />
   }

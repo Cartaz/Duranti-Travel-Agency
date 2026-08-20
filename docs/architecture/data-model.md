@@ -86,6 +86,18 @@ The referenced `reservation` owns provider, confirmation code, status, optional 
 
 `startsAt` and `endsAt` are wall-clock local date/time strings such as `2026-08-20T18:30`; they are not converted through the device timezone. `timezone` is stored separately as an optional IANA identifier such as `Europe/Paris`. The planner requires a reservation start to fall on the day that owns the block and prevents an end from exceeding the trip return date when that boundary is known.
 
+### Expense blocks
+
+An `expense` block contains only the owned record relationship:
+
+```ts
+{ expenseId: string }
+```
+
+The referenced `expense` owns `amountMinor`, ISO currency, category, description, optional local occurrence time, payer reference and notes. Block and expense writes are committed together in one IndexedDB transaction; removing the block tombstones both owned records atomically.
+
+Persisted money never uses a floating-point major-unit value. User input is converted to integer minor units according to the currency fraction digits exposed by `Intl.NumberFormat` (for example 2 for EUR and 0 for JPY). The first planner UI leaves `paidByTravelerId` untouched/reserved until traveler profiles are exposed in the product.
+
 ## Media
 
 IndexedDB stores metadata only. Ordinary photo/video/audio media bytes are kept in OPFS. Blob URLs are runtime-only and must never be persisted.
