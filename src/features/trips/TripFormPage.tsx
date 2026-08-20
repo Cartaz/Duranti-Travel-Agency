@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Trip } from '../../domain/entities'
+import { majorAmountToMinor, minorAmountToMajor } from '../../lib/currency'
 import { createTrip, getTrip, updateTrip, type EditableTripStatus, type TripDraft } from './trip-service'
 import './trips.css'
 
@@ -13,6 +14,7 @@ interface TripFormState {
   endDate: string
   summary: string
   currency: string
+  budget: string
 }
 
 const emptyForm: TripFormState = {
@@ -23,9 +25,11 @@ const emptyForm: TripFormState = {
   endDate: '',
   summary: '',
   currency: 'EUR',
+  budget: '',
 }
 
 function tripToForm(trip: Trip): TripFormState {
+  const currency = trip.currency ?? 'EUR'
   return {
     title: trip.title,
     subtitle: trip.subtitle ?? '',
@@ -33,11 +37,14 @@ function tripToForm(trip: Trip): TripFormState {
     startDate: trip.startDate ?? '',
     endDate: trip.endDate ?? '',
     summary: trip.summary ?? '',
-    currency: trip.currency ?? 'EUR',
+    currency,
+    budget: trip.budgetMinor === undefined ? '' : minorAmountToMajor(trip.budgetMinor, currency),
   }
 }
 
 function formToDraft(form: TripFormState): TripDraft {
+  const currency = form.currency.trim().toUpperCase()
+  const budgetInput = form.budget.trim()
   return {
     title: form.title,
     subtitle: form.subtitle,
@@ -45,7 +52,8 @@ function formToDraft(form: TripFormState): TripDraft {
     startDate: form.startDate,
     endDate: form.endDate,
     summary: form.summary,
-    currency: form.currency,
+    currency,
+    budgetMinor: budgetInput ? majorAmountToMinor(budgetInput, currency) : undefined,
   }
 }
 
@@ -166,6 +174,17 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
               maxLength={3}
               placeholder="EUR"
               autoCapitalize="characters"
+              autoComplete="off"
+            />
+          </label>
+
+          <label className="trip-field trip-field-wide">
+            <span>Budget del viaggio</span>
+            <input
+              value={form.budget}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setField('budget', event.target.value)}
+              inputMode="decimal"
+              placeholder="Es. 1500,00"
               autoComplete="off"
             />
           </label>
