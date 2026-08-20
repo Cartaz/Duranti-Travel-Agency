@@ -10,7 +10,7 @@ Implemented / active:
 - `planner/` — persistent day editor with text, heading, checklist, divider, place, transport, accommodation, restaurant, activity and expense blocks, atomic up/down reordering, soft-delete and read-only archived trips.
 - `places/` — manually saved local places linked from planner blocks with universal Google Maps URLs; no Google API key or automatic geocoding required.
 - `reservations/` — transport, accommodation, restaurant and activity records linked atomically to planner blocks, with local wall-clock date/time, separate IANA timezone, optional saved place and booking link; reservation saves also synchronize an itinerary entry used by the day timeline, with read-only fallback for legacy reservations not yet persisted into itinerary data. Each saved reservation can own one local PDF/image attachment stored in OPFS with metadata in IndexedDB, including replace/remove cleanup.
-- `itinerary/` — editable day timeline ordered by local start time and current planner position. Users can create/edit/delete independent manual stops, while reservation-derived entries remain single-source and expose synchronized, needs-sync or orphaned states with an explicit reconciliation action.
+- `itinerary/` — editable day timeline ordered first by local start time. Users can create/edit/delete independent manual stops; reservation-derived entries remain single-source and expose synchronized, needs-sync or orphaned states with an explicit reconciliation action. Untimed reservation entries retain planner order, while untimed manual stops can be reordered independently with transactional up/down controls.
 - `expenses/` — exact minor-unit expense records linked atomically to planner blocks, payer assignment restricted to trip participants, per-day/category/payer summaries, trip budgets, and optional explicit per-expense FX into the trip currency using only a user-supplied rate and exact integer conversion math.
 - `travelers/` — reusable system-level traveler profiles and trip memberships with role management and duplicate-membership protection; identity documents remain behind the encrypted document boundary.
 
@@ -19,7 +19,7 @@ Planned next:
 - `planner/` — richer block types and guided planning.
 - `places/` — reusable place library, richer map UI and provider-assisted lookup only when explicitly enabled.
 - `reservations/` — multiple attachments and richer booking-specific fields.
-- `itinerary/` — manual reordering for untimed stops and broader reconciliation tooling for orphaned legacy links.
+- `itinerary/` — broader reconciliation tooling for orphaned legacy links and richer cross-day views.
 - `expenses/` — richer budget views, reconciliation and optional saved FX-rate metadata/source notes.
 - `media/` — capture/import/organize photos and videos.
 - `travelers/` — encrypted identity-document UI, addresses/preferences and membership reconciliation tooling.
