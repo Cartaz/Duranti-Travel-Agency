@@ -13,6 +13,7 @@ import {
 import './reservations.css'
 
 type MoveDirection = 'up' | 'down'
+type ReservationBlockType = Extract<Block['type'], 'transport' | 'accommodation' | 'restaurant' | 'activity'>
 
 const statusLabels: Record<ReservationDraft['status'], string> = {
   planned: 'Da pianificare',
@@ -21,8 +22,46 @@ const statusLabels: Record<ReservationDraft['status'], string> = {
   cancelled: 'Annullato',
 }
 
-function blockLabel(block: Block): string {
-  return block.type === 'accommodation' ? 'Alloggio' : 'Trasporto'
+const blockConfigs: Record<ReservationBlockType, {
+  label: string
+  titlePlaceholder: string
+  providerPlaceholder: string
+  notesPlaceholder: string
+}> = {
+  transport: {
+    label: 'Trasporto',
+    titlePlaceholder: 'Volo Roma → Parigi',
+    providerPlaceholder: 'Trenitalia, ITA, compagnia…',
+    notesPlaceholder: 'Terminal, check-in, bagagli, dettagli utili…',
+  },
+  accommodation: {
+    label: 'Alloggio',
+    titlePlaceholder: 'Hotel a Parigi',
+    providerPlaceholder: 'Hotel, Booking, struttura…',
+    notesPlaceholder: 'Check-in, colazione, camera, dettagli utili…',
+  },
+  restaurant: {
+    label: 'Ristorante',
+    titlePlaceholder: 'Cena da Septime',
+    providerPlaceholder: 'Ristorante, TheFork, concierge…',
+    notesPlaceholder: 'Numero di coperti, richieste alimentari, tavolo, dettagli utili…',
+  },
+  activity: {
+    label: 'Attività',
+    titlePlaceholder: 'Visita guidata al Louvre',
+    providerPlaceholder: 'Museo, guida, GetYourGuide…',
+    notesPlaceholder: 'Punto d’incontro, biglietti, cosa portare, dettagli utili…',
+  },
+}
+
+function reservationBlockType(block: Block): ReservationBlockType {
+  if (
+    block.type === 'transport'
+    || block.type === 'accommodation'
+    || block.type === 'restaurant'
+    || block.type === 'activity'
+  ) return block.type
+  throw new Error('Tipo di blocco prenotazione non supportato.')
 }
 
 export default function ReservationBlockEditor({
@@ -46,6 +85,8 @@ export default function ReservationBlockEditor({
   canMoveDown: boolean
   onChanged: () => Promise<void>
 }) {
+  const blockType = reservationBlockType(block)
+  const config = blockConfigs[blockType]
   const [reservation, setReservation] = useState<Reservation>()
   const [places, setPlaces] = useState<Place[]>([])
   const [draft, setDraft] = useState<ReservationDraft>(EMPTY_RESERVATION_DRAFT)
@@ -98,7 +139,7 @@ export default function ReservationBlockEditor({
   }
 
   const remove = async (): Promise<void> => {
-    if (readOnly || saving || !window.confirm(`Eliminare questo blocco ${blockLabel(block).toLowerCase()} e la relativa prenotazione?`)) return
+    if (readOnly || saving || !window.confirm(`Eliminare questo blocco ${config.label.toLowerCase()} e la relativa prenotazione?`)) return
     setSaving(true)
     setError('')
     try {
@@ -129,9 +170,9 @@ export default function ReservationBlockEditor({
   const endMax = tripEndDate ? `${tripEndDate}T23:59` : undefined
 
   return (
-    <form className="planner-block reservation-block" onSubmit={(event) => void save(event)}>
+    <form className={`planner-block reservation-block reservation-block-${blockType}`} onSubmit={(event) => void save(event)}>
       <div className="planner-block-topline">
-        <span>{blockLabel(block)}</span>
+        <span>{config.label}</span>
         {!readOnly && (
           <div className="planner-block-tools">
             <button type="button" disabled={saving || !canMoveUp} aria-label="Sposta blocco su" title="Sposta su" onClick={() => void move('up')}>↑</button>
@@ -153,14 +194,14 @@ export default function ReservationBlockEditor({
                 required
                 maxLength={200}
                 readOnly={readOnly}
-                placeholder={block.type === 'accommodation' ? 'Hotel a Parigi' : 'Volo Roma → Parigi'}
+                placeholder={config.titlePlaceholder}
                 value={draft.title}
                 onChange={(event) => patch({ title: event.target.value })}
               />
             </label>
             <label>
               <span>Fornitore</span>
-              <input type="text" maxLength={200} readOnly={readOnly} placeholder="Trenitalia, ITA, hotel…" value={draft.provider ?? ''} onChange={(event) => patch({ provider: event.target.value })} />
+              <input type="text" maxLength={200} readOnly={readOnly} placeholder={config.providerPlaceholder} value={draft.provider ?? ''} onChange={(event) => patch({ provider: event.target.value })} />
             </label>
             <label>
               <span>Codice prenotazione</span>
@@ -199,7 +240,7 @@ export default function ReservationBlockEditor({
             </label>
             <label className="reservation-wide">
               <span>Note</span>
-              <textarea rows={4} maxLength={4000} readOnly={readOnly} placeholder="Terminal, check-in, bagagli, dettagli utili…" value={draft.notes ?? ''} onChange={(event) => patch({ notes: event.target.value })} />
+              <textarea rows={4} maxLength={4000} readOnly={readOnly} placeholder={config.notesPlaceholder} value={draft.notes ?? ''} onChange={(event) => patch({ notes: event.target.value })} />
             </label>
           </div>
 
