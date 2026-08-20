@@ -1,5 +1,6 @@
 import type { Trip, TripStatus } from '../../domain/entities'
-import { tripRepository } from '../../data/repositories/repositories'
+import { isDayDateWithinTripRange } from '../../domain/trip-calendar'
+import { dayRepository, tripRepository } from '../../data/repositories/repositories'
 
 export type EditableTripStatus = Exclude<TripStatus, 'archived'>
 
@@ -52,6 +53,21 @@ function tripSortValue(trip: Trip): string {
   return trip.startDate ?? trip.createdAt
 }
 
+async function assertExistingDaysFitRange(tripId: string, range: Pick<Trip, 'startDate' | 'endDate'>): Promise<void> {
+  const days = await dayRepository.list()
+  const invalidDays = days
+    .filter((day) => day.tripId === tripId && !isDayDateWithinTripRange(range, day.date))
+    .sort((left, right) => left.date.localeCompare(right.date))
+
+  if (invalidDays.length === 0) return
+
+  const first = invalidDays[0]
+  const extra = invalidDays.length > 1 ? ` e altre ${invalidDays.length - 1}` : ''
+  throw new Error(
+    `Le nuove date del viaggio escluderebbero la giornata ${first.date}${extra}. Modifica prima le giornate oppure amplia l’intervallo del viaggio.`,
+  )
+}
+
 export async function listBookTrips(): Promise<Trip[]> {
   const trips = await tripRepository.list()
   return trips
@@ -92,6 +108,11 @@ export async function updateTrip(tripId: string, input: TripDraft): Promise<Trip
   }
 
   const draft = validateDraft(input)
+  const dateRangeChanged = draft.startDate !== existing.startDate || draft.endDate !== existing.endDate
+  if (dateRangeChanged) {
+    await assertExistingDaysFitRange(tripId, draft)
+  }
+
   const updated: Trip = {
     ...existing,
     ...draft,

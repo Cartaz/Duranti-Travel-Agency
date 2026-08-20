@@ -8,6 +8,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { tripId, dayId } = useParams<{ tripId: string; dayId: string }>()
   const navigate = useNavigate()
   const [tripTitle, setTripTitle] = useState('')
+  const [tripRange, setTripRange] = useState<{ startDate?: string; endDate?: string }>({})
   const [draft, setDraft] = useState<DayDraft>({ date: '', title: '', summary: '' })
   const [loading, setLoading] = useState(true)
   const [contextReady, setContextReady] = useState(false)
@@ -27,6 +28,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
         if (!trip || trip.status === 'archived') throw new Error('Viaggio non disponibile per la modifica.')
         if (cancelled) return
         setTripTitle(trip.title)
+        setTripRange({ startDate: trip.startDate, endDate: trip.endDate })
 
         if (mode === 'edit') {
           if (!dayId) throw new Error('Identificatore della giornata mancante.')
@@ -91,7 +93,24 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
       <form className="day-form" onSubmit={(event) => void submit(event)}>
         <label>
           <span>Data</span>
-          <input type="date" required disabled={!contextReady} value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} />
+          <input
+            type="date"
+            required
+            min={tripRange.startDate}
+            max={tripRange.endDate}
+            disabled={!contextReady}
+            value={draft.date}
+            onChange={(event) => setDraft({ ...draft, date: event.target.value })}
+          />
+          {(tripRange.startDate || tripRange.endDate) && (
+            <small>
+              {tripRange.startDate && tripRange.endDate
+                ? `La giornata deve essere compresa tra ${tripRange.startDate} e ${tripRange.endDate}.`
+                : tripRange.startDate
+                  ? `La giornata non può precedere ${tripRange.startDate}.`
+                  : `La giornata non può superare ${tripRange.endDate}.`}
+            </small>
+          )}
         </label>
         <label>
           <span>Titolo della giornata</span>

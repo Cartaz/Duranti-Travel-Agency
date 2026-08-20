@@ -1,4 +1,5 @@
-import type { Day } from '../../domain/entities'
+import type { Day, Trip } from '../../domain/entities'
+import { assertDayDateWithinTripRange } from '../../domain/trip-calendar'
 import { dayRepository } from '../../data/repositories/repositories'
 import { getTrip } from '../trips/trip-service'
 
@@ -44,10 +45,11 @@ function validateDraft(input: DayDraft): DayDraft {
   }
 }
 
-async function assertEditableTrip(tripId: string): Promise<void> {
+async function getEditableTrip(tripId: string): Promise<Trip> {
   const trip = await getTrip(tripId)
   if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
   if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di modificare le sue giornate.')
+  return trip
 }
 
 export async function listTripDays(tripId: string): Promise<Day[]> {
@@ -63,8 +65,10 @@ export async function getTripDay(tripId: string, dayId: string): Promise<Day | u
 }
 
 export async function createTripDay(tripId: string, input: DayDraft): Promise<Day> {
-  await assertEditableTrip(tripId)
+  const trip = await getEditableTrip(tripId)
   const draft = validateDraft(input)
+  assertDayDateWithinTripRange(trip, draft.date)
+
   const days = await listTripDays(tripId)
   const now = new Date().toISOString()
   const nextSequence = days.reduce((maximum, day) => Math.max(maximum, day.sequence), 0) + 1
@@ -83,11 +87,13 @@ export async function createTripDay(tripId: string, input: DayDraft): Promise<Da
 }
 
 export async function updateTripDay(tripId: string, dayId: string, input: DayDraft): Promise<Day> {
-  await assertEditableTrip(tripId)
+  const trip = await getEditableTrip(tripId)
   const existing = await getTripDay(tripId, dayId)
   if (!existing) throw new Error('La giornata non esiste in questo viaggio.')
 
   const draft = validateDraft(input)
+  assertDayDateWithinTripRange(trip, draft.date)
+
   const updated: Day = {
     ...existing,
     ...draft,
