@@ -1,7 +1,12 @@
 import type { Media } from '../../domain/entities'
 import { db } from '../db/duranti-db'
 import { assertEntityBase } from '../db/validate'
-import { deleteMediaFile, readMediaFile, writeMediaFile } from '../opfs/opfs-store'
+import {
+  deleteMediaFile,
+  mediaFileExists,
+  readMediaFile,
+  writeMediaFile,
+} from '../opfs/opfs-store'
 
 export interface CreateMediaInput {
   tripId?: string
@@ -15,6 +20,10 @@ export interface CreateMediaInput {
   durationMs?: number
   sha256?: string
 }
+
+export type SoftDeleteMediaResult = 'not-found' | 'already-deleted' | 'tombstoned'
+export type RestoreMediaResult = 'not-found' | 'already-active' | 'restored'
+export type PurgeMediaResult = 'not-found' | 'purged'
 
 export class MediaRepository {
   async create(input: CreateMediaInput, source: Blob): Promise<Media> {
@@ -46,26 +55,71 @@ export class MediaRepository {
     }
   }
 
-  async get(id: string): Promise<Media | undefined> {
-    return db.media.get(id)
+  async get(
+    id: string,
+    options: { includeDeleted?: boolean } = {},
+  ): Promise<Media | undefined> {
+    const media = await db.media.get(id)
+    if (!media || (!options.includeDeleted && media.deletedAt)) return undefined
+    return media
   }
 
   async getFile(id: string): Promise<File> {
     const media = await this.get(id)
-    if (!media) throw new Error(`Media ${id} was not found.`)
+    if (!media) throw new Error(`Active media ${id} was not found.`)
     return readMediaFile(id)
   }
 
-  async delete(id: string): Promise<void> {
-    await db.transaction('rw', db.media, async () => {
-      await db.media.delete(id)
+  async softDelete(id: string): Promise<SoftDeleteMediaResult> {
+    const media = await db.media.get(id)
+    if (!media) return 'not-found'
+    if (media.deletedAt) return 'already-deleted'
+
+    const now = new Date().toISOString()
+    const updated = await db.media.update(id, {
+      deletedAt: now,
+      updatedAt: now,
     })
 
+    if (updated !== 1) throw new Error(`Media ${id} could not be tombstoned.`)
+    return 'tombstoned'
+  }
+
+  async restore(id: string): Promise<RestoreMediaResult> {
+    const media = await db.media.get(id)
+    if (!media) return 'not-found'
+    if (!media.deletedAt) return 'already-active'
+
+    if (!(await mediaFileExists(id))) {
+      throw new Error(`Media ${id} cannot be restored because its OPFS file is missing.`)
+    }
+
+    const updated = await db.media.update(id, {
+      deletedAt: undefined,
+      updatedAt: new Date().toISOString(),
+    })
+
+    if (updated !== 1) throw new Error(`Media ${id} could not be restored.`)
+    return 'restored'
+  }
+
+  async purge(id: string): Promise<PurgeMediaResult> {
+    const media = await db.media.get(id)
+    if (!media) return 'not-found'
+    if (!media.deletedAt) {
+      throw new Error(`Media ${id} must be tombstoned before it can be purged.`)
+    }
+
+    // Delete the binary first. If the app stops before metadata deletion, the tombstone
+    // remains and the integrity scanner can safely finish the purge later.
     try {
       await deleteMediaFile(id)
     } catch (error) {
       if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error
     }
+
+    await db.media.delete(id)
+    return 'purged'
   }
 }
 
