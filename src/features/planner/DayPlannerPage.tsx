@@ -34,6 +34,8 @@ const blockLabels: Record<PlannerBlockType, string> = {
   place: 'Luogo',
   transport: 'Trasporto',
   accommodation: 'Alloggio',
+  restaurant: 'Ristorante',
+  activity: 'Attività',
   expense: 'Spesa',
 }
 
@@ -199,7 +201,7 @@ export default function DayPlannerPage() {
         {blocks.length === 0 && (
           <div className="planner-empty">
             <strong>Questa pagina è ancora bianca.</strong>
-            <span>Aggiungi testo, luoghi, trasporti, alloggi, spese o checklist.</span>
+            <span>Aggiungi testo, luoghi, trasporti, alloggi, ristoranti, attività, spese o checklist.</span>
           </div>
         )}
 
@@ -238,7 +240,12 @@ interface PlannerBlockEditorProps {
 
 function PlannerBlockEditor(props: PlannerBlockEditorProps) {
   if (props.block.type === 'expense') return <ExpenseBlockEditor {...props} />
-  if (props.block.type === 'transport' || props.block.type === 'accommodation') {
+  if (
+    props.block.type === 'transport'
+    || props.block.type === 'accommodation'
+    || props.block.type === 'restaurant'
+    || props.block.type === 'activity'
+  ) {
     return <ReservationBlockEditor {...props} />
   }
   if (props.block.type === 'place') return <PlannerPlaceBlockEditor {...props} />
