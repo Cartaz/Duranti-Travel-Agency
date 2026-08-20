@@ -25,6 +25,9 @@ Rules:
 - Private attachment v1 is capped at 20 MiB because Web Crypto encrypt/decrypt consumes a complete BufferSource; larger files require a separately reviewed chunked format.
 - Replacement writes a new random attachment file before updating encrypted metadata. After the metadata switch, the old file is removed best-effort; an interrupted cleanup can therefore leave a recoverable orphan, never a metadata reference to intentionally deleted bytes.
 - Purge deletes the private OPFS directory before deleting the tombstoned IndexedDB record, matching the crash-safe media lifecycle.
+- Private-document integrity scanning is read-only by default and requires the local encryption key to be unlocked so encrypted attachment metadata can be compared with OPFS.
+- Normal integrity scans inspect directory structure, file size and the `DURDOC01` envelope marker without decrypting complete attachment bodies. AES-GCM authentication is verified when an attachment is actually decrypted/read.
+- Orphan/empty-directory cleanup is exposed only through guarded explicit maintenance functions that re-check current IndexedDB references before deletion.
 - Encryption at rest does not defend against malicious script executing while the app is unlocked. CSP/XSS hardening remains required.
 - Losing the passphrase without a valid encrypted Vault/recovery design can make sensitive data unrecoverable.
 

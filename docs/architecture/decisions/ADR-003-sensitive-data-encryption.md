@@ -46,6 +46,16 @@ A replacement attachment is written to a new random OPFS file first. Only after 
 
 Removing an attachment unlinks it from the encrypted JSON payload before deleting the ciphertext. Purging a tombstoned traveler document removes its private OPFS directory before deleting the IndexedDB record, so an interrupted purge remains discoverable and retryable.
 
+## Integrity and reconciliation
+
+Private-document integrity scanning is read-only by default. A full relational scan requires the local encryption key to be unlocked because attachment IDs, OPFS paths and plaintext sizes live inside the encrypted JSON payload.
+
+The normal scan enumerates the private OPFS tree and compares it with IndexedDB metadata. It detects missing attachments, orphan directories/files, stale empty directories, path mismatches, encrypted-size mismatches, invalid `DURDOC01` envelopes, unexpected OPFS entries, unreadable metadata and legacy plaintext records.
+
+The scanner intentionally does not decrypt every attachment body. It reads file size and the small format header only; full AES-GCM authentication remains part of normal attachment decryption. This avoids repeatedly allocating up to the v1 20 MiB plaintext/ciphertext buffers during routine diagnostics on iPhone.
+
+Cleanup is never automatic. Guarded maintenance functions re-check current IndexedDB references before removing an orphan attachment, orphan directory or stale empty document directory.
+
 ## Consequences and limitations
 
 - The passphrase is never persisted.
@@ -53,5 +63,5 @@ Removing an attachment unlinks it from the encrypted JSON payload before deletin
 - Weak passphrases remain susceptible to offline guessing; UI must encourage a strong passphrase.
 - PBKDF2 cost must be benchmarked on iPhone 16 before the security UI is frozen.
 - Encryption at rest cannot protect plaintext already displayed in an unlocked compromised page; XSS/CSP hardening remains mandatory.
-- Private attachment integrity/orphan reconciliation is still required before cleanup is automated.
+- Integrity reconciliation can detect structural corruption and stale/orphan storage without bulk-decrypting attachment bodies.
 - Vault export must eventually include encrypted private OPFS files as well as structured records.

@@ -8,10 +8,26 @@ const FILE_MAGIC = new TextEncoder().encode('DURDOC01')
 const AES_GCM_IV_BYTES = 12
 const AES_GCM_TAG_BYTES = 16
 const ENCRYPTION_PURPOSE = 'traveler-document-attachment'
+const ENVELOPE_OVERHEAD_BYTES = FILE_MAGIC.length + AES_GCM_IV_BYTES + AES_GCM_TAG_BYTES
+const SAFE_SEGMENT = /^[A-Za-z0-9_-]+$/
 
 // Web Crypto encrypt/decrypt takes the complete BufferSource at once. Keep v1
 // deliberately bounded until a reviewed chunked encrypted format is introduced.
 export const MAX_PRIVATE_DOCUMENT_BYTES = 20 * 1024 * 1024
+
+export interface PrivateDocumentRootEntry {
+  name: string
+  kind: 'file' | 'directory'
+}
+
+export interface PrivateDocumentAttachmentEntry extends PrivateDocumentRootEntry {
+  attachmentId?: string
+}
+
+export interface PrivateDocumentAttachmentInspection {
+  encryptedSizeBytes: number
+  envelopeValid: boolean
+}
 
 function assertOpfsSupport(): void {
   if (!('storage' in navigator) || typeof navigator.storage.getDirectory !== 'function') {
@@ -20,7 +36,7 @@ function assertOpfsSupport(): void {
 }
 
 function assertSafeSegment(value: string, label: string): void {
-  if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+  if (!SAFE_SEGMENT.test(value)) {
     throw new Error(`${label} contains characters that are not allowed in private OPFS paths.`)
   }
 }
@@ -28,6 +44,12 @@ function assertSafeSegment(value: string, label: string): void {
 function attachmentFileName(attachmentId: string): string {
   assertSafeSegment(attachmentId, 'Attachment ID')
   return `${attachmentId}${FILE_EXTENSION}`
+}
+
+function attachmentIdFromFileName(fileName: string): string | undefined {
+  if (!fileName.endsWith(FILE_EXTENSION)) return undefined
+  const attachmentId = fileName.slice(0, -FILE_EXTENSION.length)
+  return SAFE_SEGMENT.test(attachmentId) ? attachmentId : undefined
 }
 
 function encryptionEntityId(documentId: string, attachmentId: string): string {
@@ -64,6 +86,22 @@ async function requireDocumentDirectory(documentId: string): Promise<FileSystemD
   return documentsDirectory.getDirectoryHandle(documentId)
 }
 
+async function getDirectoryEntries(
+  directory: FileSystemDirectoryHandle,
+): Promise<Array<[string, FileSystemHandle]>> {
+  const iterableDirectory = directory as FileSystemDirectoryHandle & {
+    entries?: () => AsyncIterableIterator<[string, FileSystemHandle]>
+  }
+
+  if (typeof iterableDirectory.entries !== 'function') {
+    throw new Error('OPFS directory iteration is not available in this browser build.')
+  }
+
+  const entries: Array<[string, FileSystemHandle]> = []
+  for await (const entry of iterableDirectory.entries()) entries.push(entry)
+  return entries
+}
+
 function buildEnvelope(
   iv: Uint8Array<ArrayBuffer>,
   ciphertext: Uint8Array<ArrayBuffer>,
@@ -75,17 +113,25 @@ function buildEnvelope(
   return envelope
 }
 
+function hasRecognizedMagic(prefix: Uint8Array<ArrayBuffer>): boolean {
+  if (prefix.length !== FILE_MAGIC.length) return false
+  for (let index = 0; index < FILE_MAGIC.length; index += 1) {
+    if (prefix[index] !== FILE_MAGIC[index]) return false
+  }
+  return true
+}
+
 function parseEnvelope(bytes: Uint8Array<ArrayBuffer>): {
   iv: Uint8Array<ArrayBuffer>
   ciphertext: Uint8Array<ArrayBuffer>
 } {
-  const minimumBytes = FILE_MAGIC.length + AES_GCM_IV_BYTES + AES_GCM_TAG_BYTES
-  if (bytes.length < minimumBytes) throw new Error('Encrypted private document file is truncated.')
+  if (bytes.length < ENVELOPE_OVERHEAD_BYTES) {
+    throw new Error('Encrypted private document file is truncated.')
+  }
 
-  for (let index = 0; index < FILE_MAGIC.length; index += 1) {
-    if (bytes[index] !== FILE_MAGIC[index]) {
-      throw new Error('Unsupported encrypted private document file format.')
-    }
+  const prefix = bytes.slice(0, FILE_MAGIC.length)
+  if (!hasRecognizedMagic(prefix)) {
+    throw new Error('Unsupported encrypted private document file format.')
   }
 
   return {
@@ -97,6 +143,63 @@ function parseEnvelope(bytes: Uint8Array<ArrayBuffer>): {
 export function buildPrivateDocumentAttachmentPath(documentId: string, attachmentId: string): string {
   assertSafeSegment(documentId, 'Document ID')
   return `${ROOT_DIRECTORY}/${PRIVATE_DIRECTORY}/${DOCUMENT_DIRECTORY}/${documentId}/${attachmentFileName(attachmentId)}`
+}
+
+export function expectedEncryptedDocumentAttachmentBytes(plaintextBytes: number): number {
+  if (!Number.isSafeInteger(plaintextBytes) || plaintextBytes < 0) {
+    throw new Error('Private document plaintext byte size must be a non-negative safe integer.')
+  }
+  return plaintextBytes + ENVELOPE_OVERHEAD_BYTES
+}
+
+export async function listPrivateDocumentRootEntries(): Promise<PrivateDocumentRootEntry[]> {
+  const documentsDirectory = await getExistingPrivateDocumentsDirectory()
+  if (!documentsDirectory) return []
+
+  const entries = await getDirectoryEntries(documentsDirectory)
+  return entries
+    .map(([name, handle]) => ({ name, kind: handle.kind }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export async function listPrivateDocumentAttachmentEntries(
+  documentId: string,
+): Promise<PrivateDocumentAttachmentEntry[]> {
+  const documentDirectory = await requireDocumentDirectory(documentId)
+  const entries = await getDirectoryEntries(documentDirectory)
+
+  return entries
+    .map(([name, handle]) => ({
+      name,
+      kind: handle.kind,
+      ...(handle.kind === 'file' && attachmentIdFromFileName(name)
+        ? { attachmentId: attachmentIdFromFileName(name) }
+        : {}),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export async function inspectEncryptedDocumentAttachment(
+  documentId: string,
+  attachmentId: string,
+): Promise<PrivateDocumentAttachmentInspection> {
+  const documentDirectory = await requireDocumentDirectory(documentId)
+  const fileHandle = await documentDirectory.getFileHandle(attachmentFileName(attachmentId))
+  const file = await fileHandle.getFile()
+
+  if (file.size < ENVELOPE_OVERHEAD_BYTES) {
+    return { encryptedSizeBytes: file.size, envelopeValid: false }
+  }
+
+  const prefix = new Uint8Array(await file.slice(0, FILE_MAGIC.length).arrayBuffer())
+  try {
+    return {
+      encryptedSizeBytes: file.size,
+      envelopeValid: hasRecognizedMagic(prefix),
+    }
+  } finally {
+    prefix.fill(0)
+  }
 }
 
 export async function writeEncryptedDocumentAttachment(
