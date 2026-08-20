@@ -1,0 +1,91 @@
+.trip-detail-grid-essential {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.trip-progressive-section {
+  margin-top: 14px;
+  border: 1px solid #40342a;
+  border-radius: 18px;
+  background: rgba(25, 20, 16, .82);
+  overflow: clip;
+}
+
+.trip-progressive-section > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.trip-progressive-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.trip-progressive-section > summary::after {
+  content: '+';
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #5c4a39;
+  border-radius: 50%;
+  color: #cbbba6;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.trip-progressive-section[open] > summary::after {
+  content: '−';
+}
+
+.trip-progressive-section > summary span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.trip-progressive-section > summary strong {
+  font-family: Georgia, serif;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.trip-progressive-section > summary small {
+  color: #a99c8d;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.trip-progressive-section[open] > summary {
+  border-bottom: 1px solid #392f27;
+}
+
+.trip-progressive-content {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.trip-progressive-section .trip-itinerary-overview {
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.trip-currency-panel {
+  max-width: 260px;
+}
+
+@media (max-width: 720px) {
+  .trip-detail-grid-essential {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-progressive-section > summary {
+    padding: 16px;
+  }
+}
