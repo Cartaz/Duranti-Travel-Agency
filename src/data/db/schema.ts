@@ -1,4 +1,5 @@
 import type {
+  AppMeta,
   AuditEntry,
   Block,
   Day,
@@ -32,6 +33,7 @@ export type PersistedEntity =
   | AuditEntry
 
 export type DatabaseTables = {
+  appMeta: AppMeta
   trips: Trip
   travelers: Traveler
   travelerDocuments: TravelerDocument
