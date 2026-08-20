@@ -4,14 +4,12 @@ import { assertEntityBase } from '../db/validate'
 import { deleteMediaFile, readMediaFile, writeMediaFile } from '../opfs/opfs-store'
 
 export interface CreateMediaInput {
-  id: string
   tripId?: string
   dayId?: string
   blockId?: string
   kind: Media['kind']
-  mimeType: string
+  mimeType?: string
   originalName?: string
-  sizeBytes: number
   width?: number
   height?: number
   durationMs?: number
@@ -20,27 +18,29 @@ export interface CreateMediaInput {
 
 export class MediaRepository {
   async create(input: CreateMediaInput, source: Blob): Promise<Media> {
-    if (source.size !== input.sizeBytes) {
-      throw new Error(`Media size mismatch: metadata=${input.sizeBytes}, source=${source.size}.`)
-    }
-
-    const opfsPath = await writeMediaFile(input.id, source)
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    const mimeType = source.type || input.mimeType || 'application/octet-stream'
+    const opfsPath = await writeMediaFile(id, source)
     const entity: Media = {
       ...input,
+      id,
+      mimeType,
+      sizeBytes: source.size,
       opfsPath,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     }
 
     try {
       assertEntityBase(entity, 'Media')
-      await db.media.put(entity)
+      await db.media.add(entity)
       return entity
     } catch (error) {
       try {
-        await deleteMediaFile(input.id)
+        await deleteMediaFile(id)
       } catch {
-        // Best-effort rollback of the file if the metadata write fails.
+        // Best-effort rollback of the newly-created file if metadata persistence fails.
       }
       throw error
     }
