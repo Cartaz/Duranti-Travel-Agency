@@ -1,0 +1,100 @@
+/* Progressive, low-clutter defaults for the everyday trip workflow. */
+
+.day-itinerary-title-row strong,
+.planner-block-error,
+.day-itinerary-error,
+.day-itinerary-warning {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
+.day-itinerary-title-row strong {
+  line-height: 1.35;
+}
+
+@media (max-width: 700px) {
+  .planner-toolbar {
+    align-items: stretch;
+    gap: 12px;
+    padding: 15px;
+  }
+
+  .planner-toolbar > div:first-child {
+    width: 100%;
+  }
+
+  .planner-toolbar > div:first-child::after {
+    content: 'Scorri le azioni per vedere tutte le opzioni.';
+    display: block;
+    margin-top: 6px;
+    color: #8f8173;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .planner-toolbar-actions {
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start;
+    gap: 7px;
+    padding: 1px 2px 7px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .planner-toolbar-actions button {
+    flex: 0 0 auto !important;
+    min-height: 44px;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
+
+  /* Put travel actions first; writing/layout tools remain available by scrolling. */
+  .planner-toolbar-actions button:nth-child(5) { order: 1; }  /* Luogo */
+  .planner-toolbar-actions button:nth-child(9) { order: 2; }  /* Attività */
+  .planner-toolbar-actions button:nth-child(8) { order: 3; }  /* Ristorante */
+  .planner-toolbar-actions button:nth-child(6) { order: 4; }  /* Trasporto */
+  .planner-toolbar-actions button:nth-child(7) { order: 5; }  /* Alloggio */
+  .planner-toolbar-actions button:nth-child(10) { order: 6; } /* Spesa */
+  .planner-toolbar-actions button:nth-child(1) { order: 7; }  /* Testo */
+  .planner-toolbar-actions button:nth-child(3) { order: 8; }  /* Checklist */
+  .planner-toolbar-actions button:nth-child(2) { order: 9; }  /* Titolo */
+  .planner-toolbar-actions button:nth-child(4) { order: 10; } /* Separatore */
+
+  .planner-block {
+    padding: 13px;
+  }
+
+  .planner-block-tools button:disabled {
+    display: none;
+  }
+
+  .day-itinerary {
+    gap: 13px;
+    padding: 14px;
+  }
+
+  .day-itinerary-heading-actions {
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .day-itinerary-heading-actions button,
+  .day-itinerary-heading-actions > span {
+    flex: 0 0 auto !important;
+    white-space: nowrap;
+  }
+}
