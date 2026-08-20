@@ -18,6 +18,34 @@ async function getMediaDirectory(): Promise<FileSystemDirectoryHandle> {
   return duranti.getDirectoryHandle(MEDIA_DIRECTORY, { create: true })
 }
 
+async function getExistingMediaDirectory(): Promise<FileSystemDirectoryHandle | null> {
+  const root = await getRootDirectory()
+
+  try {
+    const duranti = await root.getDirectoryHandle(ROOT_DIRECTORY)
+    return await duranti.getDirectoryHandle(MEDIA_DIRECTORY)
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'NotFoundError') return null
+    throw error
+  }
+}
+
+async function getDirectoryEntries(
+  directory: FileSystemDirectoryHandle,
+): Promise<Array<[string, FileSystemHandle]>> {
+  const iterableDirectory = directory as FileSystemDirectoryHandle & {
+    entries?: () => AsyncIterableIterator<[string, FileSystemHandle]>
+  }
+
+  if (typeof iterableDirectory.entries !== 'function') {
+    throw new Error('OPFS directory iteration is not available in this browser build.')
+  }
+
+  const entries: Array<[string, FileSystemHandle]> = []
+  for await (const entry of iterableDirectory.entries()) entries.push(entry)
+  return entries
+}
+
 export function buildMediaPath(mediaId: string): string {
   return `${ROOT_DIRECTORY}/${MEDIA_DIRECTORY}/${mediaId}/original`
 }
@@ -68,4 +96,16 @@ export async function mediaFileExists(mediaId: string): Promise<boolean> {
     if (error instanceof DOMException && error.name === 'NotFoundError') return false
     throw error
   }
+}
+
+export async function listMediaDirectoryIds(): Promise<string[]> {
+  const mediaDirectory = await getExistingMediaDirectory()
+  if (!mediaDirectory) return []
+
+  const ids: string[] = []
+  for (const [name, handle] of await getDirectoryEntries(mediaDirectory)) {
+    if (handle.kind === 'directory') ids.push(name)
+  }
+
+  return ids.sort((a, b) => a.localeCompare(b))
 }
