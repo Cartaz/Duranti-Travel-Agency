@@ -123,6 +123,19 @@ export default function ExpenseBlockEditor({
   const currentPayerIsActive = draft.paidByTravelerId
     ? payers.some((traveler) => traveler.id === draft.paidByTravelerId)
     : false
+  const normalizedTripCurrency = tripCurrency?.trim().toUpperCase()
+  const normalizedDraftCurrency = draft.currency.trim().toUpperCase()
+  const showFx = Boolean(
+    normalizedTripCurrency
+      && /^[A-Z]{3}$/.test(normalizedDraftCurrency)
+      && normalizedDraftCurrency !== normalizedTripCurrency,
+  )
+  const savedFxMatches = Boolean(
+    expense?.fx
+      && normalizedTripCurrency
+      && expense.fx.targetCurrency === normalizedTripCurrency
+      && expense.currency === normalizedDraftCurrency,
+  )
 
   return (
     <form className="planner-block expense-block" onSubmit={(event) => void save(event)}>
@@ -170,7 +183,15 @@ export default function ExpenseBlockEditor({
                 readOnly={readOnly}
                 placeholder="EUR"
                 value={draft.currency}
-                onChange={(event) => patch({ currency: event.target.value.toUpperCase() })}
+                onChange={(event) => {
+                  const currency = event.target.value.toUpperCase()
+                  patch({
+                    currency,
+                    fxRate: normalizedTripCurrency && currency.trim() === normalizedTripCurrency
+                      ? undefined
+                      : draft.fxRate,
+                  })
+                }}
               />
             </label>
             <label>
@@ -195,6 +216,46 @@ export default function ExpenseBlockEditor({
               <span>Quando</span>
               <input type="datetime-local" min={dayMin} max={dayMax} readOnly={readOnly} value={draft.occurredAt ?? ''} onChange={(event) => patch({ occurredAt: event.target.value })} />
             </label>
+
+            {showFx && normalizedTripCurrency && (
+              <div className="expense-fx-panel expense-wide">
+                <div className="expense-fx-heading">
+                  <div>
+                    <strong>Conversione manuale</strong>
+                    <span>Solo per confrontare questa spesa con il budget del viaggio.</span>
+                  </div>
+                  <span className="expense-fx-pair">{normalizedDraftCurrency} → {normalizedTripCurrency}</span>
+                </div>
+
+                <label className="expense-fx-rate">
+                  <span>1 {normalizedDraftCurrency} =</span>
+                  <div>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      readOnly={readOnly}
+                      placeholder="0,92"
+                      value={draft.fxRate ?? ''}
+                      onChange={(event) => patch({ fxRate: event.target.value })}
+                    />
+                    <span>{normalizedTripCurrency}</span>
+                  </div>
+                </label>
+
+                {savedFxMatches && expense?.fx && (
+                  <div className="expense-fx-saved">
+                    <span>Ultima conversione salvata</span>
+                    <strong>{formatMinorCurrency(expense.fx.convertedAmountMinor, expense.fx.targetCurrency)}</strong>
+                    <small>al tasso 1 {expense.currency} = {expense.fx.rate} {expense.fx.targetCurrency}</small>
+                  </div>
+                )}
+
+                <small className="expense-hint">
+                  Il tasso è inserito da te: Duranti non scarica, aggiorna o applica automaticamente tassi di cambio.
+                </small>
+              </div>
+            )}
+
             <label className="expense-wide">
               <span>Descrizione</span>
               <input type="text" maxLength={500} readOnly={readOnly} placeholder="Cena, biglietti museo, taxi…" value={draft.description ?? ''} onChange={(event) => patch({ description: event.target.value })} />
