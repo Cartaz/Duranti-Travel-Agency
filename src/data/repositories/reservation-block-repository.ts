@@ -11,6 +11,8 @@ function readReservationId(block: Block): string | undefined {
 function expectedReservationType(block: Block): Reservation['type'] | undefined {
   if (block.type === 'transport') return 'transport'
   if (block.type === 'accommodation') return 'accommodation'
+  if (block.type === 'restaurant') return 'restaurant'
+  if (block.type === 'activity') return 'activity'
   return undefined
 }
 
