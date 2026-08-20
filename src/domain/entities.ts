@@ -30,6 +30,7 @@ export interface Trip extends EntityBase {
   coverMediaId?: string
   summary?: string
   currency?: string
+  budgetMinor?: number
   homeLocation?: {
     name?: string
     latitude?: number
