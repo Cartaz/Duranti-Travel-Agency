@@ -1,4 +1,4 @@
-import type { Block, Reservation } from '../../domain/entities'
+import type { Block, Itinerary, Reservation } from '../../domain/entities'
 import { db } from '../db/duranti-db'
 
 function readReservationId(block: Block): string | undefined {
@@ -16,6 +16,27 @@ function expectedReservationType(block: Block): Reservation['type'] | undefined 
   return undefined
 }
 
+function itineraryTypeForReservation(type: Reservation['type']): Itinerary['type'] {
+  switch (type) {
+    case 'transport': return 'transport'
+    case 'restaurant': return 'meal'
+    case 'activity': return 'activity'
+    case 'accommodation': return 'reservation'
+    default: return 'reservation'
+  }
+}
+
+function itineraryStatusForReservation(status: Reservation['status']): Itinerary['status'] {
+  switch (status) {
+    case 'booked': return 'booked'
+    case 'completed': return 'done'
+    case 'cancelled': return 'cancelled'
+    case 'planned':
+    default:
+      return 'planned'
+  }
+}
+
 function assertReservationContext(
   reservation: Reservation,
   tripId: string,
@@ -31,6 +52,75 @@ function assertReservationContext(
   }
 }
 
+function assertItineraryContext(
+  itinerary: Itinerary,
+  tripId: string,
+  dayId: string,
+  blockId: string,
+  reservationId: string,
+): void {
+  if (
+    itinerary.tripId !== tripId ||
+    itinerary.dayId !== dayId ||
+    itinerary.blockId !== blockId ||
+    (itinerary.reservationId !== undefined && itinerary.reservationId !== reservationId)
+  ) {
+    throw new Error('La voce itinerario collegata non appartiene a questa prenotazione.')
+  }
+}
+
+async function findOwnedItinerary(
+  tripId: string,
+  dayId: string,
+  blockId: string,
+  reservationId: string,
+): Promise<Itinerary | undefined> {
+  const dayEntries = await db.itineraries.where('dayId').equals(dayId).toArray()
+  const candidates = dayEntries.filter((entry) => (
+    !entry.deletedAt
+    && entry.tripId === tripId
+    && (
+      entry.reservationId === reservationId
+      || (entry.reservationId === undefined && entry.blockId === blockId)
+    )
+  ))
+
+  if (candidates.length > 1) {
+    throw new Error('Esistono più voci itinerario attive per la stessa prenotazione.')
+  }
+
+  const itinerary = candidates[0]
+  if (itinerary) assertItineraryContext(itinerary, tripId, dayId, blockId, reservationId)
+  return itinerary
+}
+
+function itineraryFromReservation(
+  current: Itinerary | undefined,
+  block: Block,
+  reservation: Reservation,
+  now: string,
+): Itinerary {
+  return {
+    id: current?.id ?? crypto.randomUUID(),
+    tripId: reservation.tripId,
+    dayId: reservation.dayId,
+    placeId: reservation.placeId,
+    blockId: block.id,
+    reservationId: reservation.id,
+    type: itineraryTypeForReservation(reservation.type),
+    startsAt: reservation.startsAt,
+    endsAt: reservation.endsAt,
+    timezone: reservation.timezone,
+    title: reservation.title,
+    notes: reservation.notes,
+    status: itineraryStatusForReservation(reservation.status),
+    bookingReference: reservation.confirmationCode,
+    position: block.position,
+    createdAt: current?.createdAt ?? now,
+    updatedAt: now,
+  }
+}
+
 export class ReservationBlockRepository {
   async saveReservationForBlock(
     blockId: string,
@@ -38,7 +128,7 @@ export class ReservationBlockRepository {
     dayId: string,
     reservation: Reservation,
   ): Promise<void> {
-    await db.transaction('rw', db.blocks, db.reservations, async () => {
+    await db.transaction('rw', db.blocks, db.reservations, db.itineraries, async () => {
       const block = await db.blocks.get(blockId)
       if (!block || block.deletedAt) throw new Error('Il blocco prenotazione non esiste più.')
       if (block.tripId !== tripId || block.dayId !== dayId) {
@@ -68,8 +158,13 @@ export class ReservationBlockRepository {
         throw new Error('Esiste già un’altra prenotazione con questo identificatore.')
       }
 
+      const currentItinerary = await findOwnedItinerary(tripId, dayId, blockId, reservation.id)
+      const now = new Date().toISOString()
+      const itinerary = itineraryFromReservation(currentItinerary, block, reservation, now)
+
       if (target) await db.reservations.put(reservation)
       else await db.reservations.add(reservation)
+      await db.itineraries.put(itinerary)
 
       await db.blocks.put({
         ...block,
@@ -77,13 +172,13 @@ export class ReservationBlockRepository {
           ...block.content,
           reservationId: reservation.id,
         },
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       })
     })
   }
 
   async softDeleteReservationBlock(blockId: string, tripId: string, dayId: string): Promise<void> {
-    await db.transaction('rw', db.blocks, db.reservations, async () => {
+    await db.transaction('rw', db.blocks, db.reservations, db.itineraries, async () => {
       const block = await db.blocks.get(blockId)
       if (!block || block.deletedAt) return
       if (block.tripId !== tripId || block.dayId !== dayId) {
@@ -101,6 +196,15 @@ export class ReservationBlockRepository {
           assertReservationContext(reservation, tripId, dayId, expectedType)
           await db.reservations.put({
             ...reservation,
+            deletedAt: now,
+            updatedAt: now,
+          })
+        }
+
+        const itinerary = await findOwnedItinerary(tripId, dayId, blockId, reservationId)
+        if (itinerary) {
+          await db.itineraries.put({
+            ...itinerary,
             deletedAt: now,
             updatedAt: now,
           })
