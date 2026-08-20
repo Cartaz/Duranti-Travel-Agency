@@ -67,7 +67,12 @@ export class MediaRepository {
   async getFile(id: string): Promise<File> {
     const media = await this.get(id)
     if (!media) throw new Error(`Active media ${id} was not found.`)
-    return readMediaFile(id)
+    const stored = await readMediaFile(id)
+    return new File(
+      [stored],
+      media.originalName || stored.name,
+      { type: media.mimeType, lastModified: stored.lastModified },
+    )
   }
 
   async softDelete(id: string): Promise<SoftDeleteMediaResult> {
