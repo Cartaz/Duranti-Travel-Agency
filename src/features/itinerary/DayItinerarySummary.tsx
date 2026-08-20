@@ -12,6 +12,10 @@ import {
   type EditableItineraryType,
   type ItineraryDraft,
 } from './itinerary-service'
+import {
+  moveManualUntimedItineraryItem,
+  type ManualItineraryMoveDirection,
+} from './itinerary-order-service'
 import './itinerary.css'
 
 const typeLabels: Record<EditableItineraryType, string> = {
@@ -42,6 +46,35 @@ function syncLabel(item: DayItineraryItem): string {
   if (item.syncState === 'synced') return 'Da prenotazione'
   if (item.syncState === 'needs-sync') return 'Da riallineare'
   return 'Collegamento da verificare'
+}
+
+function itineraryDisplayGroup(item: DayItineraryItem): number {
+  if (item.itinerary.startsAt) return 0
+  if (item.source === 'reservation') return 1
+  return 2
+}
+
+function orderItineraryForDisplay(items: DayItineraryItem[]): DayItineraryItem[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const leftGroup = itineraryDisplayGroup(left.item)
+      const rightGroup = itineraryDisplayGroup(right.item)
+      if (leftGroup !== rightGroup) return leftGroup - rightGroup
+
+      if (leftGroup === 0) {
+        return (left.item.itinerary.startsAt ?? '').localeCompare(right.item.itinerary.startsAt ?? '')
+          || left.index - right.index
+      }
+
+      if (leftGroup === 1) return left.index - right.index
+
+      return (left.item.itinerary.position ?? Number.MAX_SAFE_INTEGER)
+        - (right.item.itinerary.position ?? Number.MAX_SAFE_INTEGER)
+        || left.item.itinerary.createdAt.localeCompare(right.item.itinerary.createdAt)
+        || left.item.itinerary.id.localeCompare(right.item.itinerary.id)
+    })
+    .map(({ item }) => item)
 }
 
 export default function DayItinerarySummary({
@@ -82,6 +115,10 @@ export default function DayItinerarySummary({
 
   if (items.length === 0 && readOnly) return null
 
+  const displayItems = orderItineraryForDisplay(items)
+  const manualUntimedIds = displayItems
+    .filter((item) => item.source === 'manual' && !item.itinerary.startsAt)
+    .map((item) => item.itinerary.id)
   const needsSyncCount = items.filter((item) => item.syncState === 'needs-sync').length
   const orphanedCount = items.filter((item) => item.syncState === 'orphaned').length
   const editingItem = editingId && editingId !== 'new'
@@ -128,6 +165,23 @@ export default function DayItinerarySummary({
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile eliminare la tappa.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const moveManual = async (
+    item: DayItineraryItem,
+    direction: ManualItineraryMoveDirection,
+  ): Promise<void> => {
+    if (readOnly || busy || item.source !== 'manual' || item.itinerary.startsAt) return
+    setBusy(true)
+    setError('')
+    try {
+      await moveManualUntimedItineraryItem(tripId, dayId, item.itinerary.id, direction)
+      await onChanged()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile riordinare la tappa.')
     } finally {
       setBusy(false)
     }
@@ -182,8 +236,11 @@ export default function DayItinerarySummary({
         </div>
       ) : (
         <ol className="day-itinerary-list">
-          {items.map((item) => {
+          {displayItems.map((item) => {
             const { itinerary, place } = item
+            const untimedManualIndex = item.source === 'manual' && !itinerary.startsAt
+              ? manualUntimedIds.indexOf(itinerary.id)
+              : -1
             return (
               <li key={itinerary.id} className={itinerary.status === 'cancelled' ? 'day-itinerary-cancelled' : undefined}>
                 <time dateTime={itinerary.startsAt}>{timeLabel(itinerary.startsAt)}</time>
@@ -202,6 +259,28 @@ export default function DayItinerarySummary({
                   </div>
                   {!readOnly && item.source === 'manual' && (
                     <div className="day-itinerary-item-actions">
+                      {untimedManualIndex >= 0 && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={busy || untimedManualIndex === 0}
+                            aria-label={`Sposta ${itinerary.title} su`}
+                            title="Sposta su"
+                            onClick={() => void moveManual(item, 'up')}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy || untimedManualIndex === manualUntimedIds.length - 1}
+                            aria-label={`Sposta ${itinerary.title} giù`}
+                            title="Sposta giù"
+                            onClick={() => void moveManual(item, 'down')}
+                          >
+                            ↓
+                          </button>
+                        </>
+                      )}
                       <button type="button" disabled={busy} onClick={() => setEditingId(itinerary.id)}>Modifica</button>
                       <button type="button" disabled={busy} onClick={() => void removeManual(item)}>Elimina</button>
                     </div>
