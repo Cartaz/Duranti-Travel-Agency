@@ -4,7 +4,8 @@ import { blockRepository } from '../../data/repositories/repositories'
 import { getTripDay } from '../days/day-service'
 import { getTrip } from '../trips/trip-service'
 
-export type PlannerBlockType = Extract<BlockType, 'text' | 'heading' | 'checklist' | 'divider'>
+export type BasicPlannerBlockType = Extract<BlockType, 'text' | 'heading' | 'checklist' | 'divider'>
+export type PlannerBlockType = BasicPlannerBlockType | Extract<BlockType, 'place'>
 
 export interface ChecklistItemDraft {
   id: string
@@ -18,14 +19,15 @@ export type PlannerBlockDraft =
   | { type: 'checklist'; items: ChecklistItemDraft[] }
   | { type: 'divider' }
 
-const plannerBlockTypes = new Set<BlockType>(['text', 'heading', 'checklist', 'divider'])
+const plannerBlockTypes = new Set<BlockType>(['text', 'heading', 'checklist', 'divider', 'place'])
+const basicPlannerBlockTypes = new Set<BlockType>(['text', 'heading', 'checklist', 'divider'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function assertPlannerType(type: BlockType): asserts type is PlannerBlockType {
-  if (!plannerBlockTypes.has(type)) throw new Error('Questo tipo di blocco non è ancora modificabile nel planner.')
+function assertBasicPlannerType(type: BlockType): asserts type is BasicPlannerBlockType {
+  if (!basicPlannerBlockTypes.has(type)) throw new Error('Questo tipo di blocco usa un editor dedicato.')
 }
 
 function normalizeText(value: unknown, label: string, maxLength: number): string {
@@ -71,7 +73,7 @@ function contentFromDraft(input: PlannerBlockDraft): Record<string, unknown> {
   }
 }
 
-function defaultDraft(type: PlannerBlockType): PlannerBlockDraft {
+function defaultDraft(type: BasicPlannerBlockType): PlannerBlockDraft {
   switch (type) {
     case 'text': return { type: 'text', text: '' }
     case 'heading': return { type: 'heading', text: '' }
@@ -80,7 +82,7 @@ function defaultDraft(type: PlannerBlockType): PlannerBlockDraft {
   }
 }
 
-async function assertDayContext(tripId: string, dayId: string, editable: boolean): Promise<void> {
+export async function assertPlannerDayContext(tripId: string, dayId: string, editable: boolean): Promise<void> {
   const trip = await getTrip(tripId)
   if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
   if (editable && trip.status === 'archived') {
@@ -92,7 +94,7 @@ async function assertDayContext(tripId: string, dayId: string, editable: boolean
 }
 
 export async function listDayPlannerBlocks(tripId: string, dayId: string): Promise<Block[]> {
-  await assertDayContext(tripId, dayId, false)
+  await assertPlannerDayContext(tripId, dayId, false)
   const blocks = await blockRepository.list()
   return blocks
     .filter((block) => block.tripId === tripId && block.dayId === dayId && plannerBlockTypes.has(block.type))
@@ -104,7 +106,7 @@ export async function listDayPlannerBlocks(tripId: string, dayId: string): Promi
 }
 
 export function readPlannerBlockDraft(block: Block): PlannerBlockDraft {
-  assertPlannerType(block.type)
+  assertBasicPlannerType(block.type)
   if (!isRecord(block.content)) throw new Error('Il contenuto del blocco non è valido.')
 
   switch (block.type) {
@@ -124,12 +126,12 @@ export async function createPlannerBlock(
   dayId: string,
   type: PlannerBlockType,
 ): Promise<Block> {
-  await assertDayContext(tripId, dayId, true)
+  await assertPlannerDayContext(tripId, dayId, true)
   const siblings = (await blockRepository.list())
     .filter((block) => block.tripId === tripId && block.dayId === dayId)
   const position = siblings.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
   const now = new Date().toISOString()
-  const draft = defaultDraft(type)
+  const content = type === 'place' ? {} : contentFromDraft(defaultDraft(type))
 
   const block: Block = {
     id: crypto.randomUUID(),
@@ -137,7 +139,7 @@ export async function createPlannerBlock(
     dayId,
     type,
     position,
-    content: contentFromDraft(draft),
+    content,
     createdAt: now,
     updatedAt: now,
   }
@@ -152,12 +154,12 @@ export async function updatePlannerBlock(
   blockId: string,
   input: PlannerBlockDraft,
 ): Promise<Block> {
-  await assertDayContext(tripId, dayId, true)
+  await assertPlannerDayContext(tripId, dayId, true)
   const block = await blockRepository.get(blockId)
   if (!block || block.tripId !== tripId || block.dayId !== dayId) {
     throw new Error('Il blocco non appartiene a questa giornata.')
   }
-  assertPlannerType(block.type)
+  assertBasicPlannerType(block.type)
   if (block.type !== input.type) throw new Error('Il tipo del blocco non può essere cambiato durante la modifica.')
 
   const draft = normalizeDraft(input)
@@ -177,14 +179,14 @@ export async function movePlannerBlock(
   blockId: string,
   direction: BlockMoveDirection,
 ): Promise<void> {
-  await assertDayContext(tripId, dayId, true)
+  await assertPlannerDayContext(tripId, dayId, true)
   const result = await blockRepository.moveWithinDay(blockId, tripId, dayId, direction)
   if (result === 'not-found') throw new Error('Il blocco non esiste più.')
   if (result === 'invalid-context') throw new Error('Il blocco non appartiene a questa giornata.')
 }
 
 export async function deletePlannerBlock(tripId: string, dayId: string, blockId: string): Promise<void> {
-  await assertDayContext(tripId, dayId, true)
+  await assertPlannerDayContext(tripId, dayId, true)
   const block = await blockRepository.get(blockId)
   if (!block || block.tripId !== tripId || block.dayId !== dayId) {
     throw new Error('Il blocco non appartiene a questa giornata.')

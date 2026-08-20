@@ -165,7 +165,9 @@
 
 .planner-block textarea:focus,
 .planner-block > input[type="text"]:focus,
-.planner-checklist-row > input[type="text"]:focus {
+.planner-checklist-row > input[type="text"]:focus,
+.planner-place-grid input:focus,
+.planner-place-grid textarea:focus {
   border-color: #967552;
 }
 
@@ -232,6 +234,63 @@
   margin-top: 3px;
 }
 
+.planner-place-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.planner-place-grid label {
+  display: grid;
+  gap: 6px;
+  color: #aa9985;
+  font-size: 12px;
+}
+
+.planner-place-grid input,
+.planner-place-grid textarea {
+  width: 100%;
+  border: 1px solid #493b30;
+  border-radius: 11px;
+  background: #14100d;
+  color: #f1e7da;
+  padding: 10px 11px;
+  outline: none;
+}
+
+.planner-place-grid textarea {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.planner-place-wide {
+  grid-column: 1 / -1;
+}
+
+.planner-place-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.planner-map-link {
+  color: #d1b38f;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.planner-map-link:hover {
+  text-decoration: underline;
+}
+
+.planner-place-loading {
+  color: #a59482;
+  font-size: 13px;
+}
+
 .planner-checklist-empty,
 .planner-block-error {
   color: #a59482;
@@ -267,5 +326,24 @@
 
   .planner-block-topline {
     align-items: flex-start;
+  }
+
+  .planner-place-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-place-wide {
+    grid-column: auto;
+  }
+
+  .planner-place-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .planner-place-actions button,
+  .planner-map-link {
+    width: 100%;
+    text-align: center;
   }
 }

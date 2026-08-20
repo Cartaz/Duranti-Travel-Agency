@@ -60,6 +60,20 @@ Blocks are intentionally extensible. Examples:
 
 Templates compose blocks and define defaults; they do not own the underlying data.
 
+Block order is represented by `position` within a day. Planner reorder operations normalize active positions and write the affected rows in one IndexedDB transaction.
+
+### Place blocks
+
+A `place` block does not duplicate address or coordinate data. Its `content` contains only the stable relationship:
+
+```ts
+{ placeId: string }
+```
+
+The referenced `place` entity owns the name, address, optional coordinates, category, notes and generated Google Maps URL. The initial implementation accepts manual/offline place data and generates a universal Maps search URL; it does not require a Google API key or automatic geocoding.
+
+Removing a place block tombstones only the block. The `place` entity remains available for future reuse by other days, itinerary items, reservations or the planned place library.
+
 ## Media
 
 IndexedDB stores metadata only. Ordinary photo/video/audio media bytes are kept in OPFS. Blob URLs are runtime-only and must never be persisted.

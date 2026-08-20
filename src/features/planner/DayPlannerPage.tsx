@@ -1,7 +1,15 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import type { Block, Day, Trip } from '../../domain/entities'
+import type { Block, Day, Place, Trip } from '../../domain/entities'
 import { getTripDay } from '../days/day-service'
+import { googleMapsUrlForPlace } from '../places/maps-url'
+import {
+  EMPTY_PLACE_DRAFT,
+  getPlannerPlace,
+  placeToDraft,
+  savePlannerPlace,
+  type PlaceDraft,
+} from '../places/place-service'
 import { getTrip } from '../trips/trip-service'
 import {
   createPlannerBlock,
@@ -21,15 +29,59 @@ const blockLabels: Record<PlannerBlockType, string> = {
   heading: 'Titolo',
   checklist: 'Checklist',
   divider: 'Separatore',
+  place: 'Luogo',
 }
 
 type MoveDirection = 'up' | 'down'
+
+interface PlaceFormState {
+  name: string
+  formattedAddress: string
+  city: string
+  countryCode: string
+  category: string
+  notes: string
+  latitude: string
+  longitude: string
+}
 
 function formatDayDate(value: string): string {
   const [year, month, day] = value.split('-').map(Number)
   if (!year || !month || !day) return value
   return new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     .format(new Date(year, month - 1, day))
+}
+
+function placeFormStateFromDraft(draft: PlaceDraft): PlaceFormState {
+  return {
+    name: draft.name,
+    formattedAddress: draft.formattedAddress ?? '',
+    city: draft.city ?? '',
+    countryCode: draft.countryCode ?? '',
+    category: draft.category ?? '',
+    notes: draft.notes ?? '',
+    latitude: draft.latitude === undefined ? '' : String(draft.latitude),
+    longitude: draft.longitude === undefined ? '' : String(draft.longitude),
+  }
+}
+
+function parseOptionalCoordinate(value: string): number | undefined {
+  const cleaned = value.trim()
+  if (!cleaned) return undefined
+  return Number(cleaned.replace(',', '.'))
+}
+
+function placeDraftFromFormState(state: PlaceFormState): PlaceDraft {
+  return {
+    name: state.name,
+    formattedAddress: state.formattedAddress,
+    city: state.city,
+    countryCode: state.countryCode,
+    category: state.category,
+    notes: state.notes,
+    latitude: parseOptionalCoordinate(state.latitude),
+    longitude: parseOptionalCoordinate(state.longitude),
+  }
 }
 
 export default function DayPlannerPage() {
@@ -142,7 +194,7 @@ export default function DayPlannerPage() {
         {blocks.length === 0 && (
           <div className="planner-empty">
             <strong>Questa pagina è ancora bianca.</strong>
-            <span>Aggiungi un titolo, un testo, una checklist o un separatore.</span>
+            <span>Aggiungi testo, checklist, separatori o un luogo da visitare.</span>
           </div>
         )}
 
@@ -163,15 +215,7 @@ export default function DayPlannerPage() {
   )
 }
 
-function PlannerBlockEditor({
-  block,
-  tripId,
-  dayId,
-  readOnly,
-  canMoveUp,
-  canMoveDown,
-  onChanged,
-}: {
+interface PlannerBlockEditorProps {
   block: Block
   tripId: string
   dayId: string
@@ -179,7 +223,22 @@ function PlannerBlockEditor({
   canMoveUp: boolean
   canMoveDown: boolean
   onChanged: () => Promise<void>
-}) {
+}
+
+function PlannerBlockEditor(props: PlannerBlockEditorProps) {
+  if (props.block.type === 'place') return <PlannerPlaceBlockEditor {...props} />
+  return <PlannerBasicBlockEditor {...props} />
+}
+
+function PlannerBasicBlockEditor({
+  block,
+  tripId,
+  dayId,
+  readOnly,
+  canMoveUp,
+  canMoveDown,
+  onChanged,
+}: PlannerBlockEditorProps) {
   const [draft, setDraft] = useState<PlannerBlockDraft>(() => readPlannerBlockDraft(block))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -291,6 +350,156 @@ function PlannerBlockEditor({
         <div className="planner-block-actions">
           <button type="submit" disabled={saving}>{saving ? 'Salvataggio…' : 'Salva blocco'}</button>
         </div>
+      )}
+    </form>
+  )
+}
+
+function PlannerPlaceBlockEditor({
+  block,
+  tripId,
+  dayId,
+  readOnly,
+  canMoveUp,
+  canMoveDown,
+  onChanged,
+}: PlannerBlockEditorProps) {
+  const [place, setPlace] = useState<Place>()
+  const [state, setState] = useState<PlaceFormState>(() => placeFormStateFromDraft(EMPTY_PLACE_DRAFT))
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    void getPlannerPlace(tripId, dayId, block.id)
+      .then((loadedPlace) => {
+        if (cancelled) return
+        setPlace(loadedPlace)
+        setState(placeFormStateFromDraft(loadedPlace ? placeToDraft(loadedPlace) : EMPTY_PLACE_DRAFT))
+      })
+      .catch((cause) => {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Impossibile leggere il luogo.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [block.id, block.updatedAt, dayId, tripId])
+
+  const patch = (changes: Partial<PlaceFormState>): void => setState((current) => ({ ...current, ...changes }))
+
+  const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault()
+    if (readOnly || saving) return
+    setSaving(true)
+    setError('')
+    try {
+      const saved = await savePlannerPlace(tripId, dayId, block.id, placeDraftFromFormState(state))
+      setPlace(saved)
+      setState(placeFormStateFromDraft(placeToDraft(saved)))
+      await onChanged()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile salvare il luogo.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async (): Promise<void> => {
+    if (readOnly || saving || !window.confirm('Rimuovere questo luogo dalla giornata? Il luogo salvato resterà disponibile per funzioni future.')) return
+    setSaving(true)
+    setError('')
+    try {
+      await deletePlannerBlock(tripId, dayId, block.id)
+      await onChanged()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile rimuovere il luogo.')
+      setSaving(false)
+    }
+  }
+
+  const move = async (direction: MoveDirection): Promise<void> => {
+    if (readOnly || saving) return
+    setSaving(true)
+    setError('')
+    try {
+      await movePlannerBlock(tripId, dayId, block.id, direction)
+      await onChanged()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile spostare il luogo.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form className="planner-block planner-place-block" onSubmit={(event) => void save(event)}>
+      <div className="planner-block-topline">
+        <span>{blockLabels.place}</span>
+        <PlannerBlockTools
+          readOnly={readOnly}
+          saving={saving}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          onMove={move}
+          onRemove={remove}
+        />
+      </div>
+
+      {loading ? (
+        <span className="planner-place-loading" role="status">Carico il luogo…</span>
+      ) : (
+        <>
+          <div className="planner-place-grid">
+            <label className="planner-place-wide">
+              <span>Nome *</span>
+              <input type="text" maxLength={200} required readOnly={readOnly} placeholder="Musei Vaticani" value={state.name} onChange={(event) => patch({ name: event.target.value })} />
+            </label>
+            <label className="planner-place-wide">
+              <span>Indirizzo</span>
+              <input type="text" maxLength={500} readOnly={readOnly} placeholder="Viale Vaticano, Roma" value={state.formattedAddress} onChange={(event) => patch({ formattedAddress: event.target.value })} />
+            </label>
+            <label>
+              <span>Città</span>
+              <input type="text" maxLength={120} readOnly={readOnly} placeholder="Roma" value={state.city} onChange={(event) => patch({ city: event.target.value })} />
+            </label>
+            <label>
+              <span>Paese</span>
+              <input type="text" maxLength={2} autoCapitalize="characters" readOnly={readOnly} placeholder="IT" value={state.countryCode} onChange={(event) => patch({ countryCode: event.target.value.toUpperCase() })} />
+            </label>
+            <label>
+              <span>Categoria</span>
+              <input type="text" maxLength={80} readOnly={readOnly} placeholder="Museo" value={state.category} onChange={(event) => patch({ category: event.target.value })} />
+            </label>
+            <label>
+              <span>Latitudine</span>
+              <input type="text" inputMode="decimal" readOnly={readOnly} placeholder="41.9065" value={state.latitude} onChange={(event) => patch({ latitude: event.target.value })} />
+            </label>
+            <label>
+              <span>Longitudine</span>
+              <input type="text" inputMode="decimal" readOnly={readOnly} placeholder="12.4536" value={state.longitude} onChange={(event) => patch({ longitude: event.target.value })} />
+            </label>
+            <label className="planner-place-wide">
+              <span>Note</span>
+              <textarea rows={4} maxLength={2000} readOnly={readOnly} placeholder="Orari, biglietti, cosa vogliamo vedere…" value={state.notes} onChange={(event) => patch({ notes: event.target.value })} />
+            </label>
+          </div>
+
+          {error && <small className="planner-block-error">{error}</small>}
+          <div className="planner-place-actions">
+            {place && (
+              <a className="planner-map-link" href={googleMapsUrlForPlace(place)} target="_blank" rel="noreferrer">
+                Apri in Google Maps ↗
+              </a>
+            )}
+            {!readOnly && <button type="submit" disabled={saving}>{saving ? 'Salvataggio…' : place ? 'Salva luogo' : 'Crea luogo'}</button>}
+          </div>
+        </>
       )}
     </form>
   )
