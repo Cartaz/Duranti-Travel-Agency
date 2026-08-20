@@ -254,8 +254,8 @@ export async function listDayItineraryItems(tripId: string, dayId: string): Prom
   const coveredReservationIds = new Set<string>()
   const coveredBlockIds = new Set<string>()
   const persistedItems: DayItineraryItem[] = itineraries.map((itinerary) => {
-    const referencedReservationId = itinerary.reservationId
-      ?? (itinerary.blockId ? reservationIdFromBlock(blockById.get(itinerary.blockId) ?? ({ type: 'text', content: {} } as Block)) : undefined)
+    const linkedBlock = itinerary.blockId ? blockById.get(itinerary.blockId) : undefined
+    const referencedReservationId = itinerary.reservationId ?? (linkedBlock ? reservationIdFromBlock(linkedBlock) : undefined)
 
     if (!referencedReservationId) {
       return {
