@@ -1,0 +1,79 @@
+.app-validation-notice {
+  position: fixed;
+  z-index: 100;
+  left: 50%;
+  bottom: calc(86px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 24px));
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #8a544a;
+  border-radius: 16px;
+  background: #2b1d19;
+  color: #fff1e8;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, .48);
+}
+
+.app-validation-notice > div {
+  min-width: 0;
+}
+
+.app-validation-notice strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.app-validation-notice p {
+  margin: 0;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.app-validation-notice button {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+}
+
+.app-bottom-nav-simple {
+  width: min(210px, calc(100% - 32px));
+  grid-template-columns: 1fr;
+}
+
+/* Never truncate actionable feedback. This also fixes legacy toast messages. */
+.toast,
+[role='alert'] {
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  text-overflow: clip !important;
+}
+
+.toast {
+  width: min(560px, calc(100% - 24px));
+  max-width: none;
+  max-height: min(42dvh, 320px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+@media (max-width: 520px) {
+  .app-validation-notice {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .app-validation-notice button {
+    align-self: flex-end;
+  }
+}
