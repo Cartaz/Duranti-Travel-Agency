@@ -13,7 +13,7 @@ The model is intentionally relational-by-reference inside IndexedDB. IDs are sta
 - `activity`: planned/reserved activity linked to a place and/or day.
 - `media`: metadata for ordinary photo/video/audio/document assets stored in OPFS.
 - `link`: external URL with title, source and optional relation to another entity.
-- `travelerDocument`: sensitive identity-document record whose secret fields are encrypted at rest.
+- `travelerDocument`: sensitive identity-document record whose secret fields and optional attachment metadata are encrypted at rest.
 - `template`: reusable day/block template such as museum, day trip or travel day.
 - `appMeta`: local installation, schema, Vault and wrapped encryption-key metadata; never stores the passphrase or an unwrapped key.
 
@@ -58,7 +58,7 @@ Templates compose blocks and define defaults; they do not own the underlying dat
 
 IndexedDB stores metadata only. Ordinary photo/video/audio media bytes are kept in OPFS. Blob URLs are runtime-only and must never be persisted.
 
-Traveler passport/identity scans are **not ordinary media**. They must not use the plaintext media OPFS path; they will use the encrypted private-file layer defined by the security architecture.
+Traveler passport/identity scans are **not ordinary media**. They use the encrypted private-file namespace under `duranti/private/traveler-documents/` and are accessed only through the secure traveler-document repository.
 
 ## Sensitive documents
 
@@ -74,6 +74,16 @@ updatedAt
 deletedAt?
 ```
 
-The AES-GCM `encryptedPayload` contains fields such as document number, issuing country, issue/expiry dates, holder name and notes. The secure repository is the only application persistence boundary for these records.
+The AES-GCM `encryptedPayload` contains fields such as document number, issuing country, issue/expiry dates, holder name and notes. If a scan/photo is attached, the same encrypted payload also contains its random attachment ID, private OPFS path, MIME type, original filename and plaintext byte size.
 
-The key hierarchy is defined by ADR-003. Legacy plaintext rows are detected and blocked from normal use until an explicit unlocked migration can encrypt them. Document scans are not enabled until encrypted OPFS storage is available.
+The attachment ciphertext itself is stored separately at:
+
+```text
+duranti/private/traveler-documents/<documentId>/<attachmentId>.enc
+```
+
+The private-file format contains only its format marker, AES-GCM IV and authenticated ciphertext. It is deliberately separate from the ordinary `media` table and ordinary media OPFS tree.
+
+Private attachment format v1 is limited to 20 MiB because Web Crypto processes the complete encryption/decryption BufferSource in memory. Larger sensitive files require a future chunked authenticated-encryption format.
+
+The key hierarchy and crash-safe attachment lifecycle are defined by ADR-003. Legacy plaintext rows are detected and blocked from normal use until an explicit unlocked migration can encrypt them.

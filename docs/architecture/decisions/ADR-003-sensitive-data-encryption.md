@@ -4,7 +4,7 @@ Status: accepted
 
 ## Context
 
-Duranti stores traveler identity data and, eventually, scans of passports and identity documents. The product is an iPhone Home Screen PWA with no cloud backend and no native Apple Developer integration. Standard web APIs do not expose an iOS Keychain/Secure Enclave equivalent that Duranti can use as its sole application key store.
+Duranti stores traveler identity data and scans of passports and identity documents. The product is an iPhone Home Screen PWA with no cloud backend and no native Apple Developer integration. Standard web APIs do not expose an iOS Keychain/Secure Enclave equivalent that Duranti can use as its sole application key store.
 
 Sensitive records therefore need application-level encryption at rest while remaining fully local/offline.
 
@@ -17,11 +17,16 @@ Use a two-level symmetric key hierarchy implemented with Web Crypto:
 - persist only a versioned envelope containing the PBKDF2 salt/work factor and the AES-KW-wrapped DEK;
 - keep the unwrapped DEK only in memory and non-extractable;
 - encrypt each sensitive JSON payload using AES-256-GCM with a new 96-bit random IV;
-- authenticate `purpose + entityId + formatVersion` as AES-GCM additional data to prevent ciphertext substitution between records.
+- authenticate `purpose + entityId + formatVersion` as AES-GCM additional data to prevent ciphertext substitution between records;
+- store passport/identity binary attachments only in the encrypted private OPFS namespace, never in the ordinary media namespace.
 
 PBKDF2-HMAC-SHA256 starts at 600,000 iterations. The iteration count is persisted in the key envelope so it can evolve after performance measurements on the target iPhone.
 
-Traveler document records keep only relationship/query metadata (`id`, `travelerId`, document `type`, timestamps and tombstone) in plaintext. Document number, issuing country, issue/expiry dates, holder name and notes are stored inside the encrypted payload.
+Traveler document records keep only relationship/query metadata (`id`, `travelerId`, document `type`, timestamps and tombstone) in plaintext. Document number, issuing country, issue/expiry dates, holder name, notes and private attachment metadata are stored inside the encrypted payload.
+
+Binary attachment format v1 uses the same unlocked DEK with a distinct additional-data namespace. Each file contains only a fixed format marker, a fresh 96-bit IV and AES-GCM authenticated ciphertext. The OPFS location is `duranti/private/traveler-documents/<documentId>/<attachmentId>.enc`.
+
+Because Web Crypto `encrypt()` and `decrypt()` accept a complete BufferSource rather than a streaming source, private attachment format v1 is limited to 20 MiB. Supporting larger binaries requires a separately reviewed chunked authenticated-encryption format; this ADR does not define one.
 
 ## Why a wrapped DEK instead of password-encrypting every record directly
 
@@ -35,6 +40,12 @@ WebAuthn can improve future unlock UX, but credentials may be synchronized by th
 
 Dexie v3 removes the plaintext `expiryDate` index but does not delete or rewrite legacy document fields. Encrypting those values requires the user's unlocked key, which is unavailable during a database-version transaction. The secure repository must detect legacy plaintext rows and block normal use until an explicit user-mediated secure migration is implemented.
 
+## Attachment lifecycle
+
+A replacement attachment is written to a new random OPFS file first. Only after the new ciphertext exists is the encrypted JSON metadata switched to reference it; the previous ciphertext is then removed best-effort. A crash can therefore leave an orphan file but must not deliberately leave a live metadata reference to bytes that were already removed.
+
+Removing an attachment unlinks it from the encrypted JSON payload before deleting the ciphertext. Purging a tombstoned traveler document removes its private OPFS directory before deleting the IndexedDB record, so an interrupted purge remains discoverable and retryable.
+
 ## Consequences and limitations
 
 - The passphrase is never persisted.
@@ -42,4 +53,5 @@ Dexie v3 removes the plaintext `expiryDate` index but does not delete or rewrite
 - Weak passphrases remain susceptible to offline guessing; UI must encourage a strong passphrase.
 - PBKDF2 cost must be benchmarked on iPhone 16 before the security UI is frozen.
 - Encryption at rest cannot protect plaintext already displayed in an unlocked compromised page; XSS/CSP hardening remains mandatory.
-- Binary passport/ID scans remain disabled from ordinary media storage until the encrypted OPFS private-file layer is implemented.
+- Private attachment integrity/orphan reconciliation is still required before cleanup is automated.
+- Vault export must eventually include encrypted private OPFS files as well as structured records.

@@ -23,6 +23,14 @@ interface RootKeyEnvelopeV1 {
   }
 }
 
+export interface EncryptedBytesV1 {
+  version: 1
+  algorithm: 'AES-GCM'
+  tagLength: 128
+  iv: Uint8Array<ArrayBuffer>
+  ciphertext: Uint8Array<ArrayBuffer>
+}
+
 let sessionDataKey: CryptoKey | undefined
 
 export class LocalEncryptionLockedError extends Error {
@@ -146,8 +154,12 @@ function requireSessionDataKey(): CryptoKey {
   return sessionDataKey
 }
 
-function buildAdditionalData(purpose: string, entityId: string): Uint8Array<ArrayBuffer> {
+function buildJsonAdditionalData(purpose: string, entityId: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(`duranti|encrypted-json|v1|${purpose}|${entityId}`)
+}
+
+function buildBinaryAdditionalData(purpose: string, entityId: string): Uint8Array<ArrayBuffer> {
+  return new TextEncoder().encode(`duranti|encrypted-file|v1|${purpose}|${entityId}`)
 }
 
 export async function isLocalEncryptionConfigured(): Promise<boolean> {
@@ -227,7 +239,7 @@ export async function encryptJson<T>(
 ): Promise<EncryptedPayloadV1> {
   const key = requireSessionDataKey()
   const iv = crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES))
-  const additionalData = buildAdditionalData(purpose, entityId)
+  const additionalData = buildJsonAdditionalData(purpose, entityId)
   const plaintext = new TextEncoder().encode(JSON.stringify(value))
 
   try {
@@ -264,7 +276,7 @@ export async function decryptJson<T>(
   const key = requireSessionDataKey()
   const iv = base64ToBytes(payload.ivB64)
   const ciphertext = base64ToBytes(payload.ciphertextB64)
-  const additionalData = buildAdditionalData(purpose, entityId)
+  const additionalData = buildJsonAdditionalData(purpose, entityId)
 
   const decryptedBuffer = await crypto.subtle.decrypt(
     {
@@ -283,4 +295,54 @@ export async function decryptJson<T>(
   } finally {
     decrypted.fill(0)
   }
+}
+
+export async function encryptBytes(
+  purpose: string,
+  entityId: string,
+  plaintext: Uint8Array<ArrayBuffer>,
+): Promise<EncryptedBytesV1> {
+  const key = requireSessionDataKey()
+  const iv = crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES))
+  const additionalData = buildBinaryAdditionalData(purpose, entityId)
+  const ciphertext = await crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv,
+      additionalData,
+      tagLength: AES_GCM_TAG_LENGTH,
+    },
+    key,
+    plaintext,
+  )
+
+  return {
+    version: 1,
+    algorithm: 'AES-GCM',
+    tagLength: AES_GCM_TAG_LENGTH,
+    iv,
+    ciphertext: new Uint8Array(ciphertext),
+  }
+}
+
+export async function decryptBytes(
+  purpose: string,
+  entityId: string,
+  iv: Uint8Array<ArrayBuffer>,
+  ciphertext: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const key = requireSessionDataKey()
+  const additionalData = buildBinaryAdditionalData(purpose, entityId)
+  const plaintext = await crypto.subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv,
+      additionalData,
+      tagLength: AES_GCM_TAG_LENGTH,
+    },
+    key,
+    ciphertext,
+  )
+
+  return new Uint8Array(plaintext)
 }

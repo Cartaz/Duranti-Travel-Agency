@@ -66,6 +66,18 @@ export interface TravelerDocumentSecret {
   notes?: string
 }
 
+export interface TravelerDocumentAttachment {
+  id: string
+  opfsPath: string
+  mimeType: string
+  originalName?: string
+  sizeBytes: number
+}
+
+export interface TravelerDocumentPrivateData extends TravelerDocumentSecret {
+  attachment?: TravelerDocumentAttachment
+}
+
 export interface TravelerDocument extends EntityBase {
   travelerId: string
   type: 'passport' | 'identityCard' | 'drivingLicense' | 'visa' | 'other'
