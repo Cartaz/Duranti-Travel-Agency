@@ -112,7 +112,7 @@ An `expense` block contains only the owned record relationship:
 
 The referenced `expense` owns `amountMinor`, ISO currency, category, description, optional local occurrence time, payer reference and notes. Block and expense writes are committed together in one IndexedDB transaction; removing the block tombstones both owned records atomically.
 
-Persisted money never uses a floating-point major-unit value. User input is converted to integer minor units according to the currency fraction digits exposed by `Intl.NumberFormat` (for example 2 for EUR and 0 for JPY). `paidByTravelerId` is reserved for the next integration step that will connect expense editing to active trip participants.
+Persisted money never uses a floating-point major-unit value. User input is converted to integer minor units according to the currency fraction digits exposed by `Intl.NumberFormat` (for example 2 for EUR and 0 for JPY). New payer assignments are restricted to active `tripTraveler` participants. If a payer is later detached from the trip, an existing expense may retain that historical `paidByTravelerId`; changing to a different payer again requires an active membership.
 
 ## Media
 

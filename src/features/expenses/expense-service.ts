@@ -1,8 +1,9 @@
-import type { Block, Expense } from '../../domain/entities'
+import type { Block, Expense, Traveler } from '../../domain/entities'
 import { expenseBlockRepository } from '../../data/repositories/expense-block-repository'
 import { blockRepository, expenseRepository } from '../../data/repositories/repositories'
 import { getTripDay } from '../days/day-service'
 import { assertPlannerDayContext } from '../planner/block-service'
+import { getTraveler, listTripParticipants } from '../travelers/traveler-service'
 import {
   majorAmountToMinor,
   minorAmountToMajor,
@@ -15,6 +16,7 @@ export interface ExpenseDraft {
   category?: string
   description?: string
   occurredAt?: string
+  paidByTravelerId?: string
   notes?: string
 }
 
@@ -83,6 +85,26 @@ function assertExpenseContext(expense: Expense, tripId: string, dayId: string): 
   }
 }
 
+async function validatePayer(
+  tripId: string,
+  requestedTravelerId: string | undefined,
+  currentTravelerId: string | undefined,
+): Promise<string | undefined> {
+  const travelerId = cleanOptional(requestedTravelerId)
+  if (!travelerId) return undefined
+
+  // Preserve the historical payer of an existing expense even if that person was
+  // later detached from the trip. Choosing a different payer still requires an
+  // active trip membership.
+  if (travelerId === currentTravelerId) return travelerId
+
+  const participants = await listTripParticipants(tripId)
+  if (!participants.some((participant) => participant.traveler.id === travelerId)) {
+    throw new Error('“Pagato da” deve riferirsi a un viaggiatore attualmente associato al viaggio.')
+  }
+  return travelerId
+}
+
 export function expenseToDraft(expense: Expense): ExpenseDraft {
   return {
     amount: minorAmountToMajor(expense.amountMinor, expense.currency),
@@ -90,7 +112,27 @@ export function expenseToDraft(expense: Expense): ExpenseDraft {
     category: expense.category,
     description: expense.description,
     occurredAt: expense.occurredAt,
+    paidByTravelerId: expense.paidByTravelerId,
     notes: expense.notes,
+  }
+}
+
+export async function listExpensePayerOptions(
+  tripId: string,
+  currentTravelerId?: string,
+): Promise<{ active: Traveler[]; historical?: Traveler }> {
+  const participants = await listTripParticipants(tripId)
+  const active = participants.map((participant) => participant.traveler)
+  const currentIsActive = currentTravelerId
+    ? active.some((traveler) => traveler.id === currentTravelerId)
+    : false
+  const historical = currentTravelerId && !currentIsActive
+    ? await getTraveler(currentTravelerId)
+    : undefined
+
+  return {
+    active: active.sort((left, right) => left.displayName.localeCompare(right.displayName, 'it')),
+    historical,
   }
 }
 
@@ -127,6 +169,7 @@ export async function savePlannerExpense(
   const current = expenseId ? await expenseRepository.get(expenseId) : undefined
   if (current) assertExpenseContext(current, tripId, dayId)
 
+  const paidByTravelerId = await validatePayer(tripId, input.paidByTravelerId, current?.paidByTravelerId)
   const now = new Date().toISOString()
   const common = {
     amountMinor,
@@ -134,6 +177,7 @@ export async function savePlannerExpense(
     category: validateOptionalText(input.category, 'Categoria', 80),
     description: validateOptionalText(input.description, 'Descrizione', 500),
     occurredAt: validateLocalDateTime(input.occurredAt, day.date),
+    paidByTravelerId,
     notes: validateOptionalText(input.notes, 'Note', 2000),
   }
 

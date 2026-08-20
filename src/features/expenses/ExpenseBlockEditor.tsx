@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from 'react'
-import type { Block, Expense } from '../../domain/entities'
+import type { Block, Expense, Traveler } from '../../domain/entities'
 import { movePlannerBlock } from '../planner/block-service'
 import {
   deletePlannerExpenseBlock,
   emptyExpenseDraft,
   expenseToDraft,
   getPlannerExpense,
+  listExpensePayerOptions,
   savePlannerExpense,
   type ExpenseDraft,
 } from './expense-service'
@@ -38,6 +39,8 @@ export default function ExpenseBlockEditor({
   const fallbackCurrency = tripCurrency ?? 'EUR'
   const [expense, setExpense] = useState<Expense>()
   const [draft, setDraft] = useState<ExpenseDraft>(() => emptyExpenseDraft(fallbackCurrency))
+  const [payers, setPayers] = useState<Traveler[]>([])
+  const [historicalPayer, setHistoricalPayer] = useState<Traveler>()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -46,10 +49,13 @@ export default function ExpenseBlockEditor({
     let cancelled = false
     setLoading(true)
     void getPlannerExpense(tripId, dayId, block.id)
-      .then((loadedExpense) => {
+      .then(async (loadedExpense) => {
+        const payerOptions = await listExpensePayerOptions(tripId, loadedExpense?.paidByTravelerId)
         if (cancelled) return
         setExpense(loadedExpense)
         setDraft(loadedExpense ? expenseToDraft(loadedExpense) : emptyExpenseDraft(fallbackCurrency))
+        setPayers(payerOptions.active)
+        setHistoricalPayer(payerOptions.historical)
       })
       .catch((cause) => {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Impossibile leggere la spesa.')
@@ -72,8 +78,11 @@ export default function ExpenseBlockEditor({
     setError('')
     try {
       const saved = await savePlannerExpense(tripId, dayId, block.id, draft)
+      const payerOptions = await listExpensePayerOptions(tripId, saved.paidByTravelerId)
       setExpense(saved)
       setDraft(expenseToDraft(saved))
+      setPayers(payerOptions.active)
+      setHistoricalPayer(payerOptions.historical)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile salvare la spesa.')
@@ -111,6 +120,9 @@ export default function ExpenseBlockEditor({
 
   const dayMin = `${dayDate}T00:00`
   const dayMax = `${dayDate}T23:59`
+  const currentPayerIsActive = draft.paidByTravelerId
+    ? payers.some((traveler) => traveler.id === draft.paidByTravelerId)
+    : false
 
   return (
     <form className="planner-block expense-block" onSubmit={(event) => void save(event)}>
@@ -166,6 +178,20 @@ export default function ExpenseBlockEditor({
               <input type="text" maxLength={80} readOnly={readOnly} placeholder="Cibo, museo, trasporto…" value={draft.category ?? ''} onChange={(event) => patch({ category: event.target.value })} />
             </label>
             <label>
+              <span>Pagato da</span>
+              <select disabled={readOnly} value={draft.paidByTravelerId ?? ''} onChange={(event) => patch({ paidByTravelerId: event.target.value })}>
+                <option value="">Non specificato</option>
+                {payers.map((traveler) => (
+                  <option value={traveler.id} key={traveler.id}>{traveler.displayName}</option>
+                ))}
+                {draft.paidByTravelerId && !currentPayerIsActive && (
+                  <option value={draft.paidByTravelerId} disabled>
+                    {historicalPayer?.displayName ?? 'Profilo non disponibile'} — non più nel viaggio
+                  </option>
+                )}
+              </select>
+            </label>
+            <label>
               <span>Quando</span>
               <input type="datetime-local" min={dayMin} max={dayMax} readOnly={readOnly} value={draft.occurredAt ?? ''} onChange={(event) => patch({ occurredAt: event.target.value })} />
             </label>
@@ -179,7 +205,9 @@ export default function ExpenseBlockEditor({
             </label>
           </div>
 
-          <small className="expense-hint">“Pagato da” verrà collegato ai profili viaggiatori nel relativo modulo.</small>
+          {payers.length === 0 && !draft.paidByTravelerId && (
+            <small className="expense-hint">Associa almeno un viaggiatore al capitolo per usare “Pagato da”.</small>
+          )}
           {error && <small className="planner-block-error">{error}</small>}
 
           {!readOnly && (

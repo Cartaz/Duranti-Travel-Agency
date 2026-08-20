@@ -24,6 +24,7 @@
 }
 
 .expense-grid input,
+.expense-grid select,
 .expense-grid textarea {
   width: 100%;
   min-width: 0;
@@ -33,6 +34,7 @@
   color: #f1e7da;
   padding: 10px 11px;
   outline: none;
+  font: inherit;
 }
 
 .expense-grid textarea {
@@ -42,8 +44,13 @@
 }
 
 .expense-grid input:focus,
+.expense-grid select:focus,
 .expense-grid textarea:focus {
   border-color: #967552;
+}
+
+.expense-grid select:disabled {
+  opacity: .72;
 }
 
 .expense-wide {

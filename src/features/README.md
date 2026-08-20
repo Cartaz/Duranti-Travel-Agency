@@ -10,7 +10,7 @@ Implemented / active:
 - `planner/` — persistent day editor with text, heading, checklist, divider, place, transport, accommodation and expense blocks, atomic up/down reordering, soft-delete and read-only archived trips.
 - `places/` — manually saved local places linked from planner blocks with universal Google Maps URLs; no Google API key or automatic geocoding required.
 - `reservations/` — transport and accommodation records linked atomically to planner blocks, with local wall-clock date/time, separate IANA timezone, optional saved place and booking link.
-- `expenses/` — exact minor-unit expense records linked atomically to planner blocks, with ISO currency-aware decimal handling and optional local occurrence time.
+- `expenses/` — exact minor-unit expense records linked atomically to planner blocks, with ISO currency-aware decimal handling, optional local occurrence time and payer assignment restricted to trip participants.
 - `travelers/` — reusable system-level traveler profiles and trip memberships with role management and duplicate-membership protection; identity documents remain behind the encrypted document boundary.
 
 Planned next:
@@ -18,7 +18,7 @@ Planned next:
 - `planner/` — richer block types and guided planning.
 - `places/` — reusable place library, richer map UI and provider-assisted lookup only when explicitly enabled.
 - `reservations/` — restaurant/activity workflows, attachments and richer itinerary integration.
-- `expenses/` — traveler payer assignment, trip/day totals and category summaries.
+- `expenses/` — trip/day totals and category/payer summaries.
 - `media/` — capture/import/organize photos and videos.
 - `travelers/` — encrypted identity-document UI, addresses/preferences and membership reconciliation tooling.
 - `templates/` — museum, day trip, travel day and custom templates.
