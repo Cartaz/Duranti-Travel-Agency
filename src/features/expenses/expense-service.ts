@@ -1,10 +1,11 @@
-import type { Block, Expense, Traveler } from '../../domain/entities'
+import type { Block, Expense, ExpenseFxConversion, Traveler } from '../../domain/entities'
 import { expenseBlockRepository } from '../../data/repositories/expense-block-repository'
-import { blockRepository, expenseRepository } from '../../data/repositories/repositories'
+import { blockRepository, expenseRepository, tripRepository } from '../../data/repositories/repositories'
 import { getTripDay } from '../days/day-service'
 import { assertPlannerDayContext } from '../planner/block-service'
 import { getTraveler, listTripParticipants } from '../travelers/traveler-service'
 import {
+  convertMinorByRate,
   majorAmountToMinor,
   minorAmountToMajor,
   normalizeCurrencyCode,
@@ -18,6 +19,7 @@ export interface ExpenseDraft {
   occurredAt?: string
   paidByTravelerId?: string
   notes?: string
+  fxRate?: string
 }
 
 export function emptyExpenseDraft(currency = 'EUR'): ExpenseDraft {
@@ -93,9 +95,6 @@ async function validatePayer(
   const travelerId = cleanOptional(requestedTravelerId)
   if (!travelerId) return undefined
 
-  // Preserve the historical payer of an existing expense even if that person was
-  // later detached from the trip. Choosing a different payer still requires an
-  // active trip membership.
   if (travelerId === currentTravelerId) return travelerId
 
   const participants = await listTripParticipants(tripId)
@@ -114,6 +113,7 @@ export function expenseToDraft(expense: Expense): ExpenseDraft {
     occurredAt: expense.occurredAt,
     paidByTravelerId: expense.paidByTravelerId,
     notes: expense.notes,
+    fxRate: expense.fx?.rate,
   }
 }
 
@@ -159,9 +159,13 @@ export async function savePlannerExpense(
   input: ExpenseDraft,
 ): Promise<Expense> {
   await assertPlannerDayContext(tripId, dayId, true)
-  const block = await getExpenseBlock(tripId, dayId, blockId)
-  const day = await getTripDay(tripId, dayId)
+  const [block, day, trip] = await Promise.all([
+    getExpenseBlock(tripId, dayId, blockId),
+    getTripDay(tripId, dayId),
+    tripRepository.get(tripId),
+  ])
   if (!day) throw new Error('La giornata non esiste più.')
+  if (!trip) throw new Error('Il viaggio non esiste più.')
 
   const currency = normalizeCurrencyCode(input.currency)
   const amountMinor = majorAmountToMinor(input.amount, currency)
@@ -170,6 +174,21 @@ export async function savePlannerExpense(
   if (current) assertExpenseContext(current, tripId, dayId)
 
   const paidByTravelerId = await validatePayer(tripId, input.paidByTravelerId, current?.paidByTravelerId)
+  const tripCurrency = trip.currency ? normalizeCurrencyCode(trip.currency) : undefined
+  const requestedFxRate = cleanOptional(input.fxRate)
+  let fx: ExpenseFxConversion | undefined
+
+  if (tripCurrency && currency !== tripCurrency && requestedFxRate) {
+    const conversion = convertMinorByRate(amountMinor, currency, tripCurrency, requestedFxRate)
+    fx = {
+      targetCurrency: tripCurrency,
+      rate: conversion.rate,
+      convertedAmountMinor: conversion.convertedAmountMinor,
+    }
+  } else if (!tripCurrency && requestedFxRate) {
+    throw new Error('Imposta prima la valuta del viaggio per registrare una conversione FX.')
+  }
+
   const now = new Date().toISOString()
   const common = {
     amountMinor,
@@ -179,6 +198,7 @@ export async function savePlannerExpense(
     occurredAt: validateLocalDateTime(input.occurredAt, day.date),
     paidByTravelerId,
     notes: validateOptionalText(input.notes, 'Note', 2000),
+    fx,
   }
 
   const expense: Expense = current
