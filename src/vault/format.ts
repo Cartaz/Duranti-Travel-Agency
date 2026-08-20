@@ -121,6 +121,11 @@ export function encodeUint32(value: number): Uint8Array<ArrayBuffer> {
   return bytes
 }
 
+export function decodeUint32(bytes: Uint8Array<ArrayBuffer>): number {
+  if (bytes.byteLength !== 4) throw new Error('Vault uint32 field must contain exactly 4 bytes.')
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, false)
+}
+
 export function vaultMagicBytes(): Uint8Array<ArrayBuffer> {
   return VAULT_MAGIC.slice()
 }
@@ -133,6 +138,15 @@ export function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...chunk)
   }
   return btoa(binary)
+}
+
+export function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(value)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return bytes
 }
 
 export async function deriveVaultKey(
@@ -189,6 +203,27 @@ export async function encryptVaultPayload(
     iv,
     ciphertext: new Uint8Array(ciphertext),
   }
+}
+
+export async function decryptVaultPayload(
+  key: CryptoKey,
+  aadText: string,
+  iv: Uint8Array<ArrayBuffer>,
+  ciphertext: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const additionalData = new TextEncoder().encode(aadText)
+  const plaintext = await crypto.subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv,
+      additionalData,
+      tagLength: AES_GCM_TAG_BITS,
+    },
+    key,
+    ciphertext,
+  )
+
+  return new Uint8Array(plaintext)
 }
 
 export function manifestAdditionalData(archiveId: string): string {

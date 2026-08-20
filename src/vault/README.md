@@ -4,7 +4,7 @@ Portable encrypted backup independent of origin storage.
 
 ## Production format v1
 
-Export is implemented as a chunked binary `.duranti` archive. Import remains a separate gated step because restore must stage and validate the entire archive before mutating live IndexedDB/OPFS state.
+Export is implemented as a chunked binary `.duranti` archive. Import now supports strict parse/decrypt/validation plus isolated OPFS staging; the final live commit/rollback step remains separately gated.
 
 The export contains:
 
@@ -46,19 +46,47 @@ Preparing a Vault may take too long to retain the browser's transient user activ
 
 The passphrase is never persisted. A prepared staging file is already encrypted, but the UI should offer explicit cleanup after a successful share/download or cancellation.
 
-## Import requirements
+## Import staging
 
-Production import must still implement all of the following before it is enabled in UI:
+`stageVaultImport()` never writes to the live Duranti database or managed live OPFS trees.
 
-- strict header/frame/version validation;
-- password derivation and authenticated manifest decryption;
-- chunk-order/AAD/authentication validation;
-- complete archive validation before live mutation;
-- staging of structured data and OPFS files;
-- compatibility checks for schema/Vault versions;
-- atomic user-visible commit or rollback;
-- post-restore integrity scan.
+It performs, in order:
 
-Never import directly into live data while parsing. Never log plaintext Vault contents, passwords, keys or sensitive document data.
+1. exact file magic/header/version/KDF/encryption validation;
+2. PBKDF2 key derivation;
+3. authenticated AES-GCM manifest decryption;
+4. current-schema table-set and primary-key validation;
+5. managed-path, file-size and chunk-count validation;
+6. strict frame ordering and per-chunk AAD/authentication checks;
+7. sequential decryption of file chunks into an isolated staging subtree;
+8. final staged byte-size verification, end-frame verification and rejection of trailing bytes.
+
+Staged binary bytes live only under:
+
+```text
+duranti/vault-import-staging/<stageId>/files/<fileIndex>.bin
+```
+
+Original managed paths are not used as staging filesystem paths. They remain authenticated manifest metadata and are revalidated before any future live commit.
+
+Structured rows remain in the returned in-memory validated manifest during this phase; they are not inserted into IndexedDB. Ordinary media chunks are plaintext in import staging because they are plaintext in their normal live OPFS namespace. Private-document files remain protected by their inner `DURDOC01` encryption even after the outer Vault layer is removed.
+
+Any parsing, password, authentication, ordering, size or staging failure removes the entire import staging directory best-effort and leaves live Duranti state untouched. `discardStagedVaultImport()` explicitly removes a successful staging area when the user cancels.
+
+Production format v1 currently accepts only the exact current database schema version. Cross-schema restore will require an explicit reviewed migration path rather than silently inserting incompatible rows.
+
+## Remaining import commit requirements
+
+Before restore is exposed as complete in the UI, the next gated step must implement:
+
+- re-validation of the staged manifest immediately before mutation;
+- a user-visible replace/restore policy for existing live data;
+- isolated live OPFS replacement with recoverable rollback material;
+- one short Dexie transaction for structured-data replacement;
+- cleanup/rollback if either side of the commit fails;
+- post-restore media and private-document integrity scans;
+- explicit removal of staging data only after successful verification.
+
+Never parse directly into live data. Never log plaintext Vault contents, passwords, keys or sensitive document data.
 
 The Storage Lab Vault remains a diagnostic PoC only and is not compatible with production format v1.
