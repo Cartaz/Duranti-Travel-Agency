@@ -1,5 +1,5 @@
 import { dayRepository, expenseRepository, travelerRepository, tripRepository } from '../../data/repositories/repositories'
-import type { Day } from '../../domain/entities'
+import type { Day, Expense } from '../../domain/entities'
 
 export interface ExpenseSummarySlice {
   key: string
@@ -24,6 +24,8 @@ export interface TripBudgetSummary {
   remainingMinor: number
   exceededMinor: number
   includedExpenseCount: number
+  directExpenseCount: number
+  convertedExpenseCount: number
   excludedExpenseCount: number
 }
 
@@ -101,6 +103,42 @@ function finalizeDaySlices(map: Map<string, MutableSlice>, dayById: Map<string, 
 
       return left.label.localeCompare(right.label, 'it')
     })
+}
+
+function summarizeBudgetExpenses(expenses: Expense[], currency: string): {
+  spentMinor: number
+  directExpenseCount: number
+  convertedExpenseCount: number
+  excludedExpenseCount: number
+} {
+  let spentMinor = 0
+  let directExpenseCount = 0
+  let convertedExpenseCount = 0
+  let excludedExpenseCount = 0
+
+  for (const expense of expenses) {
+    if (expense.currency === currency) {
+      spentMinor = addMinor(spentMinor, expense.amountMinor)
+      directExpenseCount += 1
+      continue
+    }
+
+    if (expense.fx?.targetCurrency === currency) {
+      if (!Number.isSafeInteger(expense.fx.convertedAmountMinor) || expense.fx.convertedAmountMinor <= 0) {
+        throw new Error('Una conversione FX persistita contiene un importo non valido.')
+      }
+      if (!expense.fx.rate || typeof expense.fx.rate !== 'string') {
+        throw new Error('Una conversione FX persistita non contiene un tasso valido.')
+      }
+      spentMinor = addMinor(spentMinor, expense.fx.convertedAmountMinor)
+      convertedExpenseCount += 1
+      continue
+    }
+
+    excludedExpenseCount += 1
+  }
+
+  return { spentMinor, directExpenseCount, convertedExpenseCount, excludedExpenseCount }
 }
 
 export async function getTripExpenseSummary(tripId: string): Promise<TripExpenseSummary> {
@@ -197,17 +235,17 @@ export async function getTripExpenseSummary(tripId: string): Promise<TripExpense
     const currency = trip.currency?.trim().toUpperCase()
     if (!currency) throw new Error('Il viaggio ha un budget ma non una valuta associata.')
 
-    const budgetCurrencySummary = grouped.get(currency)
-    const spentMinor = budgetCurrencySummary?.totalMinor ?? 0
-    const includedExpenseCount = budgetCurrencySummary?.count ?? 0
+    const budgetExpenses = summarizeBudgetExpenses(expenses, currency)
     budget = {
       currency,
       budgetMinor: trip.budgetMinor,
-      spentMinor,
-      remainingMinor: spentMinor < trip.budgetMinor ? trip.budgetMinor - spentMinor : 0,
-      exceededMinor: spentMinor > trip.budgetMinor ? spentMinor - trip.budgetMinor : 0,
-      includedExpenseCount,
-      excludedExpenseCount: expenses.length - includedExpenseCount,
+      spentMinor: budgetExpenses.spentMinor,
+      remainingMinor: budgetExpenses.spentMinor < trip.budgetMinor ? trip.budgetMinor - budgetExpenses.spentMinor : 0,
+      exceededMinor: budgetExpenses.spentMinor > trip.budgetMinor ? budgetExpenses.spentMinor - trip.budgetMinor : 0,
+      includedExpenseCount: budgetExpenses.directExpenseCount + budgetExpenses.convertedExpenseCount,
+      directExpenseCount: budgetExpenses.directExpenseCount,
+      convertedExpenseCount: budgetExpenses.convertedExpenseCount,
+      excludedExpenseCount: budgetExpenses.excludedExpenseCount,
     }
   }
 
