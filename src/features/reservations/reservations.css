@@ -45,6 +45,106 @@
   grid-column: 1 / -1;
 }
 
+.reservation-attachment {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid #40372e;
+  border-radius: 14px;
+  background: rgba(18, 15, 12, .42);
+}
+
+.reservation-attachment-heading,
+.reservation-attachment-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reservation-attachment-heading > div,
+.reservation-attachment-current > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.reservation-attachment-heading strong,
+.reservation-attachment-current strong {
+  color: #d8c4aa;
+  font-size: 13px;
+}
+
+.reservation-attachment-heading span,
+.reservation-attachment-current span,
+.reservation-attachment-heading small {
+  color: #938473;
+  font-size: 11px;
+}
+
+.reservation-attachment-current strong,
+.reservation-attachment-current span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reservation-attachment-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 7px;
+}
+
+.reservation-attachment-actions button {
+  border: 1px solid #544536;
+  border-radius: 9px;
+  background: #211a14;
+  color: #d8c4aa;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
+.reservation-attachment-actions button:disabled {
+  cursor: default;
+  opacity: .55;
+}
+
+.reservation-attachment-empty {
+  margin: 0;
+  color: #8f806f;
+  font-size: 12px;
+}
+
+.reservation-attachment-picker {
+  position: relative;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  border: 1px dashed #66513e;
+  border-radius: 10px;
+  color: #d2b58f;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.reservation-attachment-picker:hover {
+  border-color: #967552;
+}
+
+.reservation-attachment-picker-disabled {
+  cursor: default;
+  opacity: .55;
+}
+
+.reservation-attachment-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .reservation-actions {
   display: flex;
   align-items: center;
@@ -76,6 +176,25 @@
 
   .reservation-wide {
     grid-column: auto;
+  }
+
+  .reservation-attachment-heading,
+  .reservation-attachment-current {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reservation-attachment-actions,
+  .reservation-attachment-picker {
+    width: 100%;
+  }
+
+  .reservation-attachment-actions button {
+    flex: 1;
+  }
+
+  .reservation-attachment-picker {
+    justify-content: center;
   }
 
   .reservation-actions {
