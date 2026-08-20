@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Trip } from '../../domain/entities'
 import TripDaysPanel from '../days/TripDaysPanel'
+import TripExpenseSummary from '../expenses/TripExpenseSummary'
 import TripTravelersPanel from '../travelers/TripTravelersPanel'
 import { archiveTrip, getTrip } from './trip-service'
 import './trips.css'
@@ -128,15 +129,16 @@ export default function TripDetailPage() {
       </section>
 
       <TripTravelersPanel tripId={trip.id} />
+      <TripExpenseSummary tripId={trip.id} />
       <TripDaysPanel trip={trip} />
 
       <section className="trip-next-panel">
         <div>
           <p className="eyebrow">Capitolo operativo</p>
-          <h2>Persone, giornate e planner ora vivono nello stesso viaggio.</h2>
-          <p>Ogni giornata può già contenere testi, checklist, luoghi, trasporti, alloggi e spese persistenti offline.</p>
+          <h2>Persone, giornate, planner e conti ora vivono nello stesso viaggio.</h2>
+          <p>Ogni giornata può contenere testi, checklist, luoghi, trasporti, alloggi e spese persistenti offline, riepilogate senza conversioni valutarie implicite.</p>
         </div>
-        <span className="trip-next-mark" aria-hidden="true">03</span>
+        <span className="trip-next-mark" aria-hidden="true">04</span>
       </section>
 
       <Link className="trip-text-link" to="/">← Torna all’indice</Link>
