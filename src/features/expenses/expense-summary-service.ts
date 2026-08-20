@@ -1,4 +1,4 @@
-import { dayRepository, expenseRepository, travelerRepository } from '../../data/repositories/repositories'
+import { dayRepository, expenseRepository, travelerRepository, tripRepository } from '../../data/repositories/repositories'
 import type { Day } from '../../domain/entities'
 
 export interface ExpenseSummarySlice {
@@ -17,9 +17,20 @@ export interface ExpenseCurrencySummary {
   days: ExpenseSummarySlice[]
 }
 
+export interface TripBudgetSummary {
+  currency: string
+  budgetMinor: number
+  spentMinor: number
+  remainingMinor: number
+  exceededMinor: number
+  includedExpenseCount: number
+  excludedExpenseCount: number
+}
+
 export interface TripExpenseSummary {
   expenseCount: number
   currencies: ExpenseCurrencySummary[]
+  budget?: TripBudgetSummary
 }
 
 interface MutableSlice {
@@ -93,8 +104,11 @@ function finalizeDaySlices(map: Map<string, MutableSlice>, dayById: Map<string, 
 }
 
 export async function getTripExpenseSummary(tripId: string): Promise<TripExpenseSummary> {
-  const expenses = (await expenseRepository.list()).filter((expense) => expense.tripId === tripId)
-  if (expenses.length === 0) return { expenseCount: 0, currencies: [] }
+  const [trip, expenses] = await Promise.all([
+    tripRepository.get(tripId),
+    expenseRepository.list().then((items) => items.filter((expense) => expense.tripId === tripId)),
+  ])
+  if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
 
   const [tripDays, payerIds] = await Promise.all([
     dayRepository.list().then((days) => days.filter((day) => day.tripId === tripId)),
@@ -175,8 +189,31 @@ export async function getTripExpenseSummary(tripId: string): Promise<TripExpense
     }))
     .sort((left, right) => left.currency.localeCompare(right.currency))
 
+  let budget: TripBudgetSummary | undefined
+  if (trip.budgetMinor !== undefined) {
+    if (!Number.isSafeInteger(trip.budgetMinor) || trip.budgetMinor <= 0) {
+      throw new Error('Il viaggio contiene un budget persistito non valido.')
+    }
+    const currency = trip.currency?.trim().toUpperCase()
+    if (!currency) throw new Error('Il viaggio ha un budget ma non una valuta associata.')
+
+    const budgetCurrencySummary = grouped.get(currency)
+    const spentMinor = budgetCurrencySummary?.totalMinor ?? 0
+    const includedExpenseCount = budgetCurrencySummary?.count ?? 0
+    budget = {
+      currency,
+      budgetMinor: trip.budgetMinor,
+      spentMinor,
+      remainingMinor: spentMinor < trip.budgetMinor ? trip.budgetMinor - spentMinor : 0,
+      exceededMinor: spentMinor > trip.budgetMinor ? spentMinor - trip.budgetMinor : 0,
+      includedExpenseCount,
+      excludedExpenseCount: expenses.length - includedExpenseCount,
+    }
+  }
+
   return {
     expenseCount: expenses.length,
     currencies,
+    budget,
   }
 }
