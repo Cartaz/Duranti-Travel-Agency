@@ -1,4 +1,5 @@
 import type { Block, BlockType } from '../../domain/entities'
+import type { BlockMoveDirection } from '../../data/repositories/block-repository'
 import { blockRepository } from '../../data/repositories/repositories'
 import { getTripDay } from '../days/day-service'
 import { getTrip } from '../trips/trip-service'
@@ -95,7 +96,11 @@ export async function listDayPlannerBlocks(tripId: string, dayId: string): Promi
   const blocks = await blockRepository.list()
   return blocks
     .filter((block) => block.tripId === tripId && block.dayId === dayId && plannerBlockTypes.has(block.type))
-    .sort((left, right) => left.position - right.position || left.createdAt.localeCompare(right.createdAt))
+    .sort((left, right) => (
+      left.position - right.position ||
+      left.createdAt.localeCompare(right.createdAt) ||
+      left.id.localeCompare(right.id)
+    ))
 }
 
 export function readPlannerBlockDraft(block: Block): PlannerBlockDraft {
@@ -120,8 +125,9 @@ export async function createPlannerBlock(
   type: PlannerBlockType,
 ): Promise<Block> {
   await assertDayContext(tripId, dayId, true)
-  const existing = await listDayPlannerBlocks(tripId, dayId)
-  const position = existing.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
+  const siblings = (await blockRepository.list())
+    .filter((block) => block.tripId === tripId && block.dayId === dayId)
+  const position = siblings.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
   const now = new Date().toISOString()
   const draft = defaultDraft(type)
 
@@ -163,6 +169,18 @@ export async function updatePlannerBlock(
 
   await blockRepository.put(updated)
   return updated
+}
+
+export async function movePlannerBlock(
+  tripId: string,
+  dayId: string,
+  blockId: string,
+  direction: BlockMoveDirection,
+): Promise<void> {
+  await assertDayContext(tripId, dayId, true)
+  const result = await blockRepository.moveWithinDay(blockId, tripId, dayId, direction)
+  if (result === 'not-found') throw new Error('Il blocco non esiste più.')
+  if (result === 'invalid-context') throw new Error('Il blocco non appartiene a questa giornata.')
 }
 
 export async function deletePlannerBlock(tripId: string, dayId: string, blockId: string): Promise<void> {

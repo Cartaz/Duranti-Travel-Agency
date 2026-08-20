@@ -7,6 +7,7 @@ import {
   createPlannerBlock,
   deletePlannerBlock,
   listDayPlannerBlocks,
+  movePlannerBlock,
   readPlannerBlockDraft,
   updatePlannerBlock,
   type ChecklistItemDraft,
@@ -21,6 +22,8 @@ const blockLabels: Record<PlannerBlockType, string> = {
   checklist: 'Checklist',
   divider: 'Separatore',
 }
+
+type MoveDirection = 'up' | 'down'
 
 function formatDayDate(value: string): string {
   const [year, month, day] = value.split('-').map(Number)
@@ -143,13 +146,15 @@ export default function DayPlannerPage() {
           </div>
         )}
 
-        {blocks.map((block) => (
+        {blocks.map((block, index) => (
           <PlannerBlockEditor
             key={block.id}
             block={block}
             tripId={trip.id}
             dayId={day.id}
             readOnly={readOnly}
+            canMoveUp={index > 0}
+            canMoveDown={index < blocks.length - 1}
             onChanged={refreshBlocks}
           />
         ))}
@@ -163,12 +168,16 @@ function PlannerBlockEditor({
   tripId,
   dayId,
   readOnly,
+  canMoveUp,
+  canMoveDown,
   onChanged,
 }: {
   block: Block
   tripId: string
   dayId: string
   readOnly: boolean
+  canMoveUp: boolean
+  canMoveDown: boolean
   onChanged: () => Promise<void>
 }) {
   const [draft, setDraft] = useState<PlannerBlockDraft>(() => readPlannerBlockDraft(block))
@@ -207,11 +216,39 @@ function PlannerBlockEditor({
     }
   }
 
+  const move = async (direction: MoveDirection): Promise<void> => {
+    if (readOnly || saving) return
+    setSaving(true)
+    setError('')
+    try {
+      await movePlannerBlock(tripId, dayId, block.id, direction)
+      await onChanged()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile spostare il blocco.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const tools = (
+    <PlannerBlockTools
+      readOnly={readOnly}
+      saving={saving}
+      canMoveUp={canMoveUp}
+      canMoveDown={canMoveDown}
+      onMove={move}
+      onRemove={remove}
+    />
+  )
+
   if (draft.type === 'divider') {
     return (
       <article className="planner-block planner-divider-block">
+        <div className="planner-block-topline">
+          <span>{blockLabels.divider}</span>
+          {tools}
+        </div>
         <hr />
-        {!readOnly && <button className="planner-delete" type="button" disabled={saving} onClick={() => void remove()}>Elimina</button>}
         {error && <small className="planner-block-error">{error}</small>}
       </article>
     )
@@ -221,7 +258,7 @@ function PlannerBlockEditor({
     <form className={`planner-block planner-block-${draft.type}`} onSubmit={(event) => void save(event)}>
       <div className="planner-block-topline">
         <span>{blockLabels[draft.type]}</span>
-        {!readOnly && <button className="planner-delete" type="button" disabled={saving} onClick={() => void remove()}>Elimina</button>}
+        {tools}
       </div>
 
       {draft.type === 'text' && (
@@ -256,6 +293,32 @@ function PlannerBlockEditor({
         </div>
       )}
     </form>
+  )
+}
+
+function PlannerBlockTools({
+  readOnly,
+  saving,
+  canMoveUp,
+  canMoveDown,
+  onMove,
+  onRemove,
+}: {
+  readOnly: boolean
+  saving: boolean
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMove: (direction: MoveDirection) => Promise<void>
+  onRemove: () => Promise<void>
+}) {
+  if (readOnly) return null
+
+  return (
+    <div className="planner-block-tools">
+      <button type="button" disabled={saving || !canMoveUp} aria-label="Sposta blocco su" title="Sposta su" onClick={() => void onMove('up')}>↑</button>
+      <button type="button" disabled={saving || !canMoveDown} aria-label="Sposta blocco giù" title="Sposta giù" onClick={() => void onMove('down')}>↓</button>
+      <button className="planner-delete" type="button" disabled={saving} onClick={() => void onRemove()}>Elimina</button>
+    </div>
   )
 }
 

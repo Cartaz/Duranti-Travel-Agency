@@ -119,6 +119,28 @@
   letter-spacing: .12em;
 }
 
+.planner-block-tools {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.planner-block-tools button {
+  min-width: 32px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.planner-block-tools button:not(.planner-delete) {
+  border-color: #4e4033;
+  background: rgba(33, 27, 21, .8);
+  color: #c8b294;
+}
+
+.planner-block-tools button:disabled {
+  opacity: .38;
+}
+
 .planner-block textarea,
 .planner-block > input[type="text"] {
   width: 100%;
@@ -154,18 +176,9 @@
 }
 
 .planner-delete {
-  padding: 5px 8px;
   border-color: transparent;
   background: transparent;
   color: #ba8177;
-  font-size: 12px;
-}
-
-.planner-divider-block {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
 }
 
 .planner-divider-block hr {
@@ -250,5 +263,9 @@
   .planner-heading-actions .trip-secondary-action {
     flex: 1 1 auto;
     text-align: center;
+  }
+
+  .planner-block-topline {
+    align-items: flex-start;
   }
 }
