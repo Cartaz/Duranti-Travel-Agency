@@ -1,0 +1,160 @@
+.day-itinerary {
+  display: grid;
+  gap: 16px;
+  margin: 0 0 20px;
+  padding: 18px;
+  border: 1px solid #43372c;
+  border-radius: 20px;
+  background: rgba(24, 19, 14, .72);
+}
+
+.day-itinerary-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.day-itinerary-heading h2 {
+  margin: 4px 0 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(24px, 5vw, 32px);
+  font-weight: 500;
+}
+
+.day-itinerary-heading > span {
+  border: 1px solid #4b5b3e;
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: #b6c49b;
+  font-size: 11px;
+}
+
+.day-itinerary-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day-itinerary-list li {
+  display: grid;
+  grid-template-columns: 72px 18px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 64px;
+}
+
+.day-itinerary-list time {
+  padding-top: 3px;
+  color: #c9b28f;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  text-align: right;
+}
+
+.day-itinerary-marker {
+  position: relative;
+}
+
+.day-itinerary-marker::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #bea06f;
+  border-radius: 50%;
+  background: #1b1611;
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+.day-itinerary-marker::after {
+  content: '';
+  position: absolute;
+  top: 17px;
+  bottom: -2px;
+  left: 50%;
+  width: 1px;
+  background: #4c4033;
+}
+
+.day-itinerary-list li:last-child .day-itinerary-marker::after {
+  display: none;
+}
+
+.day-itinerary-content {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding-bottom: 17px;
+}
+
+.day-itinerary-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.day-itinerary-title-row strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #eadcc8;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 17px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-itinerary-title-row > span {
+  flex: 0 0 auto;
+  color: #9c8c77;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.day-itinerary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: #9d8e7c;
+  font-size: 11px;
+}
+
+.day-itinerary-cancelled {
+  opacity: .56;
+}
+
+.day-itinerary-cancelled .day-itinerary-title-row strong {
+  text-decoration: line-through;
+}
+
+@media (max-width: 600px) {
+  .day-itinerary-heading {
+    display: grid;
+  }
+
+  .day-itinerary-heading > span {
+    justify-self: start;
+  }
+
+  .day-itinerary-list li {
+    grid-template-columns: 60px 16px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .day-itinerary-title-row {
+    display: grid;
+    gap: 4px;
+  }
+
+  .day-itinerary-title-row > span {
+    justify-self: start;
+  }
+}
