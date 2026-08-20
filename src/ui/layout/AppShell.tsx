@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import './app-shell.css'
 
@@ -16,6 +16,9 @@ function controlLabel(control: ValidatableControl): string {
   const labelText = label?.querySelector('span')?.textContent ?? label?.textContent
   const cleaned = labelText?.replace(/\s*\*\s*$/, '').trim()
   if (cleaned) return cleaned
+
+  const placeholder = control.getAttribute('placeholder')?.trim()
+  if (placeholder) return placeholder
 
   return control.name || 'questo campo'
 }
@@ -39,6 +42,7 @@ function readableValidationMessage(control: ValidatableControl): string {
 
 export default function AppShell() {
   const [validationNotice, setValidationNotice] = useState('')
+  const validationLockRef = useRef(false)
 
   const handleInvalid = (event: FormEvent<HTMLElement>): void => {
     event.preventDefault()
@@ -46,6 +50,14 @@ export default function AppShell() {
     if (!(target instanceof HTMLInputElement)
       && !(target instanceof HTMLTextAreaElement)
       && !(target instanceof HTMLSelectElement)) return
+
+    // A single submit can dispatch invalid on several controls. Keep the first
+    // useful error so the message and focus do not jump between fields.
+    if (validationLockRef.current) return
+    validationLockRef.current = true
+    window.requestAnimationFrame(() => {
+      validationLockRef.current = false
+    })
 
     setValidationNotice(readableValidationMessage(target))
     target.focus({ preventScroll: true })
