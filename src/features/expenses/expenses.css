@@ -116,6 +116,76 @@
   color: #9d8d7b;
 }
 
+.expense-budget-card {
+  display: grid;
+  grid-template-columns: minmax(150px, .75fr) minmax(0, 1.25fr);
+  gap: 14px 18px;
+  padding: 17px;
+  border: 1px solid #4b5b3e;
+  border-radius: 17px;
+  background: rgba(32, 39, 25, .28);
+}
+
+.expense-budget-card-over {
+  border-color: #74493e;
+  background: rgba(63, 31, 24, .22);
+}
+
+.expense-budget-main,
+.expense-budget-metrics > div {
+  display: grid;
+  gap: 4px;
+}
+
+.expense-budget-main > span,
+.expense-budget-metrics span {
+  color: #a99b89;
+  font-size: 11px;
+  letter-spacing: .08em;
+}
+
+.expense-budget-main > strong {
+  font-family: Georgia, serif;
+  font-size: 29px;
+  font-weight: 500;
+  color: #e3c9a5;
+}
+
+.expense-budget-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.expense-budget-metrics strong {
+  color: #d9c8ae;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.expense-budget-card-over .expense-budget-metrics > div:last-child strong {
+  color: #e3b5a8;
+}
+
+.expense-budget-progress {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 8px;
+  accent-color: #b6c49b;
+}
+
+.expense-budget-card-over .expense-budget-progress {
+  accent-color: #c48470;
+}
+
+.expense-budget-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #958572;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .expense-currency-list {
   display: grid;
   gap: 12px;
@@ -218,11 +288,19 @@
   }
 
   .expense-summary-heading,
+  .expense-budget-card,
   .expense-currency-card {
     display: grid;
+    grid-template-columns: 1fr;
   }
 
+  .expense-budget-metrics,
   .expense-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .expense-budget-progress,
+  .expense-budget-note {
+    grid-column: auto;
   }
 }
