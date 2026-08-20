@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vite-pwa/assets-generator": "^1.0.0",
     "dexie": "^4.2.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
