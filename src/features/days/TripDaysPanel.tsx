@@ -40,9 +40,9 @@ export default function TripDaysPanel({ trip }: { trip: Trip }) {
         <div>
           <p className="eyebrow">Pagine del viaggio</p>
           <h2 id="trip-days-title">Giornate</h2>
-          <p>Ogni giornata è una pagina ordinata del capitolo. Nel blocco successivo conterrà i primi blocchi del planner.</p>
+          <p>Ogni giornata è una pagina ordinata del capitolo e contiene i blocchi del planner.</p>
         </div>
-        <Link className="trip-primary-action" to={`/trips/${trip.id}/days/new`}>Nuova giornata</Link>
+        {trip.status !== 'archived' && <Link className="trip-primary-action" to={`/trips/${trip.id}/days/new`}>Nuova giornata</Link>}
       </div>
 
       {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
@@ -65,9 +65,16 @@ export default function TripDaysPanel({ trip }: { trip: Trip }) {
                 <strong>{day.title ?? `Giorno ${day.sequence}`}</strong>
                 {day.summary && <p>{day.summary}</p>}
               </div>
-              <Link className="day-edit-link" to={`/trips/${trip.id}/days/${day.id}/edit`} aria-label={`Modifica ${day.title ?? `giorno ${day.sequence}`}`}>
-                Modifica
-              </Link>
+              <div className="day-card-actions">
+                <Link className="day-open-link" to={`/trips/${trip.id}/days/${day.id}`} aria-label={`Apri ${day.title ?? `giorno ${day.sequence}`}`}>
+                  Apri pagina
+                </Link>
+                {trip.status !== 'archived' && (
+                  <Link className="day-edit-link" to={`/trips/${trip.id}/days/${day.id}/edit`} aria-label={`Modifica ${day.title ?? `giorno ${day.sequence}`}`}>
+                    Modifica
+                  </Link>
+                )}
+              </div>
             </li>
           ))}
         </ol>

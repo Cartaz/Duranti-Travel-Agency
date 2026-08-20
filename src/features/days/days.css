@@ -101,12 +101,25 @@
   text-overflow: ellipsis;
 }
 
+.day-card-actions {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.day-open-link,
 .day-edit-link {
   color: #c9ae8c;
   font-size: 13px;
   text-decoration: none;
 }
 
+.day-open-link {
+  color: #ead8bf;
+  font-weight: 600;
+}
+
+.day-open-link:hover,
 .day-edit-link:hover {
   text-decoration: underline;
 }
@@ -173,8 +186,11 @@
     grid-template-columns: auto 1fr;
   }
 
-  .day-edit-link {
+  .day-card-actions {
     grid-column: 2;
+    grid-auto-flow: column;
+    justify-content: start;
+    justify-items: start;
   }
 
   .day-form-actions .trip-primary-action {

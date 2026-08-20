@@ -1,0 +1,254 @@
+.planner-page {
+  width: min(920px, 100%);
+  margin: 0 auto;
+  padding-bottom: 56px;
+}
+
+.planner-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.planner-heading h1 {
+  margin-bottom: 6px;
+}
+
+.planner-date {
+  margin: 0;
+  color: #c2ad91;
+  text-transform: capitalize;
+}
+
+.planner-summary {
+  max-width: 680px;
+  margin: 10px 0 0;
+  color: #a99a89;
+  line-height: 1.55;
+}
+
+.planner-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.planner-readonly {
+  border: 1px solid #65513d;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(38, 29, 22, .8);
+  color: #c8b69e;
+}
+
+.planner-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 18px 0;
+  padding: 17px;
+  border: 1px solid #493b2f;
+  border-radius: 18px;
+  background: rgba(24, 19, 15, .88);
+}
+
+.planner-toolbar strong {
+  display: block;
+  margin-top: 4px;
+  font-family: Georgia, serif;
+  font-weight: 500;
+  font-size: 18px;
+}
+
+.planner-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.planner-toolbar-actions button {
+  padding: 9px 11px;
+}
+
+.planner-canvas {
+  display: grid;
+  gap: 12px;
+}
+
+.planner-empty {
+  display: grid;
+  gap: 5px;
+  min-height: 180px;
+  place-content: center;
+  text-align: center;
+  border: 1px dashed #4d3f32;
+  border-radius: 20px;
+  color: #bca991;
+  background: rgba(20, 16, 13, .56);
+}
+
+.planner-empty span {
+  color: #8f8173;
+  font-size: 13px;
+}
+
+.planner-block {
+  border: 1px solid #44372c;
+  border-radius: 17px;
+  padding: 15px;
+  background: rgba(19, 15, 12, .82);
+}
+
+.planner-block-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.planner-block-topline > span {
+  color: #9d8b76;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+}
+
+.planner-block textarea,
+.planner-block > input[type="text"] {
+  width: 100%;
+  border: 1px solid #493b30;
+  border-radius: 12px;
+  background: #14100d;
+  color: #f1e7da;
+  padding: 12px 13px;
+  outline: none;
+}
+
+.planner-block textarea {
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.55;
+}
+
+.planner-block-heading > input[type="text"] {
+  font-family: Georgia, serif;
+  font-size: 24px;
+}
+
+.planner-block textarea:focus,
+.planner-block > input[type="text"]:focus,
+.planner-checklist-row > input[type="text"]:focus {
+  border-color: #967552;
+}
+
+.planner-block-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.planner-delete {
+  padding: 5px 8px;
+  border-color: transparent;
+  background: transparent;
+  color: #ba8177;
+  font-size: 12px;
+}
+
+.planner-divider-block {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.planner-divider-block hr {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #5a4838;
+}
+
+.planner-checklist {
+  display: grid;
+  gap: 8px;
+}
+
+.planner-checklist-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.planner-checklist-row > input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #a7855f;
+}
+
+.planner-checklist-row > input[type="text"] {
+  min-width: 0;
+  border: 1px solid #493b30;
+  border-radius: 10px;
+  background: #14100d;
+  color: #f1e7da;
+  padding: 10px 11px;
+  outline: none;
+}
+
+.planner-checklist-row > button,
+.planner-add-check {
+  padding: 8px 10px;
+}
+
+.planner-checklist-row > button {
+  border-color: transparent;
+  background: transparent;
+  color: #bd877d;
+  font-size: 18px;
+}
+
+.planner-add-check {
+  justify-self: start;
+  margin-top: 3px;
+}
+
+.planner-checklist-empty,
+.planner-block-error {
+  color: #a59482;
+  font-size: 12px;
+}
+
+.planner-block-error {
+  display: block;
+  margin-top: 8px;
+  color: #e2a092;
+}
+
+@media (max-width: 700px) {
+  .planner-heading,
+  .planner-toolbar {
+    flex-direction: column;
+  }
+
+  .planner-heading-actions,
+  .planner-toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .planner-toolbar-actions button {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  .planner-heading-actions .trip-secondary-action {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}
