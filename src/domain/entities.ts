@@ -183,6 +183,12 @@ export interface Template extends EntityBase {
   }
 }
 
+export interface ExpenseFxConversion {
+  targetCurrency: string
+  rate: string
+  convertedAmountMinor: number
+}
+
 export interface Expense extends EntityBase {
   tripId: string
   dayId?: string
@@ -193,6 +199,7 @@ export interface Expense extends EntityBase {
   paidByTravelerId?: string
   occurredAt?: string
   notes?: string
+  fx?: ExpenseFxConversion
 }
 
 export interface Reservation extends EntityBase {
