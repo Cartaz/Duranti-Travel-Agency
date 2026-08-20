@@ -7,6 +7,11 @@ export interface EntityBase {
   deletedAt?: string
 }
 
+export interface AppMeta {
+  key: string
+  value: unknown
+}
+
 export interface Trip extends EntityBase {
   title: string
   subtitle?: string
@@ -16,6 +21,11 @@ export interface Trip extends EntityBase {
   coverMediaId?: string
   summary?: string
   currency?: string
+  homeLocation?: {
+    name?: string
+    latitude?: number
+    longitude?: number
+  }
 }
 
 export interface Traveler extends EntityBase {
@@ -23,10 +33,38 @@ export interface Traveler extends EntityBase {
   lastName: string
   displayName: string
   birthDate?: string
+  birthPlace?: string
   nationality?: string
+  gender?: string
   email?: string
   phone?: string
+  address?: {
+    line1?: string
+    line2?: string
+    postalCode?: string
+    city?: string
+    region?: string
+    countryCode?: string
+  }
   notes?: string
+}
+
+export interface TravelerDocument extends EntityBase {
+  travelerId: string
+  type: 'passport' | 'identityCard' | 'drivingLicense' | 'visa' | 'other'
+  documentNumber?: string
+  issuingCountryCode?: string
+  issueDate?: string
+  expiryDate?: string
+  holderName?: string
+  mediaId?: string
+  notes?: string
+}
+
+export interface TripTraveler extends EntityBase {
+  tripId: string
+  travelerId: string
+  role?: 'owner' | 'companion' | 'child' | 'other'
 }
 
 export interface Day extends EntityBase {
@@ -66,6 +104,35 @@ export interface Place extends EntityBase {
   notes?: string
 }
 
+export interface Itinerary extends EntityBase {
+  tripId: string
+  dayId?: string
+  placeId?: string
+  blockId?: string
+  type?: 'transport' | 'activity' | 'meal' | 'reservation' | 'free-time' | 'custom'
+  startsAt?: string
+  endsAt?: string
+  timezone?: string
+  title: string
+  notes?: string
+  status?: 'idea' | 'planned' | 'booked' | 'done' | 'cancelled'
+  bookingReference?: string
+  position?: number
+}
+
+export interface Link extends EntityBase {
+  tripId?: string
+  dayId?: string
+  blockId?: string
+  url: string
+  title?: string
+  domain?: string
+  source?: string
+  description?: string
+  thumbnailMediaId?: string
+  notes?: string
+}
+
 export interface Media extends EntityBase {
   tripId?: string
   dayId?: string
@@ -79,4 +146,52 @@ export interface Media extends EntityBase {
   durationMs?: number
   sha256?: string
   opfsPath: string
+}
+
+export interface Template extends EntityBase {
+  name: string
+  description?: string
+  category: string
+  version: number
+  definition: {
+    blocks: Array<Pick<Block, 'type' | 'content' | 'position'>>
+  }
+}
+
+export interface Expense extends EntityBase {
+  tripId: string
+  dayId?: string
+  amountMinor: number
+  currency: string
+  category?: string
+  description?: string
+  paidByTravelerId?: string
+  occurredAt?: string
+  notes?: string
+}
+
+export interface Reservation extends EntityBase {
+  tripId: string
+  dayId?: string
+  type: 'accommodation' | 'transport' | 'restaurant' | 'activity' | 'other'
+  title: string
+  provider?: string
+  confirmationCode?: string
+  startsAt?: string
+  endsAt?: string
+  timezone?: string
+  placeId?: string
+  url?: string
+  attachmentMediaId?: string
+  notes?: string
+  status?: 'planned' | 'booked' | 'completed' | 'cancelled'
+  linkId?: string
+}
+
+export interface AuditEntry extends EntityBase {
+  entityType: string
+  entityId: string
+  action: 'create' | 'update' | 'delete' | 'restore' | 'import' | 'export'
+  timestamp: string
+  metadata?: Record<string, unknown>
 }
