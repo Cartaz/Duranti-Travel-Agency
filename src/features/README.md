@@ -5,16 +5,15 @@ Feature modules contain user workflows and orchestration. They depend on domain 
 Implemented / active:
 
 - `storage-lab/` — regression UI for IndexedDB, OPFS and the legacy diagnostic Vault.
-- `trips/` — initial travel-book index shell with planned / in-progress / completed chapter sections.
+- `trips/` — travel-book index backed by local persistence, trip creation/editing, status grouping and chapter detail navigation.
 
 Planned next:
 
-- `trips/` — real trip creation, editing, status and chapter navigation.
+- `days/` — day timeline and first editable trip pages.
 - `planner/` — free-form and guided planning.
-- `days/` — day timeline and block editor.
 - `places/` — saved places, Google Maps references and map UI.
 - `media/` — capture/import/organize photos and videos.
 - `travelers/` — reusable companion profiles and secure document references.
 - `templates/` — museum, day trip, travel day and custom templates.
 - `vault/` — production encrypted export/import UI.
-- `book/` — book/chapter/page presentation state.
+- `book/` — book/chapter/page presentation state and page-turn interaction.
