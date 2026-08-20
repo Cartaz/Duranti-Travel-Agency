@@ -6,11 +6,11 @@ Implemented / active:
 
 - `storage-lab/` — regression UI for IndexedDB, OPFS and the legacy diagnostic Vault.
 - `trips/` — travel-book index backed by local persistence, trip creation/editing, status grouping, chapter detail navigation and archive/restore lifecycle.
+- `days/` — ordered trip-day pages with local create/edit workflows and trip ownership validation.
 
 Planned next:
 
-- `days/` — day timeline and first editable trip pages.
-- `planner/` — free-form and guided planning.
+- `planner/` — block-based free-form and guided planning inside each day.
 - `places/` — saved places, Google Maps references and map UI.
 - `media/` — capture/import/organize photos and videos.
 - `travelers/` — reusable companion profiles and secure document references.

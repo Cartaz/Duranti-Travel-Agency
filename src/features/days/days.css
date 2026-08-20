@@ -1,0 +1,183 @@
+.days-panel,
+.day-form-page {
+  width: 100%;
+}
+
+.days-panel {
+  border: 1px solid #47392d;
+  border-radius: 22px;
+  background: rgba(25, 20, 16, .84);
+  padding: 22px;
+  margin: 16px 0;
+}
+
+.days-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.days-panel-heading h2 {
+  margin-top: 4px;
+}
+
+.days-panel-heading p:not(.eyebrow) {
+  color: #a99b8d;
+  max-width: 600px;
+  line-height: 1.55;
+}
+
+.days-empty {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  margin-top: 16px;
+  border: 1px dashed #4f4033;
+  border-radius: 16px;
+  color: #b9ab9b;
+}
+
+.days-empty span {
+  color: #8f8173;
+  font-size: 13px;
+}
+
+.day-list {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+}
+
+.day-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 15px;
+  border: 1px solid #44372c;
+  border-radius: 16px;
+  background: rgba(17, 14, 11, .68);
+}
+
+.day-sequence {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid #6b553f;
+  font-family: Georgia, serif;
+  color: #d4b995;
+}
+
+.day-card-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.day-card-copy > span {
+  color: #9d8d7a;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.day-card-copy > strong {
+  font-family: Georgia, serif;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.day-card-copy > p {
+  margin: 3px 0 0;
+  color: #a99a89;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.day-edit-link {
+  color: #c9ae8c;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.day-edit-link:hover {
+  text-decoration: underline;
+}
+
+.day-form-page {
+  width: min(820px, 100%);
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
+
+.day-form {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid #47392d;
+  border-radius: 22px;
+  background: rgba(25, 20, 16, .88);
+}
+
+.day-form label {
+  display: grid;
+  gap: 7px;
+  color: #bbaa98;
+  font-size: 13px;
+}
+
+.day-form input,
+.day-form textarea {
+  width: 100%;
+  border: 1px solid #4c3d31;
+  border-radius: 12px;
+  background: #15110e;
+  color: #f3eadc;
+  padding: 12px 13px;
+  outline: none;
+}
+
+.day-form textarea {
+  resize: vertical;
+  min-height: 130px;
+}
+
+.day-form input:focus,
+.day-form textarea:focus {
+  border-color: #9a7854;
+}
+
+.day-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 620px) {
+  .days-panel-heading {
+    flex-direction: column;
+  }
+
+  .days-panel-heading .trip-primary-action {
+    width: 100%;
+    text-align: center;
+  }
+
+  .day-card {
+    grid-template-columns: auto 1fr;
+  }
+
+  .day-edit-link {
+    grid-column: 2;
+  }
+
+  .day-form-actions .trip-primary-action {
+    width: 100%;
+  }
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Trip } from '../../domain/entities'
+import TripDaysPanel from '../days/TripDaysPanel'
 import { archiveTrip, getTrip } from './trip-service'
 import './trips.css'
 import './trip-lifecycle.css'
@@ -125,13 +126,15 @@ export default function TripDetailPage() {
         <p>{trip.summary ?? 'Nessun riepilogo ancora. Puoi aggiungere le prime idee modificando il viaggio.'}</p>
       </section>
 
+      <TripDaysPanel trip={trip} />
+
       <section className="trip-next-panel">
         <div>
-          <p className="eyebrow">Pagine del viaggio</p>
-          <h2>Il planner giornaliero arriva nel prossimo blocco.</h2>
-          <p>Questo capitolo ora è persistito davvero offline. Il prossimo passo aggiungerà giorni e prime pagine editabili.</p>
+          <p className="eyebrow">Prossimo livello</p>
+          <h2>I blocchi del planner entreranno dentro ogni giornata.</h2>
+          <p>Testi, checklist, luoghi, prenotazioni e media saranno ordinati come contenuti della pagina giornaliera.</p>
         </div>
-        <span className="trip-next-mark" aria-hidden="true">01</span>
+        <span className="trip-next-mark" aria-hidden="true">02</span>
       </section>
 
       <Link className="trip-text-link" to="/">← Torna all’indice</Link>
