@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { bootstrapApplication } from './data/bootstrap'
 import './styles.css'
+import './ui/guided-ux.css'
 
 const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('Duranti root element was not found.')
