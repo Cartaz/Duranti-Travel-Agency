@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Trip } from '../../domain/entities'
 import TripDaysPanel from '../days/TripDaysPanel'
 import TripExpenseSummary from '../expenses/TripExpenseSummary'
+import TripItineraryOverview from '../itinerary/TripItineraryOverview'
 import TripTravelersPanel from '../travelers/TripTravelersPanel'
 import { archiveTrip, getTrip } from './trip-service'
 import './trips.css'
@@ -129,14 +130,15 @@ export default function TripDetailPage() {
       </section>
 
       <TripTravelersPanel tripId={trip.id} />
+      <TripItineraryOverview tripId={trip.id} />
       <TripExpenseSummary tripId={trip.id} />
       <TripDaysPanel trip={trip} />
 
       <section className="trip-next-panel">
         <div>
           <p className="eyebrow">Capitolo operativo</p>
-          <h2>Persone, giornate, planner e conti ora vivono nello stesso viaggio.</h2>
-          <p>Ogni giornata può contenere testi, checklist, luoghi, trasporti, alloggi e spese persistenti offline, riepilogate senza conversioni valutarie implicite.</p>
+          <h2>Persone, itinerario, giornate, planner e conti ora vivono nello stesso viaggio.</h2>
+          <p>La scheda viaggio mostra la sequenza completa delle tappe; ogni giornata resta la pagina operativa per modificare planner, prenotazioni, luoghi e spese offline.</p>
         </div>
         <span className="trip-next-mark" aria-hidden="true">04</span>
       </section>
