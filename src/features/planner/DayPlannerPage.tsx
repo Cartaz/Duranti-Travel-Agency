@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 import type { Block, Day, Place, Trip } from '../../domain/entities'
 import { getTripDay } from '../days/day-service'
 import ExpenseBlockEditor from '../expenses/ExpenseBlockEditor'
+import DayItinerarySummary from '../itinerary/DayItinerarySummary'
+import { listDayItineraryItems, type DayItineraryItem } from '../itinerary/itinerary-service'
 import { googleMapsUrlForPlace } from '../places/maps-url'
 import {
   EMPTY_PLACE_DRAFT,
@@ -96,13 +98,19 @@ export default function DayPlannerPage() {
   const [trip, setTrip] = useState<Trip>()
   const [day, setDay] = useState<Day>()
   const [blocks, setBlocks] = useState<Block[]>([])
+  const [itineraryItems, setItineraryItems] = useState<DayItineraryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   const refreshBlocks = useCallback(async (): Promise<void> => {
     if (!tripId || !dayId) return
-    setBlocks(await listDayPlannerBlocks(tripId, dayId))
+    const [loadedBlocks, loadedItinerary] = await Promise.all([
+      listDayPlannerBlocks(tripId, dayId),
+      listDayItineraryItems(tripId, dayId),
+    ])
+    setBlocks(loadedBlocks)
+    setItineraryItems(loadedItinerary)
   }, [dayId, tripId])
 
   useEffect(() => {
@@ -113,14 +121,19 @@ export default function DayPlannerPage() {
     }
 
     let cancelled = false
-    void Promise.all([getTrip(tripId), getTripDay(tripId, dayId)])
-      .then(async ([loadedTrip, loadedDay]) => {
+    void Promise.all([
+      getTrip(tripId),
+      getTripDay(tripId, dayId),
+      listDayPlannerBlocks(tripId, dayId),
+      listDayItineraryItems(tripId, dayId),
+    ])
+      .then(([loadedTrip, loadedDay, loadedBlocks, loadedItinerary]) => {
         if (!loadedTrip || !loadedDay) throw new Error('Giornata non trovata in questo viaggio.')
-        const loadedBlocks = await listDayPlannerBlocks(tripId, dayId)
         if (cancelled) return
         setTrip(loadedTrip)
         setDay(loadedDay)
         setBlocks(loadedBlocks)
+        setItineraryItems(loadedItinerary)
       })
       .catch((cause) => {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Impossibile aprire il planner.')
@@ -180,6 +193,8 @@ export default function DayPlannerPage() {
         <p className="planner-readonly" role="status">Il viaggio è archiviato: la pagina resta leggibile ma non modificabile.</p>
       )}
       {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
+
+      <DayItinerarySummary items={itineraryItems} />
 
       {!readOnly && (
         <section className="planner-toolbar" aria-label="Aggiungi blocco">
