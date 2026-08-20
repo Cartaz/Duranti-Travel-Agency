@@ -29,5 +29,5 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isBlockType(value: string): value is Block['type'] {
-  return ['text','heading','checklist','place','map','media','link','quote','divider','table','expense','transport','accommodation','document','weatherSnapshot'].includes(value)
+  return ['text','heading','checklist','place','map','media','link','quote','divider','table','expense','transport','accommodation','restaurant','activity','document','weatherSnapshot'].includes(value)
 }
