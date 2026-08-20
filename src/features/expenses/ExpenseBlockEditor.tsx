@@ -37,6 +37,7 @@ export default function ExpenseBlockEditor({
   onChanged: () => Promise<void>
 }) {
   const fallbackCurrency = tripCurrency ?? 'EUR'
+  const normalizedTripCurrency = tripCurrency?.trim().toUpperCase()
   const [expense, setExpense] = useState<Expense>()
   const [draft, setDraft] = useState<ExpenseDraft>(() => emptyExpenseDraft(fallbackCurrency))
   const [payers, setPayers] = useState<Traveler[]>([])
@@ -52,8 +53,21 @@ export default function ExpenseBlockEditor({
       .then(async (loadedExpense) => {
         const payerOptions = await listExpensePayerOptions(tripId, loadedExpense?.paidByTravelerId)
         if (cancelled) return
+
+        let loadedDraft = loadedExpense ? expenseToDraft(loadedExpense) : emptyExpenseDraft(fallbackCurrency)
+        if (
+          loadedExpense?.fx
+          && (
+            !normalizedTripCurrency
+            || loadedExpense.fx.targetCurrency !== normalizedTripCurrency
+            || loadedExpense.currency === normalizedTripCurrency
+          )
+        ) {
+          loadedDraft = { ...loadedDraft, fxRate: undefined }
+        }
+
         setExpense(loadedExpense)
-        setDraft(loadedExpense ? expenseToDraft(loadedExpense) : emptyExpenseDraft(fallbackCurrency))
+        setDraft(loadedDraft)
         setPayers(payerOptions.active)
         setHistoricalPayer(payerOptions.historical)
       })
@@ -67,7 +81,7 @@ export default function ExpenseBlockEditor({
     return () => {
       cancelled = true
     }
-  }, [block.id, block.updatedAt, dayId, fallbackCurrency, tripId])
+  }, [block.id, block.updatedAt, dayId, fallbackCurrency, normalizedTripCurrency, tripId])
 
   const patch = (changes: Partial<ExpenseDraft>): void => setDraft((current) => ({ ...current, ...changes }))
 
@@ -123,7 +137,6 @@ export default function ExpenseBlockEditor({
   const currentPayerIsActive = draft.paidByTravelerId
     ? payers.some((traveler) => traveler.id === draft.paidByTravelerId)
     : false
-  const normalizedTripCurrency = tripCurrency?.trim().toUpperCase()
   const normalizedDraftCurrency = draft.currency.trim().toUpperCase()
   const showFx = Boolean(
     normalizedTripCurrency
