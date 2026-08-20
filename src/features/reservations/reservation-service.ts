@@ -5,7 +5,7 @@ import { getTripDay } from '../days/day-service'
 import { assertPlannerDayContext } from '../planner/block-service'
 import { getTrip } from '../trips/trip-service'
 
-export type PlannerReservationType = Extract<Reservation['type'], 'transport' | 'accommodation'>
+export type PlannerReservationType = Extract<Reservation['type'], 'transport' | 'accommodation' | 'restaurant' | 'activity'>
 export type PlannerReservationStatus = NonNullable<Reservation['status']>
 
 export interface ReservationDraft {
@@ -92,6 +92,8 @@ function validateUrl(value: string | undefined): string | undefined {
 function reservationTypeFromBlock(block: Block): PlannerReservationType | undefined {
   if (block.type === 'transport') return 'transport'
   if (block.type === 'accommodation') return 'accommodation'
+  if (block.type === 'restaurant') return 'restaurant'
+  if (block.type === 'activity') return 'activity'
   return undefined
 }
 
