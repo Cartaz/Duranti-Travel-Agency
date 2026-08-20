@@ -63,8 +63,10 @@ function BudgetCard({ budget }: { budget: TripBudgetSummary }) {
       />
 
       <p className="expense-budget-note">
-        Il budget considera {budget.includedExpenseCount} {budget.includedExpenseCount === 1 ? 'spesa' : 'spese'} in {budget.currency}.
-        {budget.excludedExpenseCount > 0 && ` ${budget.excludedExpenseCount} ${budget.excludedExpenseCount === 1 ? 'spesa in altra valuta resta esclusa' : 'spese in altre valute restano escluse'}.`}
+        Il budget considera {budget.includedExpenseCount} {budget.includedExpenseCount === 1 ? 'spesa' : 'spese'}:
+        {' '}{budget.directExpenseCount} già in {budget.currency}
+        {budget.convertedExpenseCount > 0 && ` e ${budget.convertedExpenseCount} ${budget.convertedExpenseCount === 1 ? 'convertita' : 'convertite'} con un tasso inserito manualmente`}.
+        {budget.excludedExpenseCount > 0 && ` ${budget.excludedExpenseCount} ${budget.excludedExpenseCount === 1 ? 'spesa in altra valuta resta esclusa perché non ha una conversione esplicita' : 'spese in altre valute restano escluse perché non hanno una conversione esplicita'}.`}
       </p>
     </article>
   )
@@ -102,7 +104,7 @@ export default function TripExpenseSummary({ tripId }: { tripId: string }) {
         <div>
           <p className="eyebrow">Conti del capitolo</p>
           <h2 id="trip-expense-summary-title">Riepilogo spese</h2>
-          <p>Budget e totali restano legati alla loro valuta: nessuna conversione o tasso di cambio viene applicato implicitamente.</p>
+          <p>Le valute restano separate. Una spesa estera entra nel budget solo quando registri esplicitamente un tasso verso la valuta del viaggio.</p>
         </div>
         {summary && <span className="expense-summary-count">{summary.expenseCount} spese</span>}
       </div>
