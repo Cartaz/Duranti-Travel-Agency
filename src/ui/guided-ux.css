@@ -14,6 +14,61 @@
   line-height: 1.35;
 }
 
+.trip-form-optional {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  border: 1px solid #46392b;
+  border-radius: 16px;
+  background: rgba(18, 14, 11, .62);
+}
+
+.trip-form-optional > summary {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  color: #dfcfba;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.trip-form-optional > summary > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.trip-form-optional > summary strong,
+.trip-form-optional > summary small {
+  display: block;
+}
+
+.trip-form-optional > summary small {
+  color: #938473;
+  line-height: 1.35;
+}
+
+.trip-form-optional-state {
+  flex: 0 0 auto;
+  border: 1px solid #536245;
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: #b8c7a0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.trip-form-optional-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  padding: 15px;
+  border-top: 1px solid #3a2f25;
+}
+
 @media (max-width: 700px) {
   .planner-toolbar {
     align-items: stretch;
@@ -96,5 +151,13 @@
   .day-itinerary-heading-actions > span {
     flex: 0 0 auto !important;
     white-space: nowrap;
+  }
+
+  .trip-form-optional-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-form-optional-grid .trip-field-wide {
+    grid-column: auto;
   }
 }
