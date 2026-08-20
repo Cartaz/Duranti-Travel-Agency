@@ -30,6 +30,12 @@ async function getExistingMediaDirectory(): Promise<FileSystemDirectoryHandle | 
   }
 }
 
+async function requireExistingMediaDirectory(): Promise<FileSystemDirectoryHandle> {
+  const directory = await getExistingMediaDirectory()
+  if (directory) return directory
+  throw new DOMException('Duranti media directory was not found.', 'NotFoundError')
+}
+
 async function getDirectoryEntries(
   directory: FileSystemDirectoryHandle,
 ): Promise<Array<[string, FileSystemHandle]>> {
@@ -77,14 +83,14 @@ export async function writeMediaFile(mediaId: string, source: Blob): Promise<str
 }
 
 export async function readMediaFile(mediaId: string): Promise<File> {
-  const mediaDirectory = await getMediaDirectory()
+  const mediaDirectory = await requireExistingMediaDirectory()
   const itemDirectory = await mediaDirectory.getDirectoryHandle(mediaId)
   const fileHandle = await itemDirectory.getFileHandle('original')
   return fileHandle.getFile()
 }
 
 export async function deleteMediaFile(mediaId: string): Promise<void> {
-  const mediaDirectory = await getMediaDirectory()
+  const mediaDirectory = await requireExistingMediaDirectory()
   await mediaDirectory.removeEntry(mediaId, { recursive: true })
 }
 
