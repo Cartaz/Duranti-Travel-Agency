@@ -1,6 +1,7 @@
 import { db } from '../db/duranti-db'
 import { Repository } from './base-repository'
 import { plannerBlockRepository } from './block-repository'
+import { itineraryRepository } from './itinerary-repository'
 import { mediaFileRepository } from './media-repository'
 import { tripTravelerRepository } from './trip-traveler-repository'
 import { secureTravelerDocumentRepository } from './traveler-document-repository'
@@ -15,7 +16,7 @@ export const blockRepository = plannerBlockRepository
 export const placeRepository = new Repository<DatabaseTables['places']>(db.places)
 export const mediaRepository = mediaFileRepository
 export const linkRepository = new Repository<DatabaseTables['links']>(db.links)
-export const itineraryRepository = new Repository<DatabaseTables['itineraries']>(db.itineraries)
+export { itineraryRepository }
 export const templateRepository = new Repository<DatabaseTables['templates']>(db.templates)
 export const expenseRepository = new Repository<DatabaseTables['expenses']>(db.expenses)
 export const reservationRepository = new Repository<DatabaseTables['reservations']>(db.reservations)
