@@ -118,19 +118,26 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
   }
 
   const cancelTo = mode === 'edit' && tripId ? `/trips/${tripId}` : '/'
+  const hasOptionalDetails = Boolean(
+    form.subtitle.trim()
+      || form.summary.trim()
+      || form.budget.trim()
+      || form.status !== 'planned'
+      || form.currency.trim().toUpperCase() !== 'EUR',
+  )
 
   return (
     <section className="trip-editor-page" aria-labelledby="trip-editor-title">
       <div className="trip-page-heading">
         <div>
-          <p className="eyebrow">{mode === 'create' ? 'Nuovo capitolo' : 'Modifica capitolo'}</p>
+          <p className="eyebrow">{mode === 'create' ? 'Nuovo viaggio' : 'Modifica viaggio'}</p>
           <h1 id="trip-editor-title">{mode === 'create' ? 'Crea un viaggio' : 'Dettagli del viaggio'}</h1>
         </div>
         <Link className="trip-text-link" to={cancelTo}>Annulla</Link>
       </div>
 
       {loading ? (
-        <p className="trip-feedback" role="status">Apro il capitolo…</p>
+        <p className="trip-feedback" role="status">Apro il viaggio…</p>
       ) : (
         <form className="trip-form" onSubmit={submit}>
           {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
@@ -147,48 +154,6 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
             />
           </label>
 
-          <label className="trip-field trip-field-wide">
-            <span>Sottotitolo</span>
-            <input
-              value={form.subtitle}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setField('subtitle', event.target.value)}
-              placeholder="Una frase per questo capitolo"
-              autoComplete="off"
-            />
-          </label>
-
-          <label className="trip-field">
-            <span>Stato</span>
-            <select value={form.status} onChange={(event: ChangeEvent<HTMLSelectElement>) => setField('status', event.target.value as EditableTripStatus)}>
-              <option value="planned">Pianificato</option>
-              <option value="ongoing">In corso</option>
-              <option value="completed">Concluso</option>
-            </select>
-          </label>
-
-          <label className="trip-field">
-            <span>Valuta</span>
-            <input
-              value={form.currency}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setField('currency', event.target.value.toUpperCase())}
-              maxLength={3}
-              placeholder="EUR"
-              autoCapitalize="characters"
-              autoComplete="off"
-            />
-          </label>
-
-          <label className="trip-field trip-field-wide">
-            <span>Budget del viaggio</span>
-            <input
-              value={form.budget}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setField('budget', event.target.value)}
-              inputMode="decimal"
-              placeholder="Es. 1500,00"
-              autoComplete="off"
-            />
-          </label>
-
           <label className="trip-field">
             <span>Partenza</span>
             <input type="date" value={form.startDate} onChange={(event: ChangeEvent<HTMLInputElement>) => setField('startDate', event.target.value)} />
@@ -199,20 +164,74 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
             <input type="date" value={form.endDate} min={form.startDate || undefined} onChange={(event: ChangeEvent<HTMLInputElement>) => setField('endDate', event.target.value)} />
           </label>
 
-          <label className="trip-field trip-field-wide">
-            <span>Idea / riepilogo</span>
-            <textarea
-              rows={6}
-              value={form.summary}
-              onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setField('summary', event.target.value)}
-              placeholder="Perché vogliamo partire, cosa non vogliamo perderci, prime idee…"
-            />
-          </label>
+          <details className="trip-form-optional">
+            <summary>
+              <span>
+                <strong>Altri dettagli</strong>
+                <small>Sottotitolo, stato, budget, valuta e appunti</small>
+              </span>
+              {hasOptionalDetails && <span className="trip-form-optional-state">Configurati</span>}
+            </summary>
+
+            <div className="trip-form-optional-grid">
+              <label className="trip-field trip-field-wide">
+                <span>Sottotitolo</span>
+                <input
+                  value={form.subtitle}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => setField('subtitle', event.target.value)}
+                  placeholder="Una frase per questo viaggio"
+                  autoComplete="off"
+                />
+              </label>
+
+              <label className="trip-field">
+                <span>Stato</span>
+                <select value={form.status} onChange={(event: ChangeEvent<HTMLSelectElement>) => setField('status', event.target.value as EditableTripStatus)}>
+                  <option value="planned">Pianificato</option>
+                  <option value="ongoing">In corso</option>
+                  <option value="completed">Concluso</option>
+                </select>
+              </label>
+
+              <label className="trip-field">
+                <span>Valuta</span>
+                <input
+                  value={form.currency}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => setField('currency', event.target.value.toUpperCase())}
+                  maxLength={3}
+                  placeholder="EUR"
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                />
+              </label>
+
+              <label className="trip-field trip-field-wide">
+                <span>Budget del viaggio</span>
+                <input
+                  value={form.budget}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => setField('budget', event.target.value)}
+                  inputMode="decimal"
+                  placeholder="Es. 1500,00"
+                  autoComplete="off"
+                />
+              </label>
+
+              <label className="trip-field trip-field-wide">
+                <span>Appunti</span>
+                <textarea
+                  rows={5}
+                  value={form.summary}
+                  onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setField('summary', event.target.value)}
+                  placeholder="Prime idee, cose da non perdere, note sul viaggio…"
+                />
+              </label>
+            </div>
+          </details>
 
           <div className="trip-form-actions">
             <Link className="trip-secondary-action" to={cancelTo}>Annulla</Link>
             <button className="trip-primary-action" type="submit" disabled={saving}>
-              {saving ? 'Salvataggio…' : mode === 'create' ? 'Crea capitolo' : 'Salva modifiche'}
+              {saving ? 'Salvataggio…' : mode === 'create' ? 'Crea viaggio' : 'Salva modifiche'}
             </button>
           </div>
         </form>
