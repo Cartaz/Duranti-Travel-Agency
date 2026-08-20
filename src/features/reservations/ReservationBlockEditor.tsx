@@ -1,11 +1,16 @@
 import { FormEvent, useEffect, useState } from 'react'
-import type { Block, Place, Reservation } from '../../domain/entities'
+import type { Block, Media, Place, Reservation } from '../../domain/entities'
 import { movePlannerBlock } from '../planner/block-service'
 import {
+  attachPlannerReservationFile,
   deletePlannerReservationBlock,
   EMPTY_RESERVATION_DRAFT,
   getPlannerReservation,
+  getPlannerReservationAttachment,
   listSavedPlaces,
+  readPlannerReservationAttachment,
+  removePlannerReservationAttachment,
+  RESERVATION_ATTACHMENT_ACCEPT,
   reservationToDraft,
   savePlannerReservation,
   type ReservationDraft,
@@ -64,6 +69,12 @@ function reservationBlockType(block: Block): ReservationBlockType {
   throw new Error('Tipo di blocco prenotazione non supportato.')
 }
 
+function formatBytes(value: number): string {
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`
+  return `${(value / (1024 * 1024)).toFixed(1)} MiB`
+}
+
 export default function ReservationBlockEditor({
   block,
   tripId,
@@ -88,22 +99,29 @@ export default function ReservationBlockEditor({
   const blockType = reservationBlockType(block)
   const config = blockConfigs[blockType]
   const [reservation, setReservation] = useState<Reservation>()
+  const [attachment, setAttachment] = useState<Media>()
   const [places, setPlaces] = useState<Place[]>([])
   const [draft, setDraft] = useState<ReservationDraft>(EMPTY_RESERVATION_DRAFT)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [attachmentBusy, setAttachmentBusy] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setError('')
     void Promise.all([
       getPlannerReservation(tripId, dayId, block.id),
       listSavedPlaces(),
     ])
-      .then(([loadedReservation, loadedPlaces]) => {
+      .then(async ([loadedReservation, loadedPlaces]) => {
+        const loadedAttachment = loadedReservation
+          ? await getPlannerReservationAttachment(tripId, dayId, block.id, loadedReservation)
+          : undefined
         if (cancelled) return
         setReservation(loadedReservation)
+        setAttachment(loadedAttachment)
         setPlaces(loadedPlaces)
         setDraft(loadedReservation ? reservationToDraft(loadedReservation) : EMPTY_RESERVATION_DRAFT)
       })
@@ -120,10 +138,11 @@ export default function ReservationBlockEditor({
   }, [block.id, block.updatedAt, dayId, tripId])
 
   const patch = (changes: Partial<ReservationDraft>): void => setDraft((current) => ({ ...current, ...changes }))
+  const busy = saving || attachmentBusy
 
   const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
-    if (readOnly || saving) return
+    if (readOnly || busy) return
     setSaving(true)
     setError('')
     try {
@@ -138,8 +157,64 @@ export default function ReservationBlockEditor({
     }
   }
 
+  const uploadAttachment = async (file: File): Promise<void> => {
+    if (readOnly || busy) return
+    setAttachmentBusy(true)
+    setError('')
+    try {
+      const result = await attachPlannerReservationFile(tripId, dayId, block.id, file)
+      setReservation(result.reservation)
+      setAttachment(result.media)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile salvare l’allegato.')
+    } finally {
+      setAttachmentBusy(false)
+    }
+  }
+
+  const removeAttachment = async (): Promise<void> => {
+    if (
+      readOnly
+      || busy
+      || !attachment
+      || !window.confirm('Rimuovere l’allegato da questa prenotazione?')
+    ) return
+
+    setAttachmentBusy(true)
+    setError('')
+    try {
+      const updated = await removePlannerReservationAttachment(tripId, dayId, block.id)
+      setReservation(updated)
+      setAttachment(undefined)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile rimuovere l’allegato.')
+    } finally {
+      setAttachmentBusy(false)
+    }
+  }
+
+  const openAttachment = async (): Promise<void> => {
+    if (!attachment || attachmentBusy) return
+    setAttachmentBusy(true)
+    setError('')
+    try {
+      const file = await readPlannerReservationAttachment(attachment)
+      const objectUrl = URL.createObjectURL(file)
+      const anchor = document.createElement('a')
+      anchor.href = objectUrl
+      anchor.target = '_blank'
+      anchor.rel = 'noopener noreferrer'
+      anchor.click()
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile aprire l’allegato.')
+    } finally {
+      setAttachmentBusy(false)
+    }
+  }
+
   const remove = async (): Promise<void> => {
-    if (readOnly || saving || !window.confirm(`Eliminare questo blocco ${config.label.toLowerCase()} e la relativa prenotazione?`)) return
+    if (readOnly || busy || !window.confirm(`Eliminare questo blocco ${config.label.toLowerCase()} e la relativa prenotazione?`)) return
     setSaving(true)
     setError('')
     try {
@@ -152,7 +227,7 @@ export default function ReservationBlockEditor({
   }
 
   const move = async (direction: MoveDirection): Promise<void> => {
-    if (readOnly || saving) return
+    if (readOnly || busy) return
     setSaving(true)
     setError('')
     try {
@@ -175,9 +250,9 @@ export default function ReservationBlockEditor({
         <span>{config.label}</span>
         {!readOnly && (
           <div className="planner-block-tools">
-            <button type="button" disabled={saving || !canMoveUp} aria-label="Sposta blocco su" title="Sposta su" onClick={() => void move('up')}>↑</button>
-            <button type="button" disabled={saving || !canMoveDown} aria-label="Sposta blocco giù" title="Sposta giù" onClick={() => void move('down')}>↓</button>
-            <button className="planner-delete" type="button" disabled={saving} onClick={() => void remove()}>Elimina</button>
+            <button type="button" disabled={busy || !canMoveUp} aria-label="Sposta blocco su" title="Sposta su" onClick={() => void move('up')}>↑</button>
+            <button type="button" disabled={busy || !canMoveDown} aria-label="Sposta blocco giù" title="Sposta giù" onClick={() => void move('down')}>↓</button>
+            <button className="planner-delete" type="button" disabled={busy} onClick={() => void remove()}>Elimina</button>
           </div>
         )}
       </div>
@@ -244,12 +319,55 @@ export default function ReservationBlockEditor({
             </label>
           </div>
 
+          <section className="reservation-attachment" aria-label="Allegato prenotazione">
+            <div className="reservation-attachment-heading">
+              <div>
+                <strong>Allegato</strong>
+                <span>PDF o immagine · massimo 25 MiB</span>
+              </div>
+              {attachmentBusy && <small role="status">Aggiornamento…</small>}
+            </div>
+
+            {attachment ? (
+              <div className="reservation-attachment-current">
+                <div>
+                  <strong>{attachment.originalName ?? 'Allegato'}</strong>
+                  <span>{attachment.mimeType} · {formatBytes(attachment.sizeBytes)}</span>
+                </div>
+                <div className="reservation-attachment-actions">
+                  <button type="button" disabled={attachmentBusy} onClick={() => void openAttachment()}>Apri</button>
+                  {!readOnly && <button type="button" disabled={busy} onClick={() => void removeAttachment()}>Rimuovi</button>}
+                </div>
+              </div>
+            ) : (
+              <p className="reservation-attachment-empty">
+                {reservation ? 'Nessun allegato collegato.' : 'Salva prima la prenotazione per aggiungere un allegato.'}
+              </p>
+            )}
+
+            {!readOnly && reservation && (
+              <label className={`reservation-attachment-picker${busy ? ' reservation-attachment-picker-disabled' : ''}`}>
+                <span>{attachment ? 'Sostituisci allegato' : 'Aggiungi allegato'}</span>
+                <input
+                  type="file"
+                  accept={RESERVATION_ATTACHMENT_ACCEPT}
+                  disabled={busy}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0]
+                    event.currentTarget.value = ''
+                    if (file) void uploadAttachment(file)
+                  }}
+                />
+              </label>
+            )}
+          </section>
+
           {places.length === 0 && <small className="reservation-hint">Puoi prima creare un blocco Luogo per collegarlo a questa prenotazione.</small>}
           {error && <small className="planner-block-error">{error}</small>}
 
           <div className="reservation-actions">
             {reservation?.url && <a href={reservation.url} target="_blank" rel="noreferrer">Apri prenotazione ↗</a>}
-            {!readOnly && <button type="submit" disabled={saving}>{saving ? 'Salvataggio…' : reservation ? 'Salva prenotazione' : 'Crea prenotazione'}</button>}
+            {!readOnly && <button type="submit" disabled={busy}>{saving ? 'Salvataggio…' : reservation ? 'Salva prenotazione' : 'Crea prenotazione'}</button>}
           </div>
         </>
       )}
