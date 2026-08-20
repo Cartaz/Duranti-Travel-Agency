@@ -194,7 +194,15 @@ export default function DayPlannerPage() {
       )}
       {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
 
-      <DayItinerarySummary items={itineraryItems} />
+      <DayItinerarySummary
+        items={itineraryItems}
+        tripId={trip.id}
+        dayId={day.id}
+        dayDate={day.date}
+        tripEndDate={trip.endDate}
+        readOnly={readOnly}
+        onChanged={refreshBlocks}
+      />
 
       {!readOnly && (
         <section className="planner-toolbar" aria-label="Aggiungi blocco">
