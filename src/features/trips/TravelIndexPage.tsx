@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { Trip, TripStatus } from '../../domain/entities'
 import { listBookTrips } from './trip-service'
 import './trips.css'
+import './trip-lifecycle.css'
 
 const chapters: Array<{
   key: Extract<TripStatus, 'planned' | 'ongoing' | 'completed'>
@@ -86,7 +87,10 @@ export default function TravelIndexPage() {
           </p>
         </div>
         <div className="book-intro-actions">
-          <Link className="trip-primary-action" to="/trips/new">Nuovo viaggio</Link>
+          <div className="trip-index-actions">
+            <Link className="trip-secondary-action" to="/archive">Archivio</Link>
+            <Link className="trip-primary-action" to="/trips/new">Nuovo viaggio</Link>
+          </div>
           <div className="book-emblem" aria-hidden="true">
             <span>DTA</span>
             <small>EST. NOI DUE</small>

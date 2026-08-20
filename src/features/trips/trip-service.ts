@@ -59,6 +59,13 @@ export async function listBookTrips(): Promise<Trip[]> {
     .sort((left, right) => tripSortValue(left).localeCompare(tripSortValue(right)))
 }
 
+export async function listArchivedTrips(): Promise<Trip[]> {
+  const trips = await tripRepository.list()
+  return trips
+    .filter((trip) => trip.status === 'archived')
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+}
+
 export async function getTrip(tripId: string): Promise<Trip | undefined> {
   return tripRepository.get(tripId)
 }
@@ -80,14 +87,51 @@ export async function createTrip(input: TripDraft): Promise<Trip> {
 export async function updateTrip(tripId: string, input: TripDraft): Promise<Trip> {
   const existing = await tripRepository.get(tripId)
   if (!existing) throw new Error('Il viaggio non esiste o è stato eliminato.')
+  if (existing.status === 'archived') {
+    throw new Error('Ripristina il viaggio dall’archivio prima di modificarlo.')
+  }
 
   const draft = validateDraft(input)
   const updated: Trip = {
     ...existing,
     ...draft,
+    archivedFromStatus: undefined,
     updatedAt: new Date().toISOString(),
   }
 
   await tripRepository.put(updated)
   return updated
+}
+
+export async function archiveTrip(tripId: string): Promise<Trip> {
+  const existing = await tripRepository.get(tripId)
+  if (!existing) throw new Error('Il viaggio non esiste o è stato eliminato.')
+  if (existing.status === 'archived') return existing
+
+  const archived: Trip = {
+    ...existing,
+    status: 'archived',
+    archivedFromStatus: existing.status,
+    updatedAt: new Date().toISOString(),
+  }
+
+  await tripRepository.put(archived)
+  return archived
+}
+
+export async function restoreArchivedTrip(tripId: string): Promise<Trip> {
+  const existing = await tripRepository.get(tripId)
+  if (!existing) throw new Error('Il viaggio non esiste o è stato eliminato.')
+  if (existing.status !== 'archived') return existing
+
+  const restoredStatus = existing.archivedFromStatus ?? 'planned'
+  const { archivedFromStatus: _archivedFromStatus, ...rest } = existing
+  const restored: Trip = {
+    ...rest,
+    status: restoredStatus,
+    updatedAt: new Date().toISOString(),
+  }
+
+  await tripRepository.put(restored)
+  return restored
 }

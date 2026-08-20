@@ -30,9 +30,15 @@ Timestamps are ISO 8601 UTC strings. IDs are immutable. User-facing entities use
 
 ## Trip lifecycle
 
-`planned -> ongoing -> completed -> archived`
+Active book states are:
 
-The lifecycle is a domain invariant, not merely a UI filter. A trip can be edited in every state unless a future feature explicitly introduces locking.
+`planned -> ongoing -> completed`
+
+A trip may be moved from any active state to `archived`. Archiving is a reversible domain state, not deletion: `archivedFromStatus` records the previous active state so restore returns the chapter to the same section. If older data lacks that field, restore falls back to `planned`.
+
+`archived` is distinct from the repository tombstone in `deletedAt`. Archived trips remain normal persisted entities, remain part of Vault backup/restore, and are hidden from the main book index only by feature-level filtering.
+
+The lifecycle is a domain invariant, not merely a UI filter. Active trips remain editable; archived trips must be restored before editing.
 
 ## Content blocks
 

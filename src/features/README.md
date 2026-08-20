@@ -5,7 +5,7 @@ Feature modules contain user workflows and orchestration. They depend on domain 
 Implemented / active:
 
 - `storage-lab/` — regression UI for IndexedDB, OPFS and the legacy diagnostic Vault.
-- `trips/` — travel-book index backed by local persistence, trip creation/editing, status grouping and chapter detail navigation.
+- `trips/` — travel-book index backed by local persistence, trip creation/editing, status grouping, chapter detail navigation and archive/restore lifecycle.
 
 Planned next:
 

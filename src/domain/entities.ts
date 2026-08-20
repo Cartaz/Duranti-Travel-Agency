@@ -24,6 +24,7 @@ export interface Trip extends EntityBase {
   title: string
   subtitle?: string
   status: TripStatus
+  archivedFromStatus?: Exclude<TripStatus, 'archived'>
   startDate?: string
   endDate?: string
   coverMediaId?: string

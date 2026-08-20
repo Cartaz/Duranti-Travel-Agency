@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Trip } from '../../domain/entities'
-import { getTrip } from './trip-service'
+import { archiveTrip, getTrip } from './trip-service'
 import './trips.css'
+import './trip-lifecycle.css'
 
 const statusLabel: Record<Exclude<Trip['status'], 'archived'>, string> = {
   planned: 'Pianificato',
@@ -20,9 +21,11 @@ function formatDate(value: string | undefined): string {
 
 export default function TripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>()
+  const navigate = useNavigate()
   const [trip, setTrip] = useState<Trip>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [archiving, setArchiving] = useState(false)
 
   useEffect(() => {
     if (!tripId) {
@@ -53,6 +56,22 @@ export default function TripDetailPage() {
     }
   }, [tripId])
 
+  const handleArchive = async (): Promise<void> => {
+    if (!trip || archiving) return
+    const confirmed = window.confirm(`Archiviare “${trip.title}”? Potrai ripristinarlo in seguito.`)
+    if (!confirmed) return
+
+    setArchiving(true)
+    setError('')
+    try {
+      await archiveTrip(trip.id)
+      navigate('/archive', { replace: true })
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile archiviare il viaggio.')
+      setArchiving(false)
+    }
+  }
+
   if (loading) return <p className="trip-feedback" role="status">Apro il capitolo…</p>
 
   if (!trip || trip.status === 'archived') {
@@ -72,8 +91,15 @@ export default function TripDetailPage() {
           <h1 id="trip-detail-title">{trip.title}</h1>
           {trip.subtitle && <p className="trip-detail-subtitle">{trip.subtitle}</p>}
         </div>
-        <Link className="trip-secondary-action" to={`/trips/${trip.id}/edit`}>Modifica</Link>
+        <div className="trip-page-actions">
+          <Link className="trip-secondary-action" to={`/trips/${trip.id}/edit`}>Modifica</Link>
+          <button className="trip-archive-action" type="button" onClick={() => void handleArchive()} disabled={archiving}>
+            {archiving ? 'Archivio…' : 'Archivia'}
+          </button>
+        </div>
       </div>
+
+      {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
 
       <div className="trip-detail-grid">
         <section className="trip-detail-panel">

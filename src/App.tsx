@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import StorageLabPage from './features/storage-lab/StorageLabPage'
+import ArchivedTripsPage from './features/trips/ArchivedTripsPage'
 import TravelIndexPage from './features/trips/TravelIndexPage'
 import TripDetailPage from './features/trips/TripDetailPage'
 import TripFormPage from './features/trips/TripFormPage'
@@ -11,6 +12,7 @@ export default function App() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<TravelIndexPage />} />
+          <Route path="archive" element={<ArchivedTripsPage />} />
           <Route path="trips/new" element={<TripFormPage mode="create" />} />
           <Route path="trips/:tripId" element={<TripDetailPage />} />
           <Route path="trips/:tripId/edit" element={<TripFormPage mode="edit" />} />
