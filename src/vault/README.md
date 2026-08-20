@@ -4,88 +4,125 @@ Portable encrypted backup independent of origin storage.
 
 ## Production format v1
 
-Export is implemented as a chunked binary `.duranti` archive. Import now supports strict parse/decrypt/validation plus isolated OPFS staging; the final live commit/rollback step remains separately gated.
+Production Vault v1 now implements the complete storage pipeline: chunked encrypted export, strict parse/decrypt/validation, isolated import staging, explicit live replacement, crash recovery/rollback and post-restore verification.
 
 The export contains:
 
 - a canonical snapshot of every Duranti Dexie table, including `appMeta` and the wrapped local document-encryption key envelope;
-- every file under the managed ordinary-media OPFS namespace `duranti/media/`;
-- every file under the encrypted private-document namespace `duranti/private/traveler-documents/`.
+- every file under `duranti/media/`;
+- every file under `duranti/private/traveler-documents/`.
 
-Managed OPFS trees are exported completely, including recoverable orphan files. This is intentional for disaster recovery: reconciliation can decide what is stale after restore, while export must not silently discard user bytes.
+Managed OPFS trees are exported completely, including recoverable orphan files. Reconciliation decides what is stale after restore; export must not silently discard user bytes.
 
 ## Envelope
 
 The plaintext header contains only format/KDF/algorithm metadata plus a random archive ID and creation timestamp. The database snapshot, managed file paths and file metadata live inside the encrypted manifest.
 
-Encryption:
+Encryption rules:
 
 - PBKDF2-HMAC-SHA256 derives an AES-256-GCM Vault key from the export passphrase and a fresh random salt;
 - every encrypted frame uses a fresh random 96-bit AES-GCM IV;
-- AES-GCM additional authenticated data binds frames to the archive ID, record type, file index/path, chunk index and plaintext chunk length;
-- ordinary media and already-encrypted private-document files are both encrypted again by the portable Vault key.
+- AES-GCM AAD binds frames to archive ID, record type, file index/path, chunk index and plaintext chunk length;
+- ordinary media and already-encrypted private-document files are encrypted again by the portable Vault key.
 
-Large files are processed in 4 MiB plaintext chunks. The completed encrypted archive is written incrementally to `duranti/vault-staging/` in OPFS instead of accumulating the whole backup in JavaScript memory.
+Large files are processed in 4 MiB chunks and the archive is written incrementally to `duranti/vault-staging/` rather than accumulated in JavaScript memory.
 
-## Consistent snapshot rule
+## Consistent export snapshot
 
-Export takes:
-
-1. Dexie snapshot A in one read-only transaction across all tables;
-2. immutable `File` snapshots of the managed OPFS trees;
-3. Dexie snapshot B in a second read-only transaction.
-
-A and B must serialize identically or export fails and must be retried. OPFS work is never awaited inside the Dexie transaction. Combined with the crash-safe media/document write protocols, this prevents a successful Vault from knowingly pairing changed database references with the wrong binary snapshot.
+Export takes Dexie snapshot A, immutable `File` snapshots of the managed OPFS trees, then Dexie snapshot B. A and B must serialize identically or export fails. OPFS work is never awaited inside the Dexie transaction.
 
 ## iPhone save/share flow
 
-Preparing a Vault may take too long to retain the browser's transient user activation. The intended UI is therefore two-stage:
+The intended UI is two-stage because preparing a backup may outlive transient user activation:
 
-1. **Prepare backup** — creates the encrypted staged `.duranti` file.
-2. **Save/Share backup** — a fresh user tap invokes Web Share with the already prepared `File`; a download-link fallback is available when file sharing is unsupported.
+1. **Prepare backup** — create the encrypted staged `.duranti` file.
+2. **Save/Share backup** — a fresh user tap invokes Web Share; download fallback remains available.
 
-The passphrase is never persisted. A prepared staging file is already encrypted, but the UI should offer explicit cleanup after a successful share/download or cancellation.
+The passphrase is never persisted.
 
 ## Import staging
 
-`stageVaultImport()` never writes to the live Duranti database or managed live OPFS trees.
-
-It performs, in order:
-
-1. exact file magic/header/version/KDF/encryption validation;
-2. PBKDF2 key derivation;
-3. authenticated AES-GCM manifest decryption;
-4. current-schema table-set and primary-key validation;
-5. managed-path, file-size and chunk-count validation;
-6. strict frame ordering and per-chunk AAD/authentication checks;
-7. sequential decryption of file chunks into an isolated staging subtree;
-8. final staged byte-size verification, end-frame verification and rejection of trailing bytes.
-
-Staged binary bytes live only under:
+`stageVaultImport()` never writes to live IndexedDB or live managed OPFS trees. It validates magic/header/version/KDF/encryption, derives the password key, authenticates and decrypts the manifest, validates current-schema tables/keys and managed paths, authenticates every file chunk, and writes only to:
 
 ```text
 duranti/vault-import-staging/<stageId>/files/<fileIndex>.bin
 ```
 
-Original managed paths are not used as staging filesystem paths. They remain authenticated manifest metadata and are revalidated before any future live commit.
+Original managed paths remain authenticated metadata and are revalidated before live mutation. Production v1 accepts only the exact current database schema version.
 
-Structured rows remain in the returned in-memory validated manifest during this phase; they are not inserted into IndexedDB. Ordinary media chunks are plaintext in import staging because they are plaintext in their normal live OPFS namespace. Private-document files remain protected by their inner `DURDOC01` encryption even after the outer Vault layer is removed.
+## Live restore protocol
 
-Any parsing, password, authentication, ordering, size or staging failure removes the entire import staging directory best-effort and leaves live Duranti state untouched. `discardStagedVaultImport()` explicitly removes a successful staging area when the user cancels.
+`commitStagedVaultImport()` requires explicit `{ mode: 'replace' }`. UI must obtain user confirmation before invoking it because current live Duranti data is replaced.
 
-Production format v1 currently accepts only the exact current database schema version. Cross-schema restore will require an explicit reviewed migration path rather than silently inserting incompatible rows.
+```text
+revalidate staged manifest + staged File snapshots
+        ↓
+snapshot current managed OPFS
+        ↓
+copy current files to rollback backup
+        ↓
+persist journal: files-mutating
+        ↓
+replace live managed OPFS from staging
+        ↓
+verify exact target file inventory
+        ↓
+persist journal: files-promoted
+        ↓
+single Dexie rw transaction:
+  clear every table
+  bulkPut every restored table
+        ↓
+lock the in-memory sensitive-data DEK
+        ↓
+persist journal: committed
+        ↓
+post-restore verification
+        ↓
+cleanup staging + backup + journal
+```
 
-## Remaining import commit requirements
+The Dexie replacement is one transaction across all tables. No OPFS or Web Crypto operation is awaited inside that transaction.
 
-Before restore is exposed as complete in the UI, the next gated step must implement:
+## Crash recovery
 
-- re-validation of the staged manifest immediately before mutation;
-- a user-visible replace/restore policy for existing live data;
-- isolated live OPFS replacement with recoverable rollback material;
-- one short Dexie transaction for structured-data replacement;
-- cleanup/rollback if either side of the commit fails;
-- post-restore media and private-document integrity scans;
-- explicit removal of staging data only after successful verification.
+IndexedDB and OPFS cannot participate in one browser transaction, so restore uses a temporary rollback copy of the previous managed OPFS files plus a small OPFS journal.
+
+Rollback files:
+
+```text
+duranti/vault-restore-backup/<restoreId>/
+```
+
+Journal:
+
+```text
+duranti/vault-restore-state/current.json
+```
+
+The journal contains restore identifiers, phase metadata and the SHA-256 fingerprint of the target database snapshot. It does not persist a plaintext duplicate of the previous IndexedDB database.
+
+Recovery runs during application bootstrap before `ensureInstallationMetadata()` can update `appMeta`:
+
+- `files-mutating` -> restore the previous OPFS backup;
+- `files-promoted` -> fingerprint the current DB; matching target means the Dexie commit won, otherwise restore the previous OPFS backup;
+- `committed` -> imported state is authoritative; finish cleanup only.
+
+This also handles a crash after Dexie commits but before the journal update: the target fingerprint disambiguates the result.
+
+## Post-restore verification
+
+After a successful Dexie commit Duranti verifies the canonical database SHA-256 fingerprint, exact managed OPFS path/byte inventory and ordinary-media integrity with `scanMediaIntegrity()`.
+
+The local sensitive-document DEK is intentionally locked after database replacement because restored `appMeta` may contain a different wrapped key envelope. Full relational private-document integrity scanning therefore runs after the user unlocks the restored sensitive store. The Vault layer has already authenticated every restored private-file byte and restore verifies its path and size.
+
+Verification warnings after the atomic database commit are returned to the caller and do not silently roll back a committed restore.
+
+## Failure and cleanup rules
+
+Before Dexie commits, any failure attempts immediate OPFS rollback. If rollback or cleanup cannot finish, the journal and backup remain so bootstrap recovery can retry before the app renders.
+
+After Dexie commits, imported structured data is authoritative. Staging and rollback artifacts are removed best-effort; a `committed` journal remains until cleanup succeeds.
 
 Never parse directly into live data. Never log plaintext Vault contents, passwords, keys or sensitive document data.
 
