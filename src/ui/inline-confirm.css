@@ -1,0 +1,57 @@
+.inline-confirm {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #71473e;
+  border-radius: 14px;
+  background: rgba(113, 71, 62, .14);
+}
+
+.inline-confirm-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.inline-confirm-copy strong,
+.inline-confirm-copy p {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.inline-confirm-copy strong {
+  color: #ead8c2;
+  font-size: 13px;
+}
+
+.inline-confirm-copy p {
+  margin: 0;
+  color: #bca995;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.inline-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.inline-confirm-actions button {
+  min-height: 40px;
+}
+
+.inline-confirm-danger {
+  border-color: #7a4b42 !important;
+  background: #39201c !important;
+  color: #edb4a8 !important;
+}
+
+@media (max-width: 600px) {
+  .inline-confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
