@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import type { Place } from '../../domain/entities'
 import {
   deleteManualItineraryItem,
@@ -39,6 +40,11 @@ const statusLabels: Record<EditableItineraryStatus, string> = {
   cancelled: 'Annullato',
 }
 
+type PendingItineraryAction =
+  | { kind: 'delete-manual'; item: DayItineraryItem }
+  | { kind: 'convert-orphan'; item: DayItineraryItem }
+  | { kind: 'delete-orphan'; item: DayItineraryItem }
+
 function timeLabel(value: string | undefined): string {
   if (!value) return 'Senza orario'
   const time = value.slice(11, 16)
@@ -57,12 +63,10 @@ function isOrphanedItem(item: DayItineraryItem): boolean {
   return item.syncState === 'orphaned' || (item.source === 'manual' && hasSourceReference(item))
 }
 
-function syncLabel(item: DayItineraryItem): string {
-  if (isOrphanedItem(item)) return 'Collegamento da verificare'
-  if (isIndependentManualItem(item)) return 'Manuale'
-  if (item.syncState === 'synced') return 'Da prenotazione'
-  if (item.syncState === 'needs-sync') return 'Da riallineare'
-  return 'Collegamento da verificare'
+function attentionLabel(item: DayItineraryItem): string | undefined {
+  if (isOrphanedItem(item)) return 'Controlla questa tappa'
+  if (item.syncState === 'needs-sync') return 'Aggiornamento disponibile'
+  return undefined
 }
 
 function itineraryDisplayGroup(item: DayItineraryItem): number {
@@ -94,6 +98,20 @@ function orderItineraryForDisplay(items: DayItineraryItem[]): DayItineraryItem[]
     .map(({ item }) => item)
 }
 
+function pendingActionCopy(action: PendingItineraryAction): { message: string; confirmLabel: string } {
+  if (action.kind === 'convert-orphan') {
+    return {
+      message: `Vuoi conservare “${action.item.itinerary.title}” come tappa indipendente? I dati visibili resteranno, mentre il collegamento non più valido verrà rimosso.`,
+      confirmLabel: 'Conserva tappa',
+    }
+  }
+
+  return {
+    message: `Vuoi rimuovere “${action.item.itinerary.title}” dall’itinerario?`,
+    confirmLabel: 'Rimuovi tappa',
+  }
+}
+
 export default function DayItinerarySummary({
   items,
   tripId,
@@ -113,6 +131,7 @@ export default function DayItinerarySummary({
 }) {
   const [places, setPlaces] = useState<Place[]>([])
   const [editingId, setEditingId] = useState<string>()
+  const [pendingAction, setPendingAction] = useState<PendingItineraryAction>()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -150,7 +169,7 @@ export default function DayItinerarySummary({
       await reconcileDayReservationItineraries(tripId, dayId)
       await onChanged()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Impossibile riallineare l’itinerario.')
+      setError(cause instanceof Error ? cause.message : 'Impossibile aggiornare le tappe collegate alle prenotazioni.')
     } finally {
       setBusy(false)
     }
@@ -171,20 +190,9 @@ export default function DayItinerarySummary({
     }
   }
 
-  const removeManual = async (item: DayItineraryItem): Promise<void> => {
+  const removeManual = (item: DayItineraryItem): void => {
     if (readOnly || busy || !isIndependentManualItem(item)) return
-    if (!window.confirm(`Eliminare la tappa “${item.itinerary.title}” dall’itinerario?`)) return
-    setBusy(true)
-    setError('')
-    try {
-      await deleteManualItineraryItem(tripId, dayId, item.itinerary.id)
-      if (editingId === item.itinerary.id) setEditingId(undefined)
-      await onChanged()
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Impossibile eliminare la tappa.')
-    } finally {
-      setBusy(false)
-    }
+    setPendingAction({ kind: 'delete-manual', item })
   }
 
   const moveManual = async (
@@ -204,28 +212,42 @@ export default function DayItinerarySummary({
     }
   }
 
-  const resolveOrphan = async (
-    item: DayItineraryItem,
-    action: OrphanResolutionAction,
-  ): Promise<void> => {
+  const resolveOrphan = (item: DayItineraryItem, action: OrphanResolutionAction): void => {
     if (readOnly || busy || !isOrphanedItem(item)) return
-    const message = action === 'convert-to-manual'
-      ? `Trasformare “${item.itinerary.title}” in una tappa libera? Il collegamento alla prenotazione verrà rimosso, ma i dati visibili resteranno nella tappa.`
-      : `Rimuovere la tappa orfana “${item.itinerary.title}” dall’itinerario?`
-    if (!window.confirm(message)) return
+    setPendingAction({
+      kind: action === 'convert-to-manual' ? 'convert-orphan' : 'delete-orphan',
+      item,
+    })
+  }
 
+  const confirmPendingAction = async (): Promise<void> => {
+    if (!pendingAction || readOnly || busy) return
+    const action = pendingAction
     setBusy(true)
     setError('')
+
     try {
-      await resolveOrphanedItineraryItem(tripId, dayId, item.itinerary.id, action)
-      if (editingId === item.itinerary.id) setEditingId(undefined)
+      if (action.kind === 'delete-manual') {
+        await deleteManualItineraryItem(tripId, dayId, action.item.itinerary.id)
+      } else {
+        await resolveOrphanedItineraryItem(
+          tripId,
+          dayId,
+          action.item.itinerary.id,
+          action.kind === 'convert-orphan' ? 'convert-to-manual' : 'delete',
+        )
+      }
+      if (editingId === action.item.itinerary.id) setEditingId(undefined)
+      setPendingAction(undefined)
       await onChanged()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Impossibile risolvere il collegamento della tappa.')
+      setError(cause instanceof Error ? cause.message : 'Impossibile completare la modifica richiesta.')
     } finally {
       setBusy(false)
     }
   }
+
+  const confirmation = pendingAction ? pendingActionCopy(pendingAction) : undefined
 
   return (
     <section className="day-itinerary" aria-labelledby="day-itinerary-title">
@@ -238,12 +260,12 @@ export default function DayItinerarySummary({
           <span>{items.length} {items.length === 1 ? 'tappa' : 'tappe'}</span>
           {!readOnly && needsSyncCount > 0 && (
             <button type="button" disabled={busy} onClick={() => void reconcile()}>
-              Riallinea {needsSyncCount}
+              Aggiorna {needsSyncCount}
             </button>
           )}
           {!readOnly && (
             <button type="button" disabled={busy || editingId === 'new'} onClick={() => setEditingId('new')}>
-              + Tappa libera
+              + Aggiungi tappa
             </button>
           )}
         </div>
@@ -251,10 +273,27 @@ export default function DayItinerarySummary({
 
       {orphanedCount > 0 && (
         <p className="day-itinerary-warning" role="status">
-          {orphanedCount} {orphanedCount === 1 ? 'tappa contiene' : 'tappe contengono'} un collegamento senza una sorgente completa. Scegli se conservarla come tappa libera oppure rimuoverla.
+          {orphanedCount === 1
+            ? 'Una tappa non è più collegata alla prenotazione o al blocco originale. Puoi conservarla così com’è oppure rimuoverla.'
+            : `${orphanedCount} tappe non sono più collegate alla prenotazione o al blocco originale. Puoi conservarle così come sono oppure rimuoverle.`}
         </p>
       )}
       {error && <p className="day-itinerary-error" role="alert">{error}</p>}
+
+      {confirmation && (
+        <div className="day-itinerary-confirm" role="alertdialog" aria-live="assertive">
+          <div>
+            <strong>Conferma modifica</strong>
+            <p>{confirmation.message}</p>
+          </div>
+          <div className="day-itinerary-confirm-actions">
+            <button type="button" disabled={busy} onClick={() => setPendingAction(undefined)}>Annulla</button>
+            <button type="button" disabled={busy} onClick={() => void confirmPendingAction()}>
+              {busy ? 'Operazione…' : confirmation.confirmLabel}
+            </button>
+          </div>
+        </div>
+      )}
 
       {editingId && (
         <ManualItineraryForm
@@ -272,7 +311,7 @@ export default function DayItinerarySummary({
       {items.length === 0 ? (
         <div className="day-itinerary-empty">
           <strong>Nessuna tappa ancora.</strong>
-          <span>Aggiungi una tappa libera oppure salva una prenotazione nel planner.</span>
+          <span>Aggiungi una tappa oppure salva una prenotazione nel planner.</span>
         </div>
       ) : (
         <ol className="day-itinerary-list">
@@ -280,7 +319,8 @@ export default function DayItinerarySummary({
             const { itinerary, place } = item
             const independentManual = isIndependentManualItem(item)
             const orphaned = isOrphanedItem(item)
-            const effectiveSyncState = orphaned ? 'orphaned' : item.syncState
+            const attention = attentionLabel(item)
+            const attentionState = orphaned ? 'orphaned' : 'needs-sync'
             const untimedManualIndex = independentManual && !itinerary.startsAt
               ? manualUntimedIds.indexOf(itinerary.id)
               : -1
@@ -298,7 +338,11 @@ export default function DayItinerarySummary({
                     {itinerary.status && <span>{statusLabels[itinerary.status]}</span>}
                     {itinerary.bookingReference && <span>Codice {itinerary.bookingReference}</span>}
                     {itinerary.endsAt && <span>fino alle {timeLabel(itinerary.endsAt)}</span>}
-                    <span className={`day-itinerary-sync day-itinerary-sync-${effectiveSyncState}`}>{syncLabel(item)}</span>
+                    {attention && (
+                      <span className={`day-itinerary-sync day-itinerary-sync-${attentionState}`}>
+                        {attention}
+                      </span>
+                    )}
                   </div>
                   {!readOnly && independentManual && (
                     <div className="day-itinerary-item-actions">
@@ -325,16 +369,16 @@ export default function DayItinerarySummary({
                         </>
                       )}
                       <button type="button" disabled={busy} onClick={() => setEditingId(itinerary.id)}>Modifica</button>
-                      <button type="button" disabled={busy} onClick={() => void removeManual(item)}>Elimina</button>
+                      <button type="button" disabled={busy} onClick={() => removeManual(item)}>Elimina</button>
                     </div>
                   )}
                   {!readOnly && orphaned && (
                     <div className="day-itinerary-item-actions">
-                      <button type="button" disabled={busy} onClick={() => void resolveOrphan(item, 'convert-to-manual')}>
-                        Rendi tappa libera
+                      <button type="button" disabled={busy} onClick={() => resolveOrphan(item, 'convert-to-manual')}>
+                        Conserva come tappa
                       </button>
-                      <button type="button" disabled={busy} onClick={() => void resolveOrphan(item, 'delete')}>
-                        Rimuovi tappa
+                      <button type="button" disabled={busy} onClick={() => resolveOrphan(item, 'delete')}>
+                        Rimuovi
                       </button>
                     </div>
                   )}
