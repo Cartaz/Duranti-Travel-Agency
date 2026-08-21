@@ -40,7 +40,7 @@ export default function TripDaysPanel({ trip }: { trip: Trip }) {
         <div>
           <p className="eyebrow">Pagine del viaggio</p>
           <h2 id="trip-days-title">Giornate</h2>
-          <p>Ogni giornata è una pagina ordinata del capitolo e contiene i blocchi del planner.</p>
+          <p>Ogni giornata raccoglie programma, tappe e ricordi in un’unica pagina.</p>
         </div>
         {trip.status !== 'archived' && <Link className="trip-primary-action" to={`/trips/${trip.id}/days/new`}>Nuova giornata</Link>}
       </div>
@@ -50,8 +50,8 @@ export default function TripDaysPanel({ trip }: { trip: Trip }) {
 
       {!loading && days.length === 0 && (
         <div className="days-empty">
-          <strong>Il capitolo non ha ancora giornate.</strong>
-          <span>Crea la prima pagina per iniziare a costruire l’itinerario.</span>
+          <strong>Il viaggio non ha ancora giornate.</strong>
+          <span>Crea la prima pagina per iniziare a costruire itinerario e diario.</span>
         </div>
       )}
 
@@ -64,6 +64,7 @@ export default function TripDaysPanel({ trip }: { trip: Trip }) {
                 <span>{formatDayDate(day.date)}</span>
                 <strong>{day.title ?? `Giorno ${day.sequence}`}</strong>
                 {day.summary && <p>{day.summary}</p>}
+                {day.journalText?.trim() && <span className="day-journal-badge">Diario scritto</span>}
               </div>
               <div className="day-card-actions">
                 <Link className="day-open-link" to={`/trips/${trip.id}/days/${day.id}`} aria-label={`Apri ${day.title ?? `giorno ${day.sequence}`}`}>
