@@ -40,11 +40,21 @@ function validateOptionalText(value: string | undefined, label: string, maxLengt
   return cleaned
 }
 
+function formatDisplayDate(value: string): string {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return value
+  return new Intl.DateTimeFormat('it-IT', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day))
+}
+
 function validateLocalDateTime(value: string | undefined, dayDate: string): string | undefined {
   const cleaned = cleanOptional(value)
   if (!cleaned) return undefined
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(cleaned)) {
-    throw new Error('Data e ora della spesa non valide.')
+    throw new Error('Ora della spesa non valida. Inserisci un orario nel formato ore:minuti.')
   }
 
   const [date, time] = cleaned.split('T')
@@ -57,10 +67,13 @@ function validateLocalDateTime(value: string | undefined, dayDate: string): stri
     parsed.getDate() !== day ||
     hour < 0 || hour > 23 || minute < 0 || minute > 59
   ) {
-    throw new Error('Data e ora della spesa non esistono nel calendario.')
+    throw new Error('Ora della spesa non valida: controlla ore e minuti.')
   }
   if (date !== dayDate) {
-    throw new Error('La spesa deve cadere nella giornata a cui è collegata.')
+    throw new Error(
+      `Data della spesa non valida: questa spesa appartiene alla giornata del ${formatDisplayDate(dayDate)}, `
+      + `non al ${formatDisplayDate(date)}. Modifica solo l’ora oppure sposta la spesa nella giornata corretta.`,
+    )
   }
 
   return cleaned
