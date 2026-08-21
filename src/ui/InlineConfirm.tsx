@@ -1,3 +1,5 @@
+import './inline-confirm.css'
+
 interface InlineConfirmProps {
   title: string
   message: string
