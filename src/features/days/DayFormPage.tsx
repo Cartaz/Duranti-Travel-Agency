@@ -4,6 +4,29 @@ import { createTripDay, getTripDay, updateTripDay, type DayDraft } from './day-s
 import { getTrip } from '../trips/trip-service'
 import './days.css'
 
+function formatDisplayDate(value: string): string {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return value
+  return new Intl.DateTimeFormat('it-IT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day))
+}
+
+function rangeHint(startDate?: string, endDate?: string): string | undefined {
+  if (startDate && endDate && startDate === endDate) {
+    return `Per questo viaggio la giornata deve essere il ${formatDisplayDate(startDate)}.`
+  }
+  if (startDate && endDate) {
+    return `Scegli una data dal ${formatDisplayDate(startDate)} al ${formatDisplayDate(endDate)}.`
+  }
+  if (startDate) return `La giornata non può precedere ${formatDisplayDate(startDate)}.`
+  if (endDate) return `La giornata non può superare ${formatDisplayDate(endDate)}.`
+  return undefined
+}
+
 export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { tripId, dayId } = useParams<{ tripId: string; dayId: string }>()
   const navigate = useNavigate()
@@ -77,6 +100,8 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
   if (!tripId) return <p className="trip-feedback trip-feedback-error">Viaggio non valido.</p>
   if (loading) return <p className="trip-feedback" role="status">Preparo la pagina…</p>
 
+  const dateHint = rangeHint(tripRange.startDate, tripRange.endDate)
+
   return (
     <section className="day-form-page" aria-labelledby="day-form-title">
       <div className="trip-page-heading">
@@ -92,7 +117,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
       <form className="day-form" onSubmit={(event) => void submit(event)}>
         <label>
-          <span>Data</span>
+          <span>Data della giornata *</span>
           <input
             type="date"
             required
@@ -102,15 +127,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
             value={draft.date}
             onChange={(event) => setDraft({ ...draft, date: event.target.value })}
           />
-          {(tripRange.startDate || tripRange.endDate) && (
-            <small>
-              {tripRange.startDate && tripRange.endDate
-                ? `La giornata deve essere compresa tra ${tripRange.startDate} e ${tripRange.endDate}.`
-                : tripRange.startDate
-                  ? `La giornata non può precedere ${tripRange.startDate}.`
-                  : `La giornata non può superare ${tripRange.endDate}.`}
-            </small>
-          )}
+          {dateHint && <small>{dateHint}</small>}
         </label>
         <label>
           <span>Titolo della giornata</span>
