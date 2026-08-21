@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Template } from '../../domain/entities'
 import { createTripDay, getTripDay, updateTripDay, type DayDraft } from './day-service'
+import DayTemplateManager from '../templates/DayTemplateManager'
 import {
   createTripDayFromTemplate,
   isBuiltInDayTemplate,
@@ -94,6 +95,14 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
   }, [dayId, mode, tripId])
 
+  const refreshTemplates = async (): Promise<void> => {
+    const availableTemplates = await listDayTemplates()
+    setTemplates(availableTemplates)
+    setTemplateId((current) => (
+      current && !availableTemplates.some((template) => template.id === current) ? '' : current
+    ))
+  }
+
   const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
     if (!tripId || !contextReady || saving) return
@@ -122,6 +131,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   const dateHint = rangeHint(tripRange.startDate, tripRange.endDate)
   const hasJournal = Boolean(draft.journalText?.trim())
+  const personalTemplates = templates.filter((template) => !isBuiltInDayTemplate(template))
 
   return (
     <section className="day-form-page" aria-labelledby="day-form-title">
@@ -189,6 +199,12 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 </button>
               ))}
             </div>
+
+            <DayTemplateManager
+              templates={personalTemplates}
+              disabled={!contextReady || saving}
+              onChanged={refreshTemplates}
+            />
           </section>
         )}
 
