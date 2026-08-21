@@ -73,12 +73,11 @@ function orderItems(items: DayItineraryItem[]): DayItineraryItem[] {
     .map(({ item }) => item)
 }
 
-function stateLabel(item: DayItineraryItem): string {
-  if (item.source === 'manual' && hasSourceReference(item)) return 'Collegamento da verificare'
-  if (item.syncState === 'orphaned') return 'Collegamento da verificare'
-  if (item.syncState === 'needs-sync') return 'Da riallineare'
-  if (item.source === 'reservation') return 'Da prenotazione'
-  return 'Manuale'
+function attentionLabel(item: DayItineraryItem): string | undefined {
+  if (item.source === 'manual' && hasSourceReference(item)) return 'Controlla questa tappa'
+  if (item.syncState === 'orphaned') return 'Controlla questa tappa'
+  if (item.syncState === 'needs-sync') return 'Aggiornamento disponibile'
+  return undefined
 }
 
 function stateClass(item: DayItineraryItem): string {
@@ -124,7 +123,7 @@ export default function TripItineraryOverview({ tripId }: { tripId: string }) {
           <div className="trip-itinerary-overview-stats" aria-label="Riepilogo itinerario">
             <span>{overview.days.length} {overview.days.length === 1 ? 'giornata' : 'giornate'}</span>
             <strong>{overview.stopCount} {overview.stopCount === 1 ? 'tappa' : 'tappe'}</strong>
-            {overview.warningCount > 0 && <span className="trip-itinerary-overview-warning">{overview.warningCount} da verificare</span>}
+            {overview.warningCount > 0 && <span className="trip-itinerary-overview-warning">{overview.warningCount} da controllare</span>}
           </div>
         )}
       </div>
@@ -163,6 +162,7 @@ export default function TripItineraryOverview({ tripId }: { tripId: string }) {
                   <ol className="trip-itinerary-stops">
                     {orderedItems.map((item) => {
                       const { itinerary, place } = item
+                      const attention = attentionLabel(item)
                       return (
                         <li key={itinerary.id} className={itinerary.status === 'cancelled' ? 'trip-itinerary-stop-cancelled' : undefined}>
                           <time dateTime={itinerary.startsAt}>{timeLabel(itinerary.startsAt)}</time>
@@ -173,9 +173,11 @@ export default function TripItineraryOverview({ tripId }: { tripId: string }) {
                               {place && <span>{place.name}</span>}
                               {itinerary.status && <span>{statusLabels[itinerary.status]}</span>}
                               {itinerary.endsAt && <span>fino alle {timeLabel(itinerary.endsAt)}</span>}
-                              <span className={`trip-itinerary-state trip-itinerary-state-${stateClass(item)}`}>
-                                {stateLabel(item)}
-                              </span>
+                              {attention && (
+                                <span className={`trip-itinerary-state trip-itinerary-state-${stateClass(item)}`}>
+                                  {attention}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </li>
