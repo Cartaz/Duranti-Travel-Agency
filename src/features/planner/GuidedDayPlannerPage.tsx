@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import DayMediaGallery from '../media/DayMediaGallery'
+import DayTemplateSaver from '../templates/DayTemplateSaver'
 import { getTrip } from '../trips/trip-service'
 import DayPlannerPage from './DayPlannerPage'
 import { createPlannerBlock, type PlannerBlockType } from './block-service'
@@ -167,6 +168,10 @@ export default function GuidedDayPlannerPage() {
             </details>
           </div>
         </details>
+      )}
+
+      {canEdit && tripId && dayId && (
+        <DayTemplateSaver tripId={tripId} dayId={dayId} />
       )}
 
       {status && <p className="planner-quick-add-status" role="status">{status}</p>}
