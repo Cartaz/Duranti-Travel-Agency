@@ -98,6 +98,7 @@ export interface Day extends EntityBase {
   sequence: number
   title?: string
   summary?: string
+  journalText?: string
   templateId?: string
 }
 
