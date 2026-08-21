@@ -1,12 +1,39 @@
-import type { Media } from '../../domain/entities'
-import { mediaRepository } from '../../data/repositories/repositories'
+import type { Media, Place } from '../../domain/entities'
+import { blockRepository, mediaRepository, placeRepository } from '../../data/repositories/repositories'
 import { getTripDay } from '../days/day-service'
+import { listDayItineraryItems } from '../itinerary/itinerary-service'
 import { getTrip } from '../trips/trip-service'
 
 export const DAY_MEDIA_ACCEPT = 'image/*,video/*'
 export const MAX_DAY_IMAGE_BYTES = 25 * 1024 * 1024
 export const MAX_DAY_VIDEO_BYTES = 250 * 1024 * 1024
 export const MAX_DAY_MEDIA_CAPTION_LENGTH = 500
+
+export interface DayMediaPlaceOption {
+  id: string
+  name: string
+}
+
+export interface DayMediaItineraryOption {
+  key: string
+  title: string
+  placeName?: string
+  itineraryId?: string
+  reservationId?: string
+}
+
+export interface DayMediaContextOptions {
+  places: DayMediaPlaceOption[]
+  itineraries: DayMediaItineraryOption[]
+}
+
+export interface DayMediaDetailsDraft {
+  caption: string
+  placeId?: string
+  itineraryKey?: string
+}
+
+export type DayMediaMoveDirection = 'up' | 'down'
 
 const mimeByExtension: Record<string, string> = {
   jpg: 'image/jpeg',
@@ -66,9 +93,69 @@ async function assertDayContext(tripId: string, dayId: string, editable: boolean
   }
 }
 
+function placeIdFromBlockContent(content: Record<string, unknown>): string | undefined {
+  return typeof content.placeId === 'string' && content.placeId ? content.placeId : undefined
+}
+
+function itineraryOptionKey(reservationId: string | undefined, itineraryId: string): string {
+  return reservationId ? `reservation:${reservationId}` : `itinerary:${itineraryId}`
+}
+
+export function dayMediaItineraryKey(media: Media): string {
+  if (media.reservationId) return `reservation:${media.reservationId}`
+  if (media.itineraryId) return `itinerary:${media.itineraryId}`
+  return ''
+}
+
 export async function listDayMedia(tripId: string, dayId: string): Promise<Media[]> {
   await assertDayContext(tripId, dayId, false)
   return mediaRepository.listForDay(tripId, dayId)
+}
+
+export async function listDayMediaContext(tripId: string, dayId: string): Promise<DayMediaContextOptions> {
+  await assertDayContext(tripId, dayId, false)
+  const [blocks, places, itineraryItems] = await Promise.all([
+    blockRepository.list().then((items) => items.filter((item) => (
+      item.tripId === tripId && item.dayId === dayId && item.type === 'place'
+    ))),
+    placeRepository.list(),
+    listDayItineraryItems(tripId, dayId),
+  ])
+
+  const placeById = new Map<string, Place>(places.map((place) => [place.id, place]))
+  const dayPlaceIds = new Set<string>()
+  for (const block of blocks) {
+    const placeId = placeIdFromBlockContent(block.content)
+    if (placeId) dayPlaceIds.add(placeId)
+  }
+  for (const item of itineraryItems) {
+    if (item.itinerary.placeId) dayPlaceIds.add(item.itinerary.placeId)
+  }
+
+  const placeOptions = [...dayPlaceIds]
+    .map((id) => placeById.get(id))
+    .filter((place): place is Place => Boolean(place))
+    .sort((left, right) => left.name.localeCompare(right.name, 'it'))
+    .map((place) => ({ id: place.id, name: place.name }))
+
+  const itineraryOptionsByKey = new Map<string, DayMediaItineraryOption>()
+  for (const item of itineraryItems) {
+    const reservationId = item.itinerary.reservationId
+    const key = itineraryOptionKey(reservationId, item.itinerary.id)
+    if (itineraryOptionsByKey.has(key)) continue
+    itineraryOptionsByKey.set(key, {
+      key,
+      title: item.itinerary.title,
+      placeName: item.place?.name,
+      itineraryId: reservationId ? undefined : item.itinerary.id,
+      reservationId,
+    })
+  }
+
+  return {
+    places: placeOptions,
+    itineraries: [...itineraryOptionsByKey.values()],
+  }
 }
 
 export async function importDayMedia(tripId: string, dayId: string, file: File): Promise<Media> {
@@ -90,21 +177,84 @@ export async function readDayMedia(media: Media, tripId: string, dayId: string):
   return mediaRepository.getFile(media.id)
 }
 
-export async function updateDayMediaCaption(
+export async function updateDayMediaDetails(
   tripId: string,
   dayId: string,
   mediaId: string,
-  caption: string,
+  input: DayMediaDetailsDraft,
 ): Promise<Media> {
   await assertDayContext(tripId, dayId, true)
   const media = await mediaRepository.get(mediaId)
   if (!media || media.tripId !== tripId || media.dayId !== dayId || media.blockId) {
     throw new Error('La foto o il video non appartiene a questa giornata.')
   }
-  if (caption.length > MAX_DAY_MEDIA_CAPTION_LENGTH) {
+
+  if (input.caption.length > MAX_DAY_MEDIA_CAPTION_LENGTH) {
     throw new Error(`La didascalia può contenere al massimo ${MAX_DAY_MEDIA_CAPTION_LENGTH} caratteri.`)
   }
-  return mediaRepository.updateCaption(mediaId, caption)
+
+  const placeId = input.placeId?.trim() || undefined
+  if (placeId && !(await placeRepository.get(placeId))) {
+    throw new Error('Il luogo collegato non esiste più.')
+  }
+
+  let itineraryId: string | undefined
+  let reservationId: string | undefined
+  const itineraryKey = input.itineraryKey?.trim() || undefined
+  if (itineraryKey) {
+    const context = await listDayMediaContext(tripId, dayId)
+    const option = context.itineraries.find((candidate) => candidate.key === itineraryKey)
+    if (option) {
+      itineraryId = option.itineraryId
+      reservationId = option.reservationId
+    } else if (itineraryKey === dayMediaItineraryKey(media)) {
+      itineraryId = media.itineraryId
+      reservationId = media.reservationId
+    } else {
+      throw new Error('La tappa collegata non è più disponibile in questa giornata.')
+    }
+  }
+
+  return mediaRepository.updateDayMetadata(mediaId, {
+    caption: input.caption,
+    placeId,
+    itineraryId,
+    reservationId,
+  })
+}
+
+export async function updateDayMediaCaption(
+  tripId: string,
+  dayId: string,
+  mediaId: string,
+  caption: string,
+): Promise<Media> {
+  const media = await mediaRepository.get(mediaId)
+  if (!media) throw new Error('La foto o il video non esiste più.')
+  return updateDayMediaDetails(tripId, dayId, mediaId, {
+    caption,
+    placeId: media.placeId,
+    itineraryKey: dayMediaItineraryKey(media),
+  })
+}
+
+export async function moveDayMedia(
+  tripId: string,
+  dayId: string,
+  mediaId: string,
+  direction: DayMediaMoveDirection,
+): Promise<void> {
+  await assertDayContext(tripId, dayId, true)
+  const items = await mediaRepository.listForDay(tripId, dayId)
+  const index = items.findIndex((item) => item.id === mediaId)
+  if (index < 0) throw new Error('La foto o il video non appartiene a questa giornata.')
+
+  const targetIndex = direction === 'up' ? index - 1 : index + 1
+  if (targetIndex < 0 || targetIndex >= items.length) return
+
+  const orderedIds = items.map((item) => item.id)
+  ;[orderedIds[index], orderedIds[targetIndex]] = [orderedIds[targetIndex], orderedIds[index]]
+  await mediaRepository.setDayOrder(tripId, dayId, orderedIds)
 }
 
 export async function removeDayMedia(tripId: string, dayId: string, mediaId: string): Promise<void> {
