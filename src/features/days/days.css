@@ -184,6 +184,90 @@
   line-height: 1.45;
 }
 
+.day-template-picker {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid #4c4033;
+  border-radius: 16px;
+  background: rgba(17, 14, 11, .42);
+}
+
+.day-template-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.day-template-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.day-template-heading > div > strong {
+  color: #dfcdb6;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.day-template-heading > small {
+  max-width: 330px;
+  color: #8f8173;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.day-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.day-template-option {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 90px;
+  padding: 12px;
+  border: 1px solid #493d31;
+  border-radius: 13px;
+  background: #15110e;
+  color: #cdbba3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.day-template-option strong {
+  color: #e3d2bb;
+  font-family: Georgia, serif;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.day-template-option span {
+  color: #918271;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.day-template-option:hover:not(:disabled) {
+  border-color: #725a42;
+}
+
+.day-template-option-selected {
+  border-color: #9a7854;
+  background: rgba(70, 52, 36, .58);
+  box-shadow: inset 0 0 0 1px rgba(154, 120, 84, .2);
+}
+
+.day-template-option:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
 .day-journal-details {
   border: 1px solid #4c4033;
   border-radius: 16px;
@@ -277,6 +361,23 @@
     grid-auto-flow: column;
     justify-content: start;
     justify-items: start;
+  }
+
+  .day-template-heading {
+    display: grid;
+  }
+
+  .day-template-heading > small {
+    max-width: none;
+    text-align: left;
+  }
+
+  .day-template-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .day-template-option {
+    min-height: 0;
   }
 
   .day-journal-details > summary {
