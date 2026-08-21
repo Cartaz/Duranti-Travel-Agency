@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import DayMediaGallery from '../media/DayMediaGallery'
 import { getTrip } from '../trips/trip-service'
 import DayPlannerPage from './DayPlannerPage'
 import { createPlannerBlock, type PlannerBlockType } from './block-service'
@@ -118,6 +119,10 @@ export default function GuidedDayPlannerPage() {
   return (
     <div className="guided-day-planner" ref={wrapperRef}>
       <DayPlannerPage key={revision} />
+
+      {tripId && dayId && (
+        <DayMediaGallery tripId={tripId} dayId={dayId} readOnly={!canEdit} />
+      )}
 
       {canEdit && (
         <details className="planner-quick-add" ref={detailsRef}>
