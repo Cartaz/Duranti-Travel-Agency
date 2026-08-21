@@ -86,8 +86,9 @@ export default function DayMediaGallery({
       await moveDayMedia(tripId, dayId, mediaId, direction)
       await refresh()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Impossibile riordinare i ricordi della giornata.')
-      throw cause
+      const message = cause instanceof Error ? cause.message : 'Impossibile riordinare i ricordi della giornata.'
+      setError(message)
+      throw cause instanceof Error ? cause : new Error(message)
     }
   }
 
@@ -243,6 +244,7 @@ function DayMediaCard({
       await onMove(direction)
     } catch (cause) {
       setPreviewError(cause instanceof Error ? cause.message : 'Impossibile spostare il ricordo.')
+    } finally {
       setSaving(false)
     }
   }
@@ -257,6 +259,7 @@ function DayMediaCard({
       await onChanged()
     } catch (cause) {
       setPreviewError(cause instanceof Error ? cause.message : 'Impossibile rimuovere il ricordo.')
+    } finally {
       setSaving(false)
     }
   }
@@ -300,7 +303,7 @@ function DayMediaCard({
               <small>{caption.length}/{MAX_DAY_MEDIA_CAPTION_LENGTH}</small>
             </label>
 
-            <details className="day-media-links-editor" open={Boolean(media.placeId || originalItineraryKey)}>
+            <details className="day-media-links-editor">
               <summary>
                 <span>
                   <strong>Collegamenti</strong>
