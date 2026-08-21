@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Block, Day, Place, Trip } from '../../domain/entities'
+import InlineConfirm from '../../ui/InlineConfirm'
 import { getTripDay } from '../days/day-service'
 import ExpenseBlockEditor from '../expenses/ExpenseBlockEditor'
 import DayItinerarySummary from '../itinerary/DayItinerarySummary'
@@ -185,7 +186,7 @@ export default function DayPlannerPage() {
         </div>
         <div className="planner-heading-actions">
           {!readOnly && <Link className="trip-secondary-action" to={`/trips/${trip.id}/days/${day.id}/edit`}>Modifica giornata</Link>}
-          <Link className="trip-secondary-action" to={`/trips/${trip.id}`}>Torna al capitolo</Link>
+          <Link className="trip-secondary-action" to={`/trips/${trip.id}`}>Torna al viaggio</Link>
         </div>
       </header>
 
@@ -193,6 +194,23 @@ export default function DayPlannerPage() {
         <p className="planner-readonly" role="status">Il viaggio è archiviato: la pagina resta leggibile ma non modificabile.</p>
       )}
       {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
+
+      {day.journalText?.trim() && (
+        <section className="planner-journal" aria-labelledby="planner-journal-title">
+          <div className="planner-journal-heading">
+            <div>
+              <p className="eyebrow">Ricordi della giornata</p>
+              <h2 id="planner-journal-title">Diario</h2>
+            </div>
+            {!readOnly && (
+              <Link className="trip-text-link" to={`/trips/${trip.id}/days/${day.id}/edit`}>
+                Modifica diario
+              </Link>
+            )}
+          </div>
+          <p className="planner-journal-text">{day.journalText}</p>
+        </section>
+      )}
 
       <DayItinerarySummary
         items={itineraryItems}
@@ -286,10 +304,12 @@ function PlannerBasicBlockEditor({
 }: PlannerBlockEditorProps) {
   const [draft, setDraft] = useState<PlannerBlockDraft>(() => readPlannerBlockDraft(block))
   const [saving, setSaving] = useState(false)
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     setDraft(readPlannerBlockDraft(block))
+    setConfirmingRemove(false)
   }, [block])
 
   const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -308,7 +328,8 @@ function PlannerBasicBlockEditor({
   }
 
   const remove = async (): Promise<void> => {
-    if (readOnly || saving || !window.confirm('Eliminare questo blocco dalla giornata?')) return
+    if (readOnly || saving) return
+    setConfirmingRemove(false)
     setSaving(true)
     setError('')
     try {
@@ -341,7 +362,18 @@ function PlannerBasicBlockEditor({
       canMoveUp={canMoveUp}
       canMoveDown={canMoveDown}
       onMove={move}
-      onRemove={remove}
+      onRemove={() => setConfirmingRemove(true)}
+    />
+  )
+
+  const removeConfirm = confirmingRemove && !readOnly && (
+    <InlineConfirm
+      title={`Eliminare ${blockLabels[draft.type].toLowerCase()}?`}
+      message="Questo elemento verrà rimosso dalla giornata. Gli altri blocchi e le altre tappe non verranno modificati."
+      confirmLabel="Elimina blocco"
+      busy={saving}
+      onCancel={() => setConfirmingRemove(false)}
+      onConfirm={() => void remove()}
     />
   )
 
@@ -354,6 +386,7 @@ function PlannerBasicBlockEditor({
         </div>
         <hr />
         {error && <small className="planner-block-error">{error}</small>}
+        {removeConfirm}
       </article>
     )
   }
@@ -391,6 +424,7 @@ function PlannerBasicBlockEditor({
       )}
 
       {error && <small className="planner-block-error">{error}</small>}
+      {removeConfirm}
       {!readOnly && (
         <div className="planner-block-actions">
           <button type="submit" disabled={saving}>{saving ? 'Salvataggio…' : 'Salva blocco'}</button>
@@ -413,11 +447,13 @@ function PlannerPlaceBlockEditor({
   const [state, setState] = useState<PlaceFormState>(() => placeFormStateFromDraft(EMPTY_PLACE_DRAFT))
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setConfirmingRemove(false)
     void getPlannerPlace(tripId, dayId, block.id)
       .then((loadedPlace) => {
         if (cancelled) return
@@ -456,7 +492,8 @@ function PlannerPlaceBlockEditor({
   }
 
   const remove = async (): Promise<void> => {
-    if (readOnly || saving || !window.confirm('Rimuovere questo luogo dalla giornata? Il luogo salvato resterà disponibile per funzioni future.')) return
+    if (readOnly || saving) return
+    setConfirmingRemove(false)
     setSaving(true)
     setError('')
     try {
@@ -501,7 +538,7 @@ function PlannerPlaceBlockEditor({
           canMoveUp={canMoveUp}
           canMoveDown={canMoveDown}
           onMove={move}
-          onRemove={remove}
+          onRemove={() => setConfirmingRemove(true)}
         />
       </div>
 
@@ -559,6 +596,16 @@ function PlannerPlaceBlockEditor({
           </div>
 
           {error && <small className="planner-block-error">{error}</small>}
+          {confirmingRemove && !readOnly && (
+            <InlineConfirm
+              title={`Rimuovere ${place?.name || state.name || 'questo luogo'}?`}
+              message="Il luogo verrà tolto da questa giornata, ma resterà salvato e potrà essere riutilizzato in futuro."
+              confirmLabel="Rimuovi luogo"
+              busy={saving}
+              onCancel={() => setConfirmingRemove(false)}
+              onConfirm={() => void remove()}
+            />
+          )}
           <div className="planner-place-actions">
             {place && (
               <a className="planner-map-link" href={googleMapsUrlForPlace(place)} target="_blank" rel="noreferrer">
@@ -586,7 +633,7 @@ function PlannerBlockTools({
   canMoveUp: boolean
   canMoveDown: boolean
   onMove: (direction: MoveDirection) => Promise<void>
-  onRemove: () => Promise<void>
+  onRemove: () => void
 }) {
   if (readOnly) return null
 
@@ -594,7 +641,7 @@ function PlannerBlockTools({
     <div className="planner-block-tools">
       <button type="button" disabled={saving || !canMoveUp} aria-label="Sposta blocco su" title="Sposta su" onClick={() => void onMove('up')}>↑</button>
       <button type="button" disabled={saving || !canMoveDown} aria-label="Sposta blocco giù" title="Sposta giù" onClick={() => void onMove('down')}>↓</button>
-      <button className="planner-delete" type="button" disabled={saving} onClick={() => void onRemove()}>Elimina</button>
+      <button className="planner-delete" type="button" disabled={saving} onClick={onRemove}>Elimina</button>
     </div>
   )
 }
