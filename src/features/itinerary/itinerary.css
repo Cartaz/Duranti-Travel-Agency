@@ -40,7 +40,8 @@
 
 .day-itinerary-heading-actions button,
 .day-itinerary-item-actions button,
-.day-itinerary-form-actions button {
+.day-itinerary-form-actions button,
+.day-itinerary-confirm-actions button {
   border: 1px solid #564736;
   border-radius: 10px;
   background: #211a14;
@@ -51,7 +52,8 @@
 
 .day-itinerary-heading-actions button:disabled,
 .day-itinerary-item-actions button:disabled,
-.day-itinerary-form-actions button:disabled {
+.day-itinerary-form-actions button:disabled,
+.day-itinerary-confirm-actions button:disabled {
   opacity: .48;
   cursor: default;
 }
@@ -128,13 +130,13 @@
 
 .day-itinerary-title-row strong {
   min-width: 0;
-  overflow: hidden;
   color: #eadcc8;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 17px;
   font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
 }
 
 .day-itinerary-title-row > span {
@@ -157,11 +159,8 @@
   border-radius: 999px;
   padding: 2px 7px;
   border: 1px solid #4a4034;
-}
-
-.day-itinerary-sync-synced {
-  color: #a9b991;
-  border-color: #4b5b3e;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .day-itinerary-sync-needs-sync {
@@ -172,10 +171,6 @@
 .day-itinerary-sync-orphaned {
   color: #d99d91;
   border-color: #70443c;
-}
-
-.day-itinerary-sync-manual {
-  color: #b9a58d;
 }
 
 .day-itinerary-item-actions {
@@ -196,6 +191,8 @@
   padding: 10px 12px;
   font-size: 12px;
   line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .day-itinerary-warning {
@@ -208,6 +205,45 @@
   border: 1px solid #6a3f38;
   background: rgba(106, 63, 56, .16);
   color: #e0a093;
+}
+
+.day-itinerary-confirm {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #6a5530;
+  border-radius: 14px;
+  padding: 13px;
+  background: rgba(77, 57, 29, .20);
+  color: #dbc49c;
+}
+
+.day-itinerary-confirm > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.day-itinerary-confirm strong {
+  color: #ead8b9;
+  font-size: 13px;
+}
+
+.day-itinerary-confirm p {
+  margin: 0;
+  line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.day-itinerary-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.day-itinerary-confirm-actions button:last-child {
+  border-color: #725048;
+  color: #e4b0a5;
 }
 
 .day-itinerary-empty {
@@ -314,6 +350,11 @@
 
   .day-itinerary-title-row > span {
     justify-self: start;
+  }
+
+  .day-itinerary-confirm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .day-itinerary-form-grid {
