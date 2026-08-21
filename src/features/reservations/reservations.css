@@ -29,6 +29,12 @@
   outline: none;
 }
 
+.reservation-grid input:disabled,
+.reservation-grid select:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
 .reservation-grid textarea {
   resize: vertical;
   min-height: 96px;
@@ -43,6 +49,96 @@
 
 .reservation-wide {
   grid-column: 1 / -1;
+}
+
+.reservation-fixed-start-date {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-height: 66px;
+  padding: 10px 11px;
+  border: 1px solid #46513d;
+  border-radius: 11px;
+  background: rgba(43, 55, 35, .35);
+}
+
+.reservation-fixed-start-date > span {
+  color: #a8b790;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.reservation-fixed-start-date strong {
+  color: #e0e7ce;
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.reservation-fixed-start-date small,
+.reservation-field-hint {
+  color: #948675;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.reservation-optional {
+  overflow: hidden;
+  border: 1px solid #40372e;
+  border-radius: 14px;
+  background: rgba(18, 15, 12, .42);
+}
+
+.reservation-optional > summary {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px;
+  cursor: pointer;
+}
+
+.reservation-optional > summary > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.reservation-optional > summary strong {
+  color: #d8c4aa;
+  font-size: 13px;
+}
+
+.reservation-optional > summary small {
+  color: #938473;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.reservation-optional-state {
+  flex: 0 0 auto;
+  border: 1px solid #536245;
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: #b8c7a0;
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.reservation-optional-grid {
+  padding: 13px;
+  border-top: 1px solid #332b24;
+}
+
+.reservation-attachment-details .reservation-attachment {
+  border: 0;
+  border-top: 1px solid #332b24;
+  border-radius: 0;
+  background: transparent;
 }
 
 .reservation-attachment {
@@ -84,9 +180,10 @@
 
 .reservation-attachment-current strong,
 .reservation-attachment-current span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
 }
 
 .reservation-attachment-actions {
@@ -176,6 +273,10 @@
 
   .reservation-wide {
     grid-column: auto;
+  }
+
+  .reservation-fixed-start-date {
+    min-height: auto;
   }
 
   .reservation-attachment-heading,
