@@ -306,6 +306,14 @@
   border-color: #967552;
 }
 
+.day-itinerary-form-hint {
+  color: #8f8170;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .day-itinerary-form-wide {
   grid-column: 1 / -1;
 }
