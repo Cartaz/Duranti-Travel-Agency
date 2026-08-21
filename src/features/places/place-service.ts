@@ -39,17 +39,28 @@ function normalizeDraft(input: PlaceDraft): PlaceDraft {
   const notes = validateOptionalText(input.notes, 'Note', 2000)
   const countryCode = cleanOptional(input.countryCode)?.toUpperCase()
   if (countryCode && !/^[A-Z]{2}$/.test(countryCode)) {
-    throw new Error('Il paese deve essere un codice di due lettere, ad esempio IT.')
+    throw new Error('Paese: inserisci esattamente due lettere, ad esempio IT per Italia o FR per Francia.')
   }
 
   const hasLatitude = input.latitude !== undefined
   const hasLongitude = input.longitude !== undefined
-  if (hasLatitude !== hasLongitude) throw new Error('Latitudine e longitudine devono essere inserite insieme.')
-  if (hasLatitude && (!Number.isFinite(input.latitude) || input.latitude! < -90 || input.latitude! > 90)) {
-    throw new Error('La latitudine deve essere compresa tra -90 e 90.')
+  if (hasLatitude && !hasLongitude) {
+    throw new Error('Hai inserito la latitudine ma manca la longitudine. Inserisci entrambe le coordinate oppure lascia entrambe vuote.')
   }
-  if (hasLongitude && (!Number.isFinite(input.longitude) || input.longitude! < -180 || input.longitude! > 180)) {
-    throw new Error('La longitudine deve essere compresa tra -180 e 180.')
+  if (!hasLatitude && hasLongitude) {
+    throw new Error('Hai inserito la longitudine ma manca la latitudine. Inserisci entrambe le coordinate oppure lascia entrambe vuote.')
+  }
+  if (hasLatitude && !Number.isFinite(input.latitude)) {
+    throw new Error('Latitudine non valida: inserisci un numero compreso tra -90 e 90.')
+  }
+  if (hasLatitude && (input.latitude! < -90 || input.latitude! > 90)) {
+    throw new Error(`Latitudine non valida: ${input.latitude} è fuori dall’intervallo consentito da -90 a 90.`)
+  }
+  if (hasLongitude && !Number.isFinite(input.longitude)) {
+    throw new Error('Longitudine non valida: inserisci un numero compreso tra -180 e 180.')
+  }
+  if (hasLongitude && (input.longitude! < -180 || input.longitude! > 180)) {
+    throw new Error(`Longitudine non valida: ${input.longitude} è fuori dall’intervallo consentito da -180 a 180.`)
   }
 
   return {
