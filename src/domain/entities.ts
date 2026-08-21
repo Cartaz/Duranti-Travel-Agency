@@ -165,6 +165,10 @@ export interface Media extends EntityBase {
   tripId?: string
   dayId?: string
   blockId?: string
+  placeId?: string
+  itineraryId?: string
+  reservationId?: string
+  position?: number
   kind: 'image' | 'video' | 'audio' | 'document'
   mimeType: string
   originalName?: string
