@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { createTripDay, getTripDay, updateTripDay, type DayDraft } from './day-service'
 import { getTrip } from '../trips/trip-service'
@@ -32,7 +32,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const navigate = useNavigate()
   const [tripTitle, setTripTitle] = useState('')
   const [tripRange, setTripRange] = useState<{ startDate?: string; endDate?: string }>({})
-  const [draft, setDraft] = useState<DayDraft>({ date: '', title: '', summary: '' })
+  const [draft, setDraft] = useState<DayDraft>({ date: '', title: '', summary: '', journalText: '' })
   const [loading, setLoading] = useState(true)
   const [contextReady, setContextReady] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -58,7 +58,12 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
           const day = await getTripDay(tripId, dayId)
           if (!day) throw new Error('Giornata non trovata in questo viaggio.')
           if (cancelled) return
-          setDraft({ date: day.date, title: day.title ?? '', summary: day.summary ?? '' })
+          setDraft({
+            date: day.date,
+            title: day.title ?? '',
+            summary: day.summary ?? '',
+            journalText: day.journalText ?? '',
+          })
         } else if (trip.startDate) {
           setDraft((current) => ({ ...current, date: trip.startDate ?? '' }))
         }
@@ -101,6 +106,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
   if (loading) return <p className="trip-feedback" role="status">Preparo la pagina…</p>
 
   const dateHint = rangeHint(tripRange.startDate, tripRange.endDate)
+  const hasJournal = Boolean(draft.journalText?.trim())
 
   return (
     <section className="day-form-page" aria-labelledby="day-form-title">
@@ -135,8 +141,32 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
         </label>
         <label>
           <span>Riepilogo</span>
-          <textarea maxLength={2000} rows={7} disabled={!contextReady} placeholder="Cosa vogliamo fare, vedere o ricordare…" value={draft.summary ?? ''} onChange={(event) => setDraft({ ...draft, summary: event.target.value })} />
+          <textarea maxLength={2000} rows={5} disabled={!contextReady} placeholder="In poche righe: cosa è previsto o cosa ha caratterizzato la giornata…" value={draft.summary ?? ''} onChange={(event) => setDraft({ ...draft, summary: event.target.value })} />
+          <small>Usa il riepilogo per una sintesi breve. Il racconto completo può stare nel diario.</small>
         </label>
+
+        <details className="day-journal-details">
+          <summary>
+            <span>
+              <strong>Diario della giornata</strong>
+              <small>Ricordi, impressioni, incontri e dettagli da conservare</small>
+            </span>
+            {hasJournal && <span className="day-journal-state">Scritto</span>}
+          </summary>
+          <label className="day-journal-field">
+            <span>Il racconto</span>
+            <textarea
+              maxLength={20_000}
+              rows={12}
+              disabled={!contextReady}
+              placeholder="Com'è andata davvero? Cosa ti ha sorpreso, cosa vuoi ricordare, quali momenti meritano di restare…"
+              value={draft.journalText ?? ''}
+              onChange={(event) => setDraft({ ...draft, journalText: event.target.value })}
+            />
+            <small>{(draft.journalText ?? '').length.toLocaleString('it-IT')} / 20.000 caratteri</small>
+          </label>
+        </details>
+
         <div className="day-form-actions">
           <button className="trip-primary-action" type="submit" disabled={saving || !contextReady}>
             {saving ? 'Salvataggio…' : mode === 'create' ? 'Crea giornata' : 'Salva giornata'}
