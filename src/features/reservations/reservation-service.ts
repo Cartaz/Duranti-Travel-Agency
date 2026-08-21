@@ -79,6 +79,35 @@ function validateLocalDateTime(value: string | undefined, label: string): string
   return cleaned
 }
 
+function formatDisplayDate(value: string): string {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return value
+  return new Intl.DateTimeFormat('it-IT', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day))
+}
+
+function formatDisplayDateTime(value: string): string {
+  const [date, time] = value.split('T')
+  return `${formatDisplayDate(date)}, ${time}`
+}
+
+function timingLabels(type: PlannerReservationType): { start: string; end: string; subject: string } {
+  switch (type) {
+    case 'transport':
+      return { start: 'partenza', end: 'arrivo', subject: 'trasporto' }
+    case 'accommodation':
+      return { start: 'check-in', end: 'check-out', subject: 'alloggio' }
+    case 'restaurant':
+      return { start: 'inizio', end: 'fine', subject: 'ristorante' }
+    case 'activity':
+    default:
+      return { start: 'inizio', end: 'fine', subject: 'attività' }
+  }
+}
+
 function validateTimezone(value: string | undefined): string | undefined {
   const cleaned = validateOptionalText(value, 'Fuso orario', 100)
   if (!cleaned) return undefined
@@ -185,6 +214,7 @@ async function getReservationBlock(tripId: string, dayId: string, blockId: strin
 async function normalizeDraft(
   tripId: string,
   dayId: string,
+  reservationType: PlannerReservationType,
   input: ReservationDraft,
 ): Promise<ReservationDraft> {
   const trip = await getTrip(tripId)
@@ -196,17 +226,29 @@ async function normalizeDraft(
   if (title.length > 200) throw new Error('Il titolo della prenotazione è troppo lungo.')
   if (!statuses.has(input.status)) throw new Error('Lo stato della prenotazione non è valido.')
 
-  const startsAt = validateLocalDateTime(input.startsAt, 'Inizio')
-  const endsAt = validateLocalDateTime(input.endsAt, 'Fine')
-  if (endsAt && !startsAt) throw new Error('Inserisci l’inizio prima della fine.')
+  const labels = timingLabels(reservationType)
+  const startsAt = validateLocalDateTime(input.startsAt, `Ora di ${labels.start}`)
+  const endsAt = validateLocalDateTime(input.endsAt, `Ora/data di ${labels.end}`)
+  if (endsAt && !startsAt) {
+    throw new Error(`Inserisci prima l’ora di ${labels.start}: senza un inizio non è possibile impostare ${labels.end}.`)
+  }
   if (startsAt && startsAt.slice(0, 10) !== day.date) {
-    throw new Error('L’inizio della prenotazione deve cadere nella giornata a cui è collegata.')
+    throw new Error(
+      `Data di ${labels.start} non valida: questo blocco ${labels.subject} appartiene alla giornata del ${formatDisplayDate(day.date)}. `
+      + `La ${labels.start} deve iniziare il ${formatDisplayDate(day.date)}.`,
+    )
   }
   if (startsAt && endsAt && endsAt < startsAt) {
-    throw new Error('La fine non può precedere l’inizio.')
+    throw new Error(
+      `${labels.end[0].toUpperCase()}${labels.end.slice(1)} non valid${labels.end === 'arrivo' ? 'o' : 'a'}: `
+      + `${formatDisplayDateTime(endsAt)} precede ${labels.start} (${formatDisplayDateTime(startsAt)}).`,
+    )
   }
   if (endsAt && trip.endDate && endsAt.slice(0, 10) > trip.endDate) {
-    throw new Error('La fine della prenotazione non può superare la data di ritorno del viaggio.')
+    throw new Error(
+      `Data di ${labels.end} non valida: ${formatDisplayDate(endsAt.slice(0, 10))} supera il ritorno del viaggio, `
+      + `fissato al ${formatDisplayDate(trip.endDate)}.`,
+    )
   }
 
   const placeId = cleanOptional(input.placeId)
@@ -376,7 +418,7 @@ export async function savePlannerReservation(
   const current = reservationId ? await reservationRepository.get(reservationId) : undefined
   if (current) assertReservationContext(current, tripId, dayId, reservationType)
 
-  const draft = await normalizeDraft(tripId, dayId, input)
+  const draft = await normalizeDraft(tripId, dayId, reservationType, input)
   const now = new Date().toISOString()
 
   const reservation: Reservation = current
