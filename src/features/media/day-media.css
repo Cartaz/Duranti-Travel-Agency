@@ -1,7 +1,8 @@
 .day-media {
   display: grid;
   gap: 16px;
-  margin: 0 0 20px;
+  width: min(920px, 100%);
+  margin: 20px auto 0;
   padding: 18px;
   border: 1px solid #43372c;
   border-radius: 20px;
