@@ -12,6 +12,10 @@ export interface CreateMediaInput {
   tripId?: string
   dayId?: string
   blockId?: string
+  placeId?: string
+  itineraryId?: string
+  reservationId?: string
+  position?: number
   kind: Media['kind']
   mimeType?: string
   originalName?: string
@@ -20,6 +24,13 @@ export interface CreateMediaInput {
   height?: number
   durationMs?: number
   sha256?: string
+}
+
+export interface DayMediaMetadataUpdate {
+  caption?: string
+  placeId?: string
+  itineraryId?: string
+  reservationId?: string
 }
 
 export type SoftDeleteMediaResult = 'not-found' | 'already-deleted' | 'tombstoned'
@@ -74,7 +85,14 @@ export class MediaRepository {
         && !item.blockId
         && (item.kind === 'image' || item.kind === 'video')
       ))
-      .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))
+      .sort((left, right) => {
+        if (left.position !== undefined || right.position !== undefined) {
+          if (left.position === undefined) return 1
+          if (right.position === undefined) return -1
+          if (left.position !== right.position) return left.position - right.position
+        }
+        return left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id)
+      })
   }
 
   async getFile(id: string): Promise<File> {
@@ -88,14 +106,49 @@ export class MediaRepository {
     )
   }
 
+  async updateDayMetadata(id: string, input: DayMediaMetadataUpdate): Promise<Media> {
+    const media = await this.get(id)
+    if (!media) throw new Error(`Active media ${id} was not found.`)
+    const updatedAt = new Date().toISOString()
+    const changes: DayMediaMetadataUpdate & { updatedAt: string } = {
+      caption: input.caption?.trim() || undefined,
+      placeId: input.placeId || undefined,
+      itineraryId: input.itineraryId || undefined,
+      reservationId: input.reservationId || undefined,
+      updatedAt,
+    }
+    const updated = await db.media.update(id, changes)
+    if (updated !== 1) throw new Error(`Media ${id} metadata could not be updated.`)
+    return { ...media, ...changes }
+  }
+
   async updateCaption(id: string, caption: string | undefined): Promise<Media> {
     const media = await this.get(id)
     if (!media) throw new Error(`Active media ${id} was not found.`)
-    const cleaned = caption?.trim() || undefined
+    return this.updateDayMetadata(id, {
+      caption,
+      placeId: media.placeId,
+      itineraryId: media.itineraryId,
+      reservationId: media.reservationId,
+    })
+  }
+
+  async setDayOrder(tripId: string, dayId: string, orderedIds: string[]): Promise<void> {
+    const current = await this.listForDay(tripId, dayId)
+    if (current.length !== orderedIds.length) throw new Error('The day media order is incomplete.')
+
+    const currentIds = new Set(current.map((item) => item.id))
+    if (orderedIds.some((id) => !currentIds.has(id)) || new Set(orderedIds).size !== orderedIds.length) {
+      throw new Error('The day media order contains invalid entries.')
+    }
+
     const updatedAt = new Date().toISOString()
-    const updated = await db.media.update(id, { caption: cleaned, updatedAt })
-    if (updated !== 1) throw new Error(`Media ${id} caption could not be updated.`)
-    return { ...media, caption: cleaned, updatedAt }
+    await db.transaction('rw', db.media, async () => {
+      for (const [index, id] of orderedIds.entries()) {
+        const updated = await db.media.update(id, { position: index + 1, updatedAt })
+        if (updated !== 1) throw new Error(`Media ${id} order could not be updated.`)
+      }
+    })
   }
 
   async softDelete(id: string): Promise<SoftDeleteMediaResult> {
