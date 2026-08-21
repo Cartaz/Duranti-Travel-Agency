@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Block, Media, Place, Reservation } from '../../domain/entities'
+import InlineConfirm from '../../ui/InlineConfirm'
 import { movePlannerBlock } from '../planner/block-service'
 import {
   attachPlannerReservationFile,
@@ -19,6 +20,7 @@ import './reservations.css'
 
 type MoveDirection = 'up' | 'down'
 type ReservationBlockType = Extract<Block['type'], 'transport' | 'accommodation' | 'restaurant' | 'activity'>
+type RemoveTarget = 'reservation' | 'attachment'
 
 const statusLabels: Record<ReservationDraft['status'], string> = {
   planned: 'Da pianificare',
@@ -138,6 +140,7 @@ export default function ReservationBlockEditor({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [attachmentBusy, setAttachmentBusy] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<RemoveTarget>()
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -245,19 +248,14 @@ export default function ReservationBlockEditor({
   }
 
   const removeAttachment = async (): Promise<void> => {
-    if (
-      readOnly
-      || busy
-      || !attachment
-      || !window.confirm('Rimuovere l’allegato da questa prenotazione?')
-    ) return
-
+    if (readOnly || busy || !attachment) return
     setAttachmentBusy(true)
     setError('')
     try {
       const updated = await removePlannerReservationAttachment(tripId, dayId, block.id)
       setReservation(updated)
       setAttachment(undefined)
+      setRemoveTarget(undefined)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile rimuovere l’allegato.')
     } finally {
@@ -286,11 +284,12 @@ export default function ReservationBlockEditor({
   }
 
   const remove = async (): Promise<void> => {
-    if (readOnly || busy || !window.confirm(`Eliminare questo blocco ${config.label.toLowerCase()} e la relativa prenotazione?`)) return
+    if (readOnly || busy) return
     setSaving(true)
     setError('')
     try {
       await deletePlannerReservationBlock(tripId, dayId, block.id)
+      setRemoveTarget(undefined)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile eliminare la prenotazione.')
@@ -328,7 +327,7 @@ export default function ReservationBlockEditor({
           <div className="planner-block-tools">
             <button type="button" disabled={busy || !canMoveUp} aria-label="Sposta blocco su" title="Sposta su" onClick={() => void move('up')}>↑</button>
             <button type="button" disabled={busy || !canMoveDown} aria-label="Sposta blocco giù" title="Sposta giù" onClick={() => void move('down')}>↓</button>
-            <button className="planner-delete" type="button" disabled={busy} onClick={() => void remove()}>Elimina</button>
+            <button className="planner-delete" type="button" disabled={busy} onClick={() => setRemoveTarget('reservation')}>Elimina</button>
           </div>
         )}
       </div>
@@ -468,13 +467,24 @@ export default function ReservationBlockEditor({
                   </div>
                   <div className="reservation-attachment-actions">
                     <button type="button" disabled={attachmentBusy} onClick={() => void openAttachment()}>Apri</button>
-                    {!readOnly && <button type="button" disabled={busy} onClick={() => void removeAttachment()}>Rimuovi</button>}
+                    {!readOnly && <button type="button" disabled={busy} onClick={() => setRemoveTarget('attachment')}>Rimuovi</button>}
                   </div>
                 </div>
               ) : (
                 <p className="reservation-attachment-empty">
                   {reservation ? 'Nessun allegato collegato.' : 'Salva prima la prenotazione per aggiungere un allegato.'}
                 </p>
+              )}
+
+              {removeTarget === 'attachment' && attachment && (
+                <InlineConfirm
+                  title="Rimuovere questo allegato?"
+                  message={`Verrà scollegato “${attachment.originalName ?? 'Allegato'}” da questa prenotazione.`}
+                  confirmLabel="Rimuovi allegato"
+                  busy={attachmentBusy}
+                  onCancel={() => setRemoveTarget(undefined)}
+                  onConfirm={() => void removeAttachment()}
+                />
               )}
 
               {!readOnly && reservation && (
@@ -497,6 +507,18 @@ export default function ReservationBlockEditor({
 
           {places.length === 0 && <small className="reservation-hint">Puoi prima creare un blocco Luogo per collegarlo a questa prenotazione.</small>}
           {error && <small className="planner-block-error" role="alert">{error}</small>}
+          {removeTarget === 'reservation' && (
+            <InlineConfirm
+              title={`Eliminare ${config.label.toLowerCase()}?`}
+              message={reservation
+                ? `Verranno rimossi il blocco e la prenotazione “${reservation.title}”.${attachment ? ' Anche il collegamento all’allegato verrà rimosso.' : ''}`
+                : `Verrà rimosso questo blocco ${config.label.toLowerCase()} dalla giornata.`}
+              confirmLabel={`Elimina ${config.label.toLowerCase()}`}
+              busy={saving}
+              onCancel={() => setRemoveTarget(undefined)}
+              onConfirm={() => void remove()}
+            />
+          )}
 
           <div className="reservation-actions">
             {reservation?.url && <a href={reservation.url} target="_blank" rel="noreferrer">Apri prenotazione ↗</a>}
