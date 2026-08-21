@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Media } from '../../domain/entities'
 import InlineConfirm from '../../ui/InlineConfirm'
+import DayMediaLightbox from './DayMediaLightbox'
 import {
   DAY_MEDIA_ACCEPT,
+  dayMediaItineraryKey,
   importDayMedia,
   listDayMedia,
+  listDayMediaContext,
   MAX_DAY_MEDIA_CAPTION_LENGTH,
+  moveDayMedia,
   readDayMedia,
   removeDayMedia,
-  updateDayMediaCaption,
+  updateDayMediaDetails,
+  type DayMediaContextOptions,
+  type DayMediaMoveDirection,
 } from './day-media-service'
 import './day-media.css'
 
@@ -17,6 +23,8 @@ function formatBytes(value: number): string {
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`
 }
+
+const EMPTY_CONTEXT: DayMediaContextOptions = { places: [], itineraries: [] }
 
 export default function DayMediaGallery({
   tripId,
@@ -28,15 +36,22 @@ export default function DayMediaGallery({
   readOnly: boolean
 }) {
   const [items, setItems] = useState<Media[]>([])
+  const [context, setContext] = useState<DayMediaContextOptions>(EMPTY_CONTEXT)
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState<number>()
   const [error, setError] = useState('')
 
-  const refresh = useCallback(async (): Promise<void> => {
+  const refresh = useCallback(async (preserveError = false): Promise<void> => {
     setLoading(true)
-    setError('')
+    if (!preserveError) setError('')
     try {
-      setItems(await listDayMedia(tripId, dayId))
+      const [loadedItems, loadedContext] = await Promise.all([
+        listDayMedia(tripId, dayId),
+        listDayMediaContext(tripId, dayId),
+      ])
+      setItems(loadedItems)
+      setContext(loadedContext)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile leggere foto e video della giornata.')
     } finally {
@@ -58,11 +73,21 @@ export default function DayMediaGallery({
       }
       await refresh()
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'Impossibile aggiungere il file alla giornata.'
-      await refresh()
-      setError(message)
+      setError(cause instanceof Error ? cause.message : 'Impossibile aggiungere il file alla giornata.')
+      await refresh(true)
     } finally {
       setImporting(false)
+    }
+  }
+
+  const move = async (mediaId: string, direction: DayMediaMoveDirection): Promise<void> => {
+    setError('')
+    try {
+      await moveDayMedia(tripId, dayId, mediaId, direction)
+      await refresh()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile riordinare i ricordi della giornata.')
+      throw cause
     }
   }
 
@@ -104,17 +129,32 @@ export default function DayMediaGallery({
 
       {items.length > 0 && (
         <div className="day-media-grid">
-          {items.map((media) => (
+          {items.map((media, index) => (
             <DayMediaCard
               key={`${media.id}:${media.updatedAt}`}
               media={media}
               tripId={tripId}
               dayId={dayId}
               readOnly={readOnly}
-              onChanged={refresh}
+              context={context}
+              canMoveUp={index > 0}
+              canMoveDown={index < items.length - 1}
+              onOpen={() => setLightboxIndex(index)}
+              onMove={(direction) => move(media.id, direction)}
+              onChanged={() => refresh()}
             />
           ))}
         </div>
+      )}
+
+      {lightboxIndex !== undefined && items.length > 0 && (
+        <DayMediaLightbox
+          items={items}
+          initialIndex={lightboxIndex}
+          tripId={tripId}
+          dayId={dayId}
+          onClose={() => setLightboxIndex(undefined)}
+        />
       )}
     </section>
   )
@@ -125,20 +165,38 @@ function DayMediaCard({
   tripId,
   dayId,
   readOnly,
+  context,
+  canMoveUp,
+  canMoveDown,
+  onOpen,
+  onMove,
   onChanged,
 }: {
   media: Media
   tripId: string
   dayId: string
   readOnly: boolean
+  context: DayMediaContextOptions
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onOpen: () => void
+  onMove: (direction: DayMediaMoveDirection) => Promise<void>
   onChanged: () => Promise<void>
 }) {
   const [objectUrl, setObjectUrl] = useState('')
   const [previewError, setPreviewError] = useState('')
   const [caption, setCaption] = useState(media.caption ?? '')
+  const [placeId, setPlaceId] = useState(media.placeId ?? '')
+  const [itineraryKey, setItineraryKey] = useState(dayMediaItineraryKey(media))
   const [saving, setSaving] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(false)
-  const captionChanged = caption.trim() !== (media.caption ?? '').trim()
+
+  const originalItineraryKey = dayMediaItineraryKey(media)
+  const detailsChanged = caption.trim() !== (media.caption ?? '').trim()
+    || placeId !== (media.placeId ?? '')
+    || itineraryKey !== originalItineraryKey
+  const placeOption = context.places.find((option) => option.id === placeId)
+  const itineraryOption = context.itineraries.find((option) => option.key === itineraryKey)
 
   useEffect(() => {
     let cancelled = false
@@ -159,16 +217,32 @@ function DayMediaCard({
     }
   }, [dayId, media, tripId])
 
-  const saveCaption = async (): Promise<void> => {
-    if (readOnly || saving || !captionChanged) return
+  const saveDetails = async (): Promise<void> => {
+    if (readOnly || saving || !detailsChanged) return
     setSaving(true)
     setPreviewError('')
     try {
-      await updateDayMediaCaption(tripId, dayId, media.id, caption)
+      await updateDayMediaDetails(tripId, dayId, media.id, {
+        caption,
+        placeId: placeId || undefined,
+        itineraryKey: itineraryKey || undefined,
+      })
       await onChanged()
     } catch (cause) {
-      setPreviewError(cause instanceof Error ? cause.message : 'Impossibile salvare la didascalia.')
+      setPreviewError(cause instanceof Error ? cause.message : 'Impossibile salvare i dettagli del ricordo.')
     } finally {
+      setSaving(false)
+    }
+  }
+
+  const move = async (direction: DayMediaMoveDirection): Promise<void> => {
+    if (readOnly || saving) return
+    setSaving(true)
+    setPreviewError('')
+    try {
+      await onMove(direction)
+    } catch (cause) {
+      setPreviewError(cause instanceof Error ? cause.message : 'Impossibile spostare il ricordo.')
       setSaving(false)
     }
   }
@@ -203,29 +277,78 @@ function DayMediaCard({
         </div>
 
         {readOnly ? (
-          media.caption && <p className="day-media-caption">{media.caption}</p>
+          <>
+            {media.caption && <p className="day-media-caption">{media.caption}</p>}
+            {(media.placeId || originalItineraryKey) && (
+              <div className="day-media-linked-summary">
+                {media.placeId && <span>Luogo: {placeOption?.name ?? 'collegamento non più disponibile'}</span>}
+                {originalItineraryKey && <span>Tappa: {itineraryOption?.title ?? 'collegamento non più disponibile'}</span>}
+              </div>
+            )}
+          </>
         ) : (
-          <label className="day-media-caption-editor">
-            <span>Didascalia</span>
-            <textarea
-              rows={3}
-              maxLength={MAX_DAY_MEDIA_CAPTION_LENGTH}
-              value={caption}
-              placeholder="Dove eravamo, cosa stavamo facendo, cosa vuoi ricordare…"
-              onChange={(event) => setCaption(event.target.value)}
-            />
-            <small>{caption.length}/{MAX_DAY_MEDIA_CAPTION_LENGTH}</small>
-          </label>
+          <>
+            <label className="day-media-caption-editor">
+              <span>Didascalia</span>
+              <textarea
+                rows={3}
+                maxLength={MAX_DAY_MEDIA_CAPTION_LENGTH}
+                value={caption}
+                placeholder="Dove eravamo, cosa stavamo facendo, cosa vuoi ricordare…"
+                onChange={(event) => setCaption(event.target.value)}
+              />
+              <small>{caption.length}/{MAX_DAY_MEDIA_CAPTION_LENGTH}</small>
+            </label>
+
+            <details className="day-media-links-editor" open={Boolean(media.placeId || originalItineraryKey)}>
+              <summary>
+                <span>
+                  <strong>Collegamenti</strong>
+                  <small>Associa questo ricordo a un luogo o a una tappa</small>
+                </span>
+                {(placeId || itineraryKey) && <span className="day-media-links-state">Configurati</span>}
+              </summary>
+              <div className="day-media-links-grid">
+                <label>
+                  <span>Luogo</span>
+                  <select value={placeId} onChange={(event) => setPlaceId(event.target.value)}>
+                    <option value="">Nessun luogo</option>
+                    {placeId && !placeOption && <option value={placeId}>Luogo non più nella giornata</option>}
+                    {context.places.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Tappa</span>
+                  <select value={itineraryKey} onChange={(event) => setItineraryKey(event.target.value)}>
+                    <option value="">Nessuna tappa</option>
+                    {itineraryKey && !itineraryOption && <option value={itineraryKey}>Tappa non più disponibile</option>}
+                    {context.itineraries.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.title}{option.placeName ? ` · ${option.placeName}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </details>
+          </>
         )}
 
-        {!readOnly && !confirmRemove && (
+        {!confirmRemove && (
           <div className="day-media-card-actions">
-            <button type="button" disabled={saving || !captionChanged} onClick={() => void saveCaption()}>
-              {saving ? 'Salvataggio…' : 'Salva didascalia'}
-            </button>
-            <button className="day-media-remove" type="button" disabled={saving} onClick={() => setConfirmRemove(true)}>
-              Rimuovi
-            </button>
+            <button type="button" onClick={onOpen}>Apri</button>
+            {!readOnly && (
+              <>
+                <button type="button" disabled={saving || !canMoveUp} aria-label="Sposta ricordo su" title="Sposta su" onClick={() => void move('up')}>↑</button>
+                <button type="button" disabled={saving || !canMoveDown} aria-label="Sposta ricordo giù" title="Sposta giù" onClick={() => void move('down')}>↓</button>
+                <button type="button" disabled={saving || !detailsChanged} onClick={() => void saveDetails()}>
+                  {saving ? 'Aggiornamento…' : 'Salva dettagli'}
+                </button>
+                <button className="day-media-remove" type="button" disabled={saving} onClick={() => setConfirmRemove(true)}>
+                  Rimuovi
+                </button>
+              </>
+            )}
           </div>
         )}
 
