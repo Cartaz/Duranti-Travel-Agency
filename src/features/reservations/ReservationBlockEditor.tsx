@@ -32,30 +32,45 @@ const blockConfigs: Record<ReservationBlockType, {
   titlePlaceholder: string
   providerPlaceholder: string
   notesPlaceholder: string
+  startTimeLabel: string
+  endDateLabel: string
+  endTimeLabel: string
 }> = {
   transport: {
     label: 'Trasporto',
     titlePlaceholder: 'Volo Roma → Parigi',
     providerPlaceholder: 'Trenitalia, ITA, compagnia…',
     notesPlaceholder: 'Terminal, check-in, bagagli, dettagli utili…',
+    startTimeLabel: 'Ora partenza',
+    endDateLabel: 'Data arrivo',
+    endTimeLabel: 'Ora arrivo',
   },
   accommodation: {
     label: 'Alloggio',
     titlePlaceholder: 'Hotel a Parigi',
     providerPlaceholder: 'Hotel, Booking, struttura…',
     notesPlaceholder: 'Check-in, colazione, camera, dettagli utili…',
+    startTimeLabel: 'Ora check-in',
+    endDateLabel: 'Data check-out',
+    endTimeLabel: 'Ora check-out',
   },
   restaurant: {
     label: 'Ristorante',
     titlePlaceholder: 'Cena da Septime',
     providerPlaceholder: 'Ristorante, TheFork, concierge…',
     notesPlaceholder: 'Numero di coperti, richieste alimentari, tavolo, dettagli utili…',
+    startTimeLabel: 'Ora inizio',
+    endDateLabel: 'Data fine',
+    endTimeLabel: 'Ora fine',
   },
   activity: {
     label: 'Attività',
     titlePlaceholder: 'Visita guidata al Louvre',
     providerPlaceholder: 'Museo, guida, GetYourGuide…',
     notesPlaceholder: 'Punto d’incontro, biglietti, cosa portare, dettagli utili…',
+    startTimeLabel: 'Ora inizio',
+    endDateLabel: 'Data fine',
+    endTimeLabel: 'Ora fine',
   },
 }
 
@@ -73,6 +88,23 @@ function formatBytes(value: number): string {
   if (value < 1024) return `${value} B`
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`
+}
+
+function formatDayDate(value: string): string {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return value
+  return new Intl.DateTimeFormat('it-IT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day))
+}
+
+function draftForDay(reservation: Reservation | undefined, dayDate: string): ReservationDraft {
+  const draft = reservation ? reservationToDraft(reservation) : { ...EMPTY_RESERVATION_DRAFT }
+  if (draft.startsAt) draft.startsAt = `${dayDate}T${draft.startsAt.slice(11, 16)}`
+  return draft
 }
 
 export default function ReservationBlockEditor({
@@ -102,6 +134,7 @@ export default function ReservationBlockEditor({
   const [attachment, setAttachment] = useState<Media>()
   const [places, setPlaces] = useState<Place[]>([])
   const [draft, setDraft] = useState<ReservationDraft>(EMPTY_RESERVATION_DRAFT)
+  const [endDateInput, setEndDateInput] = useState(dayDate)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [attachmentBusy, setAttachmentBusy] = useState(false)
@@ -120,10 +153,12 @@ export default function ReservationBlockEditor({
           ? await getPlannerReservationAttachment(tripId, dayId, block.id, loadedReservation)
           : undefined
         if (cancelled) return
+        const loadedDraft = draftForDay(loadedReservation, dayDate)
         setReservation(loadedReservation)
         setAttachment(loadedAttachment)
         setPlaces(loadedPlaces)
-        setDraft(loadedReservation ? reservationToDraft(loadedReservation) : EMPTY_RESERVATION_DRAFT)
+        setDraft(loadedDraft)
+        setEndDateInput(loadedDraft.endsAt?.slice(0, 10) ?? dayDate)
       })
       .catch((cause) => {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Impossibile leggere la prenotazione.')
@@ -135,10 +170,45 @@ export default function ReservationBlockEditor({
     return () => {
       cancelled = true
     }
-  }, [block.id, block.updatedAt, dayId, tripId])
+  }, [block.id, block.updatedAt, dayDate, dayId, tripId])
 
   const patch = (changes: Partial<ReservationDraft>): void => setDraft((current) => ({ ...current, ...changes }))
   const busy = saving || attachmentBusy
+  const startTime = draft.startsAt?.slice(11, 16) ?? ''
+  const endTime = draft.endsAt?.slice(11, 16) ?? ''
+  const sameDayEnd = endDateInput === dayDate
+
+  const updateStartTime = (value: string): void => {
+    setError('')
+    setDraft((current) => {
+      const startsAt = value ? `${dayDate}T${value}` : undefined
+      const endsAt = current.endsAt && startsAt && current.endsAt >= startsAt
+        ? current.endsAt
+        : undefined
+      return { ...current, startsAt, endsAt }
+    })
+    if (!value) setEndDateInput(dayDate)
+  }
+
+  const updateEndDate = (value: string): void => {
+    const nextDate = value || dayDate
+    setError('')
+    setEndDateInput(nextDate)
+    setDraft((current) => {
+      const currentEndTime = current.endsAt?.slice(11, 16)
+      if (!currentEndTime) return current
+      const nextEnd = `${nextDate}T${currentEndTime}`
+      return {
+        ...current,
+        endsAt: current.startsAt && nextEnd >= current.startsAt ? nextEnd : undefined,
+      }
+    })
+  }
+
+  const updateEndTime = (value: string): void => {
+    setError('')
+    patch({ endsAt: value ? `${endDateInput}T${value}` : undefined })
+  }
 
   const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
@@ -147,8 +217,10 @@ export default function ReservationBlockEditor({
     setError('')
     try {
       const saved = await savePlannerReservation(tripId, dayId, block.id, draft)
+      const savedDraft = draftForDay(saved, dayDate)
       setReservation(saved)
-      setDraft(reservationToDraft(saved))
+      setDraft(savedDraft)
+      setEndDateInput(savedDraft.endsAt?.slice(0, 10) ?? dayDate)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile salvare la prenotazione.')
@@ -240,9 +312,6 @@ export default function ReservationBlockEditor({
     }
   }
 
-  const startMin = `${dayDate}T00:00`
-  const startMax = `${dayDate}T23:59`
-  const endMax = tripEndDate ? `${tripEndDate}T23:59` : undefined
   const hasOptionalDetails = Boolean(
     draft.provider?.trim()
       || draft.confirmationCode?.trim()
@@ -281,14 +350,50 @@ export default function ReservationBlockEditor({
                 onChange={(event) => patch({ title: event.target.value })}
               />
             </label>
+
+            <div className="reservation-fixed-start-date">
+              <span>Data iniziale</span>
+              <strong>{formatDayDate(dayDate)}</strong>
+              <small>È la data di questa giornata e viene impostata automaticamente.</small>
+            </div>
+
             <label>
-              <span>Inizio</span>
-              <input type="datetime-local" min={startMin} max={startMax} readOnly={readOnly} value={draft.startsAt ?? ''} onChange={(event) => patch({ startsAt: event.target.value })} />
+              <span>{config.startTimeLabel}</span>
+              <input
+                type="time"
+                readOnly={readOnly}
+                value={startTime}
+                onChange={(event) => updateStartTime(event.target.value)}
+              />
             </label>
+
             <label>
-              <span>Fine</span>
-              <input type="datetime-local" min={draft.startsAt || startMin} max={endMax} readOnly={readOnly} value={draft.endsAt ?? ''} onChange={(event) => patch({ endsAt: event.target.value })} />
+              <span>{config.endDateLabel}</span>
+              <input
+                type="date"
+                min={dayDate}
+                max={tripEndDate}
+                disabled={readOnly || !startTime}
+                value={endDateInput}
+                onChange={(event) => updateEndDate(event.target.value)}
+              />
+              {!startTime && <small className="reservation-field-hint">Inserisci prima {config.startTimeLabel.toLowerCase()}.</small>}
             </label>
+
+            <label>
+              <span>{config.endTimeLabel}</span>
+              <input
+                type="time"
+                min={sameDayEnd ? startTime || undefined : undefined}
+                disabled={readOnly || !startTime}
+                value={endTime}
+                onChange={(event) => updateEndTime(event.target.value)}
+              />
+              {sameDayEnd && startTime && (
+                <small className="reservation-field-hint">Non prima delle {startTime}.</small>
+              )}
+            </label>
+
             <label>
               <span>Stato</span>
               <select disabled={readOnly} value={draft.status} onChange={(event) => patch({ status: event.target.value as ReservationDraft['status'] })}>
@@ -391,7 +496,7 @@ export default function ReservationBlockEditor({
           </details>
 
           {places.length === 0 && <small className="reservation-hint">Puoi prima creare un blocco Luogo per collegarlo a questa prenotazione.</small>}
-          {error && <small className="planner-block-error">{error}</small>}
+          {error && <small className="planner-block-error" role="alert">{error}</small>}
 
           <div className="reservation-actions">
             {reservation?.url && <a href={reservation.url} target="_blank" rel="noreferrer">Apri prenotazione ↗</a>}
