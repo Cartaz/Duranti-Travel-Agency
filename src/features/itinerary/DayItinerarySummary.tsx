@@ -51,6 +51,13 @@ function timeLabel(value: string | undefined): string {
   return /^\d{2}:\d{2}$/.test(time) ? time : value
 }
 
+function formatReadableDate(value: string): string {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return value
+  return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
+    .format(new Date(year, month - 1, day))
+}
+
 function hasSourceReference(item: DayItineraryItem): boolean {
   return Boolean(item.itinerary.reservationId || item.itinerary.blockId)
 }
@@ -410,10 +417,33 @@ function ManualItineraryForm({
   onSave: (draft: ItineraryDraft) => Promise<void>
 }) {
   const [draft, setDraft] = useState<ItineraryDraft>(initialDraft)
+  const [endDate, setEndDate] = useState(initialDraft.endsAt?.slice(0, 10) ?? dayDate)
   const patch = (changes: Partial<ItineraryDraft>): void => setDraft((current) => ({ ...current, ...changes }))
-  const startMin = `${dayDate}T00:00`
-  const startMax = `${dayDate}T23:59`
-  const endMax = tripEndDate ? `${tripEndDate}T23:59` : undefined
+  const startTime = draft.startsAt?.slice(11, 16) ?? ''
+  const endTime = draft.endsAt?.slice(11, 16) ?? ''
+
+  const updateStartTime = (value: string): void => {
+    if (!value) {
+      setEndDate(dayDate)
+      patch({ startsAt: undefined, endsAt: undefined })
+      return
+    }
+
+    const startsAt = `${dayDate}T${value}`
+    patch({
+      startsAt,
+      endsAt: draft.endsAt && draft.endsAt < startsAt ? undefined : draft.endsAt,
+    })
+  }
+
+  const updateEndDate = (value: string): void => {
+    setEndDate(value)
+    if (endTime) patch({ endsAt: `${value}T${endTime}` })
+  }
+
+  const updateEndTime = (value: string): void => {
+    patch({ endsAt: value ? `${endDate}T${value}` : undefined })
+  }
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
@@ -440,12 +470,30 @@ function ManualItineraryForm({
           </select>
         </label>
         <label>
-          <span>Inizio</span>
-          <input type="datetime-local" min={startMin} max={startMax} value={draft.startsAt ?? ''} onChange={(event) => patch({ startsAt: event.target.value })} />
+          <span>Ora inizio</span>
+          <input type="time" value={startTime} onChange={(event) => updateStartTime(event.target.value)} />
+          <small className="day-itinerary-form-hint">Data fissata alla giornata: {formatReadableDate(dayDate)}.</small>
         </label>
         <label>
-          <span>Fine</span>
-          <input type="datetime-local" min={draft.startsAt || startMin} max={endMax} value={draft.endsAt ?? ''} onChange={(event) => patch({ endsAt: event.target.value })} />
+          <span>Data fine</span>
+          <input
+            type="date"
+            min={dayDate}
+            max={tripEndDate}
+            disabled={!startTime}
+            value={endDate}
+            onChange={(event) => updateEndDate(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>Ora fine</span>
+          <input
+            type="time"
+            min={endDate === dayDate ? startTime || undefined : undefined}
+            disabled={!startTime}
+            value={endTime}
+            onChange={(event) => updateEndTime(event.target.value)}
+          />
         </label>
         <label>
           <span>Luogo salvato</span>
