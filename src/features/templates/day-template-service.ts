@@ -1,8 +1,11 @@
 import type { Block, BlockType, Day, Template } from '../../domain/entities'
 import { blockRepository, dayRepository, templateRepository } from '../../data/repositories/repositories'
 import { createTripDay, type DayDraft } from '../days/day-service'
+import { getTrip } from '../trips/trip-service'
 
 export const DAY_TEMPLATE_CATEGORY = 'day'
+export const MAX_DAY_TEMPLATE_NAME_LENGTH = 120
+export const MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH = 400
 
 const SUPPORTED_DAY_TEMPLATE_BLOCK_TYPES = new Set<BlockType>([
   'text',
@@ -22,6 +25,11 @@ interface BuiltInTemplateDefinition {
   name: string
   description: string
   definition: Template['definition']
+}
+
+export interface PersonalDayTemplateDraft {
+  name: string
+  description?: string
 }
 
 const BUILT_IN_DAY_TEMPLATES: BuiltInTemplateDefinition[] = [
@@ -123,8 +131,68 @@ const BUILT_IN_DAY_TEMPLATES: BuiltInTemplateDefinition[] = [
   },
 ]
 
+const BUILT_IN_DAY_TEMPLATE_IDS = new Set(BUILT_IN_DAY_TEMPLATES.map((template) => template.id))
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function cleanOptional(value: string | undefined): string | undefined {
+  const cleaned = value?.trim()
+  return cleaned ? cleaned : undefined
+}
+
 function cloneContent(content: Record<string, unknown>): Record<string, unknown> {
   return structuredClone(content)
+}
+
+function cleanReusableText(value: unknown, maxLength: number): string {
+  return typeof value === 'string' ? value.slice(0, maxLength) : ''
+}
+
+function reusableChecklistContent(
+  content: Record<string, unknown>,
+  regenerateIds: boolean,
+): Record<string, unknown> {
+  if (!Array.isArray(content.items)) return { items: [] }
+
+  const items = content.items.flatMap((item, index) => {
+    if (!isRecord(item) || typeof item.text !== 'string') return []
+    const text = item.text.trim().slice(0, 500)
+    if (!text) return []
+    return [{
+      id: regenerateIds ? crypto.randomUUID() : `template-item-${index + 1}`,
+      text,
+      checked: false,
+    }]
+  }).slice(0, 100)
+
+  return { items }
+}
+
+function reusableBlockContent(
+  type: BlockType,
+  content: Record<string, unknown>,
+  regenerateChecklistIds: boolean,
+): Record<string, unknown> {
+  switch (type) {
+    case 'text':
+      return { text: cleanReusableText(content.text, 10_000) }
+    case 'heading':
+      return { text: cleanReusableText(content.text, 200) }
+    case 'checklist':
+      return reusableChecklistContent(content, regenerateChecklistIds)
+    case 'divider':
+    case 'place':
+    case 'transport':
+    case 'accommodation':
+    case 'restaurant':
+    case 'activity':
+    case 'expense':
+      return {}
+    default:
+      throw new Error(`Il tipo di blocco ${type} non può essere usato in un template di giornata.`)
+  }
 }
 
 function validateTemplate(template: Template): Template {
@@ -165,6 +233,11 @@ async function ensureBuiltInDayTemplates(): Promise<void> {
   }
 }
 
+export function isBuiltInDayTemplate(templateOrId: Template | string): boolean {
+  const id = typeof templateOrId === 'string' ? templateOrId : templateOrId.id
+  return BUILT_IN_DAY_TEMPLATE_IDS.has(id)
+}
+
 export async function listDayTemplates(): Promise<Template[]> {
   await ensureBuiltInDayTemplates()
   const templates = (await templateRepository.list())
@@ -180,6 +253,77 @@ export async function listDayTemplates(): Promise<Template[]> {
     }
     return left.name.localeCompare(right.name, 'it')
   })
+}
+
+export async function createPersonalDayTemplate(
+  tripId: string,
+  dayId: string,
+  input: PersonalDayTemplateDraft,
+): Promise<Template> {
+  const [trip, day] = await Promise.all([
+    getTrip(tripId),
+    dayRepository.get(dayId),
+  ])
+  if (!trip || !day || day.tripId !== tripId) throw new Error('La giornata non appartiene a questo viaggio.')
+  if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di creare un modello dalla giornata.')
+
+  const name = input.name.trim()
+  if (!name) throw new Error('Inserisci un nome per il modello.')
+  if (name.length > MAX_DAY_TEMPLATE_NAME_LENGTH) {
+    throw new Error(`Il nome del modello può contenere al massimo ${MAX_DAY_TEMPLATE_NAME_LENGTH} caratteri.`)
+  }
+
+  const description = cleanOptional(input.description)
+  if (description && description.length > MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH) {
+    throw new Error(`La descrizione può contenere al massimo ${MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH} caratteri.`)
+  }
+
+  await ensureBuiltInDayTemplates()
+  const duplicate = (await templateRepository.list()).find((template) => (
+    template.category === DAY_TEMPLATE_CATEGORY
+    && template.name.trim().localeCompare(name, 'it', { sensitivity: 'accent' }) === 0
+  ))
+  if (duplicate) throw new Error('Esiste già un modello di giornata con questo nome.')
+
+  const blocks = (await blockRepository.list())
+    .filter((block) => (
+      block.tripId === tripId
+      && block.dayId === dayId
+      && SUPPORTED_DAY_TEMPLATE_BLOCK_TYPES.has(block.type)
+    ))
+    .sort((left, right) => (
+      left.position - right.position
+      || left.createdAt.localeCompare(right.createdAt)
+      || left.id.localeCompare(right.id)
+    ))
+
+  if (blocks.length === 0) {
+    throw new Error('Questa giornata non contiene ancora una struttura da salvare come modello.')
+  }
+
+  const definition: Template['definition'] = {
+    blocks: blocks.map((block, index) => ({
+      type: block.type,
+      position: index + 1,
+      content: reusableBlockContent(block.type, block.content, false),
+    })),
+  }
+
+  const now = new Date().toISOString()
+  const template: Template = {
+    id: `custom-day-${crypto.randomUUID()}`,
+    name,
+    description: description ?? `Modello personale creato da “${day.title?.trim() || `Giorno ${day.sequence}`}”.`,
+    category: DAY_TEMPLATE_CATEGORY,
+    version: 1,
+    definition,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  validateTemplate(template)
+  await templateRepository.put(template)
+  return template
 }
 
 export async function createTripDayFromTemplate(
@@ -210,7 +354,7 @@ export async function createTripDayFromTemplate(
         dayId: day.id,
         type: definition.type,
         position: index + 1,
-        content: cloneContent(definition.content),
+        content: reusableBlockContent(definition.type, cloneContent(definition.content), true),
         createdAt: now,
         updatedAt: now,
       }
