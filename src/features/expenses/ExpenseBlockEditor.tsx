@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { Block, Expense, Traveler } from '../../domain/entities'
 import { movePlannerBlock } from '../planner/block-service'
 import {
@@ -14,6 +14,16 @@ import { formatMinorCurrency } from './currency'
 import './expenses.css'
 
 type MoveDirection = 'up' | 'down'
+
+function formatDayDate(value: string): string {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return value
+  return new Intl.DateTimeFormat('it-IT', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day))
+}
 
 export default function ExpenseBlockEditor({
   block,
@@ -66,6 +76,10 @@ export default function ExpenseBlockEditor({
           loadedDraft = { ...loadedDraft, fxRate: undefined }
         }
 
+        if (loadedDraft.occurredAt) {
+          loadedDraft = { ...loadedDraft, occurredAt: `${dayDate}T${loadedDraft.occurredAt.slice(11, 16)}` }
+        }
+
         setExpense(loadedExpense)
         setDraft(loadedDraft)
         setPayers(payerOptions.active)
@@ -81,9 +95,14 @@ export default function ExpenseBlockEditor({
     return () => {
       cancelled = true
     }
-  }, [block.id, block.updatedAt, dayId, fallbackCurrency, normalizedTripCurrency, tripId])
+  }, [block.id, block.updatedAt, dayDate, dayId, fallbackCurrency, normalizedTripCurrency, tripId])
 
   const patch = (changes: Partial<ExpenseDraft>): void => setDraft((current) => ({ ...current, ...changes }))
+
+  const updateOccurredTime = (value: string): void => {
+    setError('')
+    patch({ occurredAt: value ? `${dayDate}T${value}` : undefined })
+  }
 
   const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
@@ -132,8 +151,7 @@ export default function ExpenseBlockEditor({
     }
   }
 
-  const dayMin = `${dayDate}T00:00`
-  const dayMax = `${dayDate}T23:59`
+  const occurredTime = draft.occurredAt?.slice(11, 16) ?? ''
   const currentPayerIsActive = draft.paidByTravelerId
     ? payers.some((traveler) => traveler.id === draft.paidByTravelerId)
     : false
@@ -148,6 +166,13 @@ export default function ExpenseBlockEditor({
       && normalizedTripCurrency
       && expense.fx.targetCurrency === normalizedTripCurrency
       && expense.currency === normalizedDraftCurrency,
+  )
+  const hasOptionalDetails = Boolean(
+    draft.category?.trim()
+      || draft.paidByTravelerId
+      || draft.occurredAt
+      || draft.notes?.trim()
+      || draft.fxRate?.trim(),
   )
 
   return (
@@ -197,7 +222,7 @@ export default function ExpenseBlockEditor({
                 placeholder="EUR"
                 value={draft.currency}
                 onChange={(event) => {
-                  const currency = event.target.value.toUpperCase()
+                  const currency = event.target.value.toUpperCase().replace(/[^A-Z]/g, '')
                   patch({
                     currency,
                     fxRate: normalizedTripCurrency && currency.trim() === normalizedTripCurrency
@@ -207,76 +232,90 @@ export default function ExpenseBlockEditor({
                 }}
               />
             </label>
-            <label>
-              <span>Categoria</span>
-              <input type="text" maxLength={80} readOnly={readOnly} placeholder="Cibo, museo, trasporto…" value={draft.category ?? ''} onChange={(event) => patch({ category: event.target.value })} />
-            </label>
-            <label>
-              <span>Pagato da</span>
-              <select disabled={readOnly} value={draft.paidByTravelerId ?? ''} onChange={(event) => patch({ paidByTravelerId: event.target.value })}>
-                <option value="">Non specificato</option>
-                {payers.map((traveler) => (
-                  <option value={traveler.id} key={traveler.id}>{traveler.displayName}</option>
-                ))}
-                {draft.paidByTravelerId && !currentPayerIsActive && (
-                  <option value={draft.paidByTravelerId} disabled>
-                    {historicalPayer?.displayName ?? 'Profilo non disponibile'} — non più nel viaggio
-                  </option>
-                )}
-              </select>
-            </label>
-            <label>
-              <span>Quando</span>
-              <input type="datetime-local" min={dayMin} max={dayMax} readOnly={readOnly} value={draft.occurredAt ?? ''} onChange={(event) => patch({ occurredAt: event.target.value })} />
-            </label>
-
-            {showFx && normalizedTripCurrency && (
-              <div className="expense-fx-panel expense-wide">
-                <div className="expense-fx-heading">
-                  <div>
-                    <strong>Conversione manuale</strong>
-                    <span>Solo per confrontare questa spesa con il budget del viaggio.</span>
-                  </div>
-                  <span className="expense-fx-pair">{normalizedDraftCurrency} → {normalizedTripCurrency}</span>
-                </div>
-
-                <label className="expense-fx-rate">
-                  <span>1 {normalizedDraftCurrency} =</span>
-                  <div>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      readOnly={readOnly}
-                      placeholder="0,92"
-                      value={draft.fxRate ?? ''}
-                      onChange={(event) => patch({ fxRate: event.target.value })}
-                    />
-                    <span>{normalizedTripCurrency}</span>
-                  </div>
-                </label>
-
-                {savedFxMatches && expense?.fx && (
-                  <div className="expense-fx-saved">
-                    <span>Ultima conversione salvata</span>
-                    <strong>{formatMinorCurrency(expense.fx.convertedAmountMinor, expense.fx.targetCurrency)}</strong>
-                    <small>al tasso 1 {expense.currency} = {expense.fx.rate} {expense.fx.targetCurrency}</small>
-                  </div>
-                )}
-
-                <small className="expense-hint">
-                  Il tasso è inserito da te: Duranti non scarica, aggiorna o applica automaticamente tassi di cambio.
-                </small>
-              </div>
-            )}
-
             <label className="expense-wide">
               <span>Descrizione</span>
               <input type="text" maxLength={500} readOnly={readOnly} placeholder="Cena, biglietti museo, taxi…" value={draft.description ?? ''} onChange={(event) => patch({ description: event.target.value })} />
             </label>
-            <label className="expense-wide">
-              <span>Note</span>
-              <textarea rows={3} maxLength={2000} readOnly={readOnly} placeholder="Dettagli utili sulla spesa…" value={draft.notes ?? ''} onChange={(event) => patch({ notes: event.target.value })} />
-            </label>
+
+            <details className="expense-optional expense-wide">
+              <summary>
+                <span>
+                  <strong>Altri dettagli</strong>
+                  <small>Categoria, pagatore, ora, note e conversione valuta</small>
+                </span>
+                {hasOptionalDetails && <span className="expense-optional-state">Configurati</span>}
+              </summary>
+
+              <div className="expense-optional-grid">
+                <label>
+                  <span>Categoria</span>
+                  <input type="text" maxLength={80} readOnly={readOnly} placeholder="Cibo, museo, trasporto…" value={draft.category ?? ''} onChange={(event) => patch({ category: event.target.value })} />
+                </label>
+                <label>
+                  <span>Pagato da</span>
+                  <select disabled={readOnly} value={draft.paidByTravelerId ?? ''} onChange={(event) => patch({ paidByTravelerId: event.target.value })}>
+                    <option value="">Non specificato</option>
+                    {payers.map((traveler) => (
+                      <option value={traveler.id} key={traveler.id}>{traveler.displayName}</option>
+                    ))}
+                    {draft.paidByTravelerId && !currentPayerIsActive && (
+                      <option value={draft.paidByTravelerId} disabled>
+                        {historicalPayer?.displayName ?? 'Profilo non disponibile'} — non più nel viaggio
+                      </option>
+                    )}
+                  </select>
+                </label>
+                <label className="expense-wide">
+                  <span>Ora della spesa</span>
+                  <input type="time" readOnly={readOnly} value={occurredTime} onChange={(event) => updateOccurredTime(event.target.value)} />
+                  <small className="expense-field-hint">Data fissata alla giornata: {formatDayDate(dayDate)}.</small>
+                </label>
+
+                {showFx && normalizedTripCurrency && (
+                  <div className="expense-fx-panel expense-wide">
+                    <div className="expense-fx-heading">
+                      <div>
+                        <strong>Conversione manuale</strong>
+                        <span>Solo per confrontare questa spesa con il budget del viaggio.</span>
+                      </div>
+                      <span className="expense-fx-pair">{normalizedDraftCurrency} → {normalizedTripCurrency}</span>
+                    </div>
+
+                    <label className="expense-fx-rate">
+                      <span>1 {normalizedDraftCurrency} =</span>
+                      <div>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          readOnly={readOnly}
+                          placeholder="0,92"
+                          value={draft.fxRate ?? ''}
+                          onChange={(event) => patch({ fxRate: event.target.value })}
+                        />
+                        <span>{normalizedTripCurrency}</span>
+                      </div>
+                    </label>
+
+                    {savedFxMatches && expense?.fx && (
+                      <div className="expense-fx-saved">
+                        <span>Ultima conversione salvata</span>
+                        <strong>{formatMinorCurrency(expense.fx.convertedAmountMinor, expense.fx.targetCurrency)}</strong>
+                        <small>al tasso 1 {expense.currency} = {expense.fx.rate} {expense.fx.targetCurrency}</small>
+                      </div>
+                    )}
+
+                    <small className="expense-hint">
+                      Il tasso è inserito da te: Duranti non scarica, aggiorna o applica automaticamente tassi di cambio.
+                    </small>
+                  </div>
+                )}
+
+                <label className="expense-wide">
+                  <span>Note</span>
+                  <textarea rows={3} maxLength={2000} readOnly={readOnly} placeholder="Dettagli utili sulla spesa…" value={draft.notes ?? ''} onChange={(event) => patch({ notes: event.target.value })} />
+                </label>
+              </div>
+            </details>
           </div>
 
           {payers.length === 0 && !draft.paidByTravelerId && (
