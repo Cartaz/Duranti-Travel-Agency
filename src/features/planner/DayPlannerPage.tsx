@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Block, Day, Place, Trip } from '../../domain/entities'
 import { getTripDay } from '../days/day-service'
@@ -482,6 +482,15 @@ function PlannerPlaceBlockEditor({
     }
   }
 
+  const hasOptionalDetails = Boolean(
+    state.city.trim()
+      || state.countryCode.trim()
+      || state.category.trim()
+      || state.latitude.trim()
+      || state.longitude.trim()
+      || state.notes.trim(),
+  )
+
   return (
     <form className="planner-block planner-place-block" onSubmit={(event) => void save(event)}>
       <div className="planner-block-topline">
@@ -509,30 +518,44 @@ function PlannerPlaceBlockEditor({
               <span>Indirizzo</span>
               <input type="text" maxLength={500} readOnly={readOnly} placeholder="Viale Vaticano, Roma" value={state.formattedAddress} onChange={(event) => patch({ formattedAddress: event.target.value })} />
             </label>
-            <label>
-              <span>Città</span>
-              <input type="text" maxLength={120} readOnly={readOnly} placeholder="Roma" value={state.city} onChange={(event) => patch({ city: event.target.value })} />
-            </label>
-            <label>
-              <span>Paese</span>
-              <input type="text" maxLength={2} autoCapitalize="characters" readOnly={readOnly} placeholder="IT" value={state.countryCode} onChange={(event) => patch({ countryCode: event.target.value.toUpperCase() })} />
-            </label>
-            <label>
-              <span>Categoria</span>
-              <input type="text" maxLength={80} readOnly={readOnly} placeholder="Museo" value={state.category} onChange={(event) => patch({ category: event.target.value })} />
-            </label>
-            <label>
-              <span>Latitudine</span>
-              <input type="text" inputMode="decimal" readOnly={readOnly} placeholder="41.9065" value={state.latitude} onChange={(event) => patch({ latitude: event.target.value })} />
-            </label>
-            <label>
-              <span>Longitudine</span>
-              <input type="text" inputMode="decimal" readOnly={readOnly} placeholder="12.4536" value={state.longitude} onChange={(event) => patch({ longitude: event.target.value })} />
-            </label>
-            <label className="planner-place-wide">
-              <span>Note</span>
-              <textarea rows={4} maxLength={2000} readOnly={readOnly} placeholder="Orari, biglietti, cosa vogliamo vedere…" value={state.notes} onChange={(event) => patch({ notes: event.target.value })} />
-            </label>
+
+            <details className="planner-place-optional">
+              <summary>
+                <span>
+                  <strong>Altri dettagli</strong>
+                  <small>Città, paese, categoria, coordinate e note</small>
+                </span>
+                {hasOptionalDetails && <span className="planner-place-optional-state">Configurati</span>}
+              </summary>
+
+              <div className="planner-place-optional-grid">
+                <label>
+                  <span>Città</span>
+                  <input type="text" maxLength={120} readOnly={readOnly} placeholder="Roma" value={state.city} onChange={(event) => patch({ city: event.target.value })} />
+                </label>
+                <label>
+                  <span>Paese</span>
+                  <input type="text" maxLength={2} autoCapitalize="characters" readOnly={readOnly} placeholder="IT" value={state.countryCode} onChange={(event) => patch({ countryCode: event.target.value.toUpperCase() })} />
+                </label>
+                <label className="planner-place-wide">
+                  <span>Categoria</span>
+                  <input type="text" maxLength={80} readOnly={readOnly} placeholder="Museo" value={state.category} onChange={(event) => patch({ category: event.target.value })} />
+                </label>
+                <label>
+                  <span>Latitudine</span>
+                  <input type="text" inputMode="decimal" readOnly={readOnly} placeholder="41.9065" value={state.latitude} onChange={(event) => patch({ latitude: event.target.value })} />
+                </label>
+                <label>
+                  <span>Longitudine</span>
+                  <input type="text" inputMode="decimal" readOnly={readOnly} placeholder="12.4536" value={state.longitude} onChange={(event) => patch({ longitude: event.target.value })} />
+                </label>
+                <small className="planner-place-coordinate-hint planner-place-wide">Coordinate facoltative: inseriscile entrambe oppure lasciale vuote.</small>
+                <label className="planner-place-wide">
+                  <span>Note</span>
+                  <textarea rows={4} maxLength={2000} readOnly={readOnly} placeholder="Orari, biglietti, cosa vogliamo vedere…" value={state.notes} onChange={(event) => patch({ notes: event.target.value })} />
+                </label>
+              </div>
+            </details>
           </div>
 
           {error && <small className="planner-block-error">{error}</small>}
