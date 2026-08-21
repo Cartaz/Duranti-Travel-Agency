@@ -2,7 +2,11 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Template } from '../../domain/entities'
 import { createTripDay, getTripDay, updateTripDay, type DayDraft } from './day-service'
-import { createTripDayFromTemplate, listDayTemplates } from '../templates/day-template-service'
+import {
+  createTripDayFromTemplate,
+  isBuiltInDayTemplate,
+  listDayTemplates,
+} from '../templates/day-template-service'
 import { getTrip } from '../trips/trip-service'
 import './days.css'
 
@@ -164,6 +168,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 disabled={!contextReady || saving}
                 onClick={() => setTemplateId('')}
               >
+                <span className="day-template-option-kind">Vuota</span>
                 <strong>Pagina vuota</strong>
                 <span>Inizia senza blocchi precompilati.</span>
               </button>
@@ -176,8 +181,11 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   disabled={!contextReady || saving}
                   onClick={() => setTemplateId(template.id)}
                 >
+                  <span className="day-template-option-kind">
+                    {isBuiltInDayTemplate(template) ? 'Predefinito' : 'Personale'}
+                  </span>
                   <strong>{template.name}</strong>
-                  <span>{template.description}</span>
+                  <span>{template.description ?? 'Struttura di giornata riutilizzabile.'}</span>
                 </button>
               ))}
             </div>
