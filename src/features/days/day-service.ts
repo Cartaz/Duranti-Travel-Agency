@@ -7,6 +7,7 @@ export interface DayDraft {
   date: string
   title?: string
   summary?: string
+  journalText?: string
 }
 
 function cleanOptional(value: string | undefined): string | undefined {
@@ -38,10 +39,16 @@ function validateDraft(input: DayDraft): DayDraft {
   const summary = cleanOptional(input.summary)
   if (summary && summary.length > 2000) throw new Error('Il riepilogo della giornata è troppo lungo.')
 
+  const journalText = cleanOptional(input.journalText)
+  if (journalText && journalText.length > 20_000) {
+    throw new Error('Il diario della giornata supera il limite di 20.000 caratteri.')
+  }
+
   return {
     date: validateDate(input.date),
     title,
     summary,
+    journalText,
   }
 }
 
