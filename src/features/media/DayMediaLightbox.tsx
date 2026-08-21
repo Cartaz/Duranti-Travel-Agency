@@ -33,13 +33,21 @@ export default function DayMediaLightbox({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
-      if (items.length > 1 && event.key === 'ArrowLeft') showPrevious()
-      if (items.length > 1 && event.key === 'ArrowRight') showNext()
+      if (event.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (items.length <= 1) return
+      if (event.key === 'ArrowLeft') {
+        setIndex((current) => (current <= 0 ? items.length - 1 : current - 1))
+      }
+      if (event.key === 'ArrowRight') {
+        setIndex((current) => (current >= items.length - 1 ? 0 : current + 1))
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  })
+  }, [items.length, onClose])
 
   useEffect(() => {
     if (!media) return
