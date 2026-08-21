@@ -21,6 +21,12 @@ const mimeByExtension: Record<string, string> = {
   webm: 'video/webm',
 }
 
+function kindForMime(mimeType: string | undefined): 'image' | 'video' | undefined {
+  if (mimeType?.startsWith('image/')) return 'image'
+  if (mimeType?.startsWith('video/')) return 'video'
+  return undefined
+}
+
 function mediaDescriptor(file: File): { kind: 'image' | 'video'; mimeType: string; originalName: string } {
   if (file.size <= 0) throw new Error('Il file selezionato è vuoto.')
 
@@ -29,14 +35,17 @@ function mediaDescriptor(file: File): { kind: 'image' | 'video'; mimeType: strin
   if (originalName.length > 255) throw new Error('Il nome del file è troppo lungo.')
 
   const extension = originalName.includes('.') ? originalName.split('.').pop()!.toLowerCase() : ''
+  const extensionMime = mimeByExtension[extension]
   const declaredMime = file.type.trim().toLowerCase().split(';')[0]
-  const mimeType = declaredMime || mimeByExtension[extension]
-  const kind = mimeType?.startsWith('image/')
-    ? 'image'
-    : mimeType?.startsWith('video/')
-      ? 'video'
-      : undefined
+  const declaredKind = kindForMime(declaredMime)
+  const extensionKind = kindForMime(extensionMime)
 
+  if (declaredKind && extensionKind && declaredKind !== extensionKind) {
+    throw new Error('Il tipo del file non corrisponde alla sua estensione.')
+  }
+
+  const mimeType = declaredKind ? declaredMime : extensionMime
+  const kind = kindForMime(mimeType)
   if (!kind || !mimeType) throw new Error('Formato non supportato. Seleziona una foto o un video.')
 
   const maximum = kind === 'image' ? MAX_DAY_IMAGE_BYTES : MAX_DAY_VIDEO_BYTES
