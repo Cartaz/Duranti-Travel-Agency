@@ -96,9 +96,8 @@
   color: #a99a89;
   font-size: 13px;
   line-height: 1.45;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .day-card-actions {
@@ -160,11 +159,86 @@
 .day-form textarea {
   resize: vertical;
   min-height: 130px;
+  line-height: 1.55;
 }
 
 .day-form input:focus,
 .day-form textarea:focus {
   border-color: #9a7854;
+}
+
+.day-form label > small {
+  color: #8f8173;
+  line-height: 1.45;
+}
+
+.day-journal-details {
+  border: 1px solid #4c4033;
+  border-radius: 16px;
+  background: rgba(17, 14, 11, .42);
+  overflow: hidden;
+}
+
+.day-journal-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 15px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.day-journal-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.day-journal-details > summary > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.day-journal-details > summary strong {
+  color: #dfcdb6;
+  font-family: Georgia, serif;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.day-journal-details > summary small {
+  color: #938472;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.day-journal-state {
+  flex: 0 0 auto;
+  border: 1px solid #4f5f42;
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #b9c99e;
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.day-journal-details[open] > summary {
+  border-bottom: 1px solid #40352b;
+}
+
+.day-journal-field {
+  padding: 15px;
+}
+
+.day-journal-field textarea {
+  min-height: 240px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.day-journal-field > small {
+  justify-self: end;
 }
 
 .day-form-actions {
@@ -191,6 +265,14 @@
     grid-auto-flow: column;
     justify-content: start;
     justify-items: start;
+  }
+
+  .day-journal-details > summary {
+    align-items: flex-start;
+  }
+
+  .day-journal-field textarea {
+    min-height: 210px;
   }
 
   .day-form-actions .trip-primary-action {
