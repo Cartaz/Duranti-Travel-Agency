@@ -99,6 +99,15 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
+  const setStartDate = (value: string): void => {
+    setError('')
+    setForm((current) => ({
+      ...current,
+      startDate: value,
+      endDate: value && current.endDate && current.endDate < value ? value : current.endDate,
+    }))
+  }
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (saving) return
@@ -156,12 +165,22 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
           <label className="trip-field">
             <span>Partenza</span>
-            <input type="date" value={form.startDate} onChange={(event: ChangeEvent<HTMLInputElement>) => setField('startDate', event.target.value)} />
+            <input
+              type="date"
+              value={form.startDate}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setStartDate(event.target.value)}
+            />
           </label>
 
           <label className="trip-field">
             <span>Ritorno</span>
-            <input type="date" value={form.endDate} min={form.startDate || undefined} onChange={(event: ChangeEvent<HTMLInputElement>) => setField('endDate', event.target.value)} />
+            <input
+              type="date"
+              value={form.endDate}
+              min={form.startDate || undefined}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setField('endDate', event.target.value)}
+            />
+            {form.startDate && <small>Non può precedere la partenza. Se sposti in avanti la partenza, il ritorno viene riallineato automaticamente.</small>}
           </label>
 
           <details className="trip-form-optional">
