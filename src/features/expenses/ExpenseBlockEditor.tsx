@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Block, Expense, Traveler } from '../../domain/entities'
+import InlineConfirm from '../../ui/InlineConfirm'
 import { movePlannerBlock } from '../planner/block-service'
 import {
   deletePlannerExpenseBlock,
@@ -54,6 +55,7 @@ export default function ExpenseBlockEditor({
   const [historicalPayer, setHistoricalPayer] = useState<Traveler>()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [removeConfirm, setRemoveConfirm] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -125,11 +127,12 @@ export default function ExpenseBlockEditor({
   }
 
   const remove = async (): Promise<void> => {
-    if (readOnly || saving || !window.confirm('Eliminare questo blocco e la relativa spesa?')) return
+    if (readOnly || saving) return
     setSaving(true)
     setError('')
     try {
       await deletePlannerExpenseBlock(tripId, dayId, block.id)
+      setRemoveConfirm(false)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile eliminare la spesa.')
@@ -183,7 +186,7 @@ export default function ExpenseBlockEditor({
           <div className="planner-block-tools">
             <button type="button" disabled={saving || !canMoveUp} aria-label="Sposta blocco su" title="Sposta su" onClick={() => void move('up')}>↑</button>
             <button type="button" disabled={saving || !canMoveDown} aria-label="Sposta blocco giù" title="Sposta giù" onClick={() => void move('down')}>↓</button>
-            <button className="planner-delete" type="button" disabled={saving} onClick={() => void remove()}>Elimina</button>
+            <button className="planner-delete" type="button" disabled={saving} onClick={() => setRemoveConfirm(true)}>Elimina</button>
           </div>
         )}
       </div>
@@ -319,9 +322,21 @@ export default function ExpenseBlockEditor({
           </div>
 
           {payers.length === 0 && !draft.paidByTravelerId && (
-            <small className="expense-hint">Associa almeno un viaggiatore al capitolo per usare “Pagato da”.</small>
+            <small className="expense-hint">Associa almeno un viaggiatore al viaggio per usare “Pagato da”.</small>
           )}
           {error && <small className="planner-block-error">{error}</small>}
+          {removeConfirm && (
+            <InlineConfirm
+              title="Eliminare questa spesa?"
+              message={expense
+                ? `Verranno rimossi il blocco e la spesa salvata (${formatMinorCurrency(expense.amountMinor, expense.currency)}).`
+                : 'Verrà rimosso questo blocco spesa dalla giornata.'}
+              confirmLabel="Elimina spesa"
+              busy={saving}
+              onCancel={() => setRemoveConfirm(false)}
+              onConfirm={() => void remove()}
+            />
+          )}
 
           {!readOnly && (
             <div className="expense-actions">
