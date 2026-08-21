@@ -21,6 +21,10 @@ An editable day can be saved as a personal reusable template from the day page. 
 
 The save form asks for a name and optional description. A day must contain at least one supported planner block, and active day-template names are unique case-insensitively.
 
+Personal templates can be managed from the new-day picker. The management panel supports inline rename and confirmed deletion. Built-in template IDs are rejected by the management service even if an invalid caller bypasses the UI, so presets remain immutable.
+
+Deletion uses the repository tombstone instead of purging the template record. This removes the template from future choices while leaving historical `Day.templateId` references untouched on days that were already created from it. If a deleted template was selected in the current creation form, the picker automatically falls back to `Pagina vuota`.
+
 ## Safety rules
 
 A template stores only reusable planner structure. It does not fabricate or copy trip-specific records.
@@ -47,4 +51,4 @@ If block creation fails, blocks created by that operation are soft-deleted and p
 
 ## Schema compatibility
 
-Personal template metadata uses fields already present on `Template` and `Day`. No IndexedDB index changes are required, so the existing database version remains compatible.
+Personal template metadata and management use fields already present on `Template` and `Day`. No IndexedDB index changes are required, so the existing database version remains compatible.
