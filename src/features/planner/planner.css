@@ -44,6 +44,42 @@
   color: #c8b69e;
 }
 
+.planner-journal {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 20px;
+  padding: 20px;
+  border: 1px solid #554633;
+  border-radius: 22px;
+  background: rgba(31, 24, 17, .72);
+}
+
+.planner-journal-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.planner-journal-heading h2 {
+  margin: 4px 0 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(24px, 5vw, 32px);
+  font-weight: 500;
+  color: #ead8bf;
+}
+
+.planner-journal-text {
+  max-width: 760px;
+  margin: 0;
+  color: #d2c0a8;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 17px;
+  line-height: 1.78;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .planner-toolbar {
   display: flex;
   align-items: center;
@@ -385,7 +421,8 @@
 
 @media (max-width: 700px) {
   .planner-heading,
-  .planner-toolbar {
+  .planner-toolbar,
+  .planner-journal-heading {
     flex-direction: column;
   }
 
