@@ -23,6 +23,27 @@ function controlLabel(control: ValidatableControl): string {
   return control.name || 'questo campo'
 }
 
+function formatDateConstraint(value: string): string {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return value
+  return new Intl.DateTimeFormat('it-IT', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day))
+}
+
+function constraintValue(control: ValidatableControl, value: string): string {
+  if (!(control instanceof HTMLInputElement)) return value
+  if (control.type === 'date') return formatDateConstraint(value)
+  if (control.type === 'time') return value
+  if (control.type === 'datetime-local') {
+    const [date, time] = value.split('T')
+    return time ? `${formatDateConstraint(date)}, ${time}` : formatDateConstraint(date)
+  }
+  return value
+}
+
 function readableValidationMessage(control: ValidatableControl): string {
   const label = controlLabel(control)
   const { validity } = control
@@ -32,8 +53,18 @@ function readableValidationMessage(control: ValidatableControl): string {
   if (validity.patternMismatch) return `Controlla “${label}”: il valore non rispetta il formato richiesto.`
   if (validity.tooShort) return `“${label}” è troppo corto.`
   if (validity.tooLong) return `“${label}” è troppo lungo.`
-  if (validity.rangeUnderflow) return `“${label}” è inferiore al valore minimo consentito.`
-  if (validity.rangeOverflow) return `“${label}” supera il valore massimo consentito.`
+  if (validity.rangeUnderflow) {
+    const minimum = control instanceof HTMLInputElement ? control.min : ''
+    return minimum
+      ? `“${label}” non può essere prima di ${constraintValue(control, minimum)}.`
+      : `“${label}” è inferiore al valore minimo consentito.`
+  }
+  if (validity.rangeOverflow) {
+    const maximum = control instanceof HTMLInputElement ? control.max : ''
+    return maximum
+      ? `“${label}” non può essere oltre ${constraintValue(control, maximum)}.`
+      : `“${label}” supera il valore massimo consentito.`
+  }
   if (validity.stepMismatch) return `Controlla “${label}”: il valore non è ammesso.`
   if (validity.badInput) return `Controlla “${label}”: il valore inserito non può essere letto.`
 
