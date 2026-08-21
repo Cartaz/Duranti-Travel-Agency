@@ -68,7 +68,12 @@ export class MediaRepository {
   async listForDay(tripId: string, dayId: string): Promise<Media[]> {
     const media = await db.media.where('dayId').equals(dayId).toArray()
     return media
-      .filter((item) => !item.deletedAt && item.tripId === tripId && (item.kind === 'image' || item.kind === 'video'))
+      .filter((item) => (
+        !item.deletedAt
+        && item.tripId === tripId
+        && !item.blockId
+        && (item.kind === 'image' || item.kind === 'video')
+      ))
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))
   }
 
