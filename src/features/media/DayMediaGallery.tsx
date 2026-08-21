@@ -58,8 +58,9 @@ export default function DayMediaGallery({
       }
       await refresh()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Impossibile aggiungere il file alla giornata.')
+      const message = cause instanceof Error ? cause.message : 'Impossibile aggiungere il file alla giornata.'
       await refresh()
+      setError(message)
     } finally {
       setImporting(false)
     }
