@@ -15,6 +15,7 @@ export interface CreateMediaInput {
   kind: Media['kind']
   mimeType?: string
   originalName?: string
+  caption?: string
   width?: number
   height?: number
   durationMs?: number
@@ -64,6 +65,13 @@ export class MediaRepository {
     return media
   }
 
+  async listForDay(tripId: string, dayId: string): Promise<Media[]> {
+    const media = await db.media.where('dayId').equals(dayId).toArray()
+    return media
+      .filter((item) => !item.deletedAt && item.tripId === tripId && (item.kind === 'image' || item.kind === 'video'))
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))
+  }
+
   async getFile(id: string): Promise<File> {
     const media = await this.get(id)
     if (!media) throw new Error(`Active media ${id} was not found.`)
@@ -73,6 +81,16 @@ export class MediaRepository {
       media.originalName || stored.name,
       { type: media.mimeType, lastModified: stored.lastModified },
     )
+  }
+
+  async updateCaption(id: string, caption: string | undefined): Promise<Media> {
+    const media = await this.get(id)
+    if (!media) throw new Error(`Active media ${id} was not found.`)
+    const cleaned = caption?.trim() || undefined
+    const updatedAt = new Date().toISOString()
+    const updated = await db.media.update(id, { caption: cleaned, updatedAt })
+    if (updated !== 1) throw new Error(`Media ${id} caption could not be updated.`)
+    return { ...media, caption: cleaned, updatedAt }
   }
 
   async softDelete(id: string): Promise<SoftDeleteMediaResult> {
