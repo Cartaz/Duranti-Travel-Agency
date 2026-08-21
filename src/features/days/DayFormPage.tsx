@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import type { Template } from '../../domain/entities'
 import { createTripDay, getTripDay, updateTripDay, type DayDraft } from './day-service'
+import { createTripDayFromTemplate, listDayTemplates } from '../templates/day-template-service'
 import { getTrip } from '../trips/trip-service'
 import './days.css'
 
@@ -33,6 +35,8 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const [tripTitle, setTripTitle] = useState('')
   const [tripRange, setTripRange] = useState<{ startDate?: string; endDate?: string }>({})
   const [draft, setDraft] = useState<DayDraft>({ date: '', title: '', summary: '', journalText: '' })
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [templateId, setTemplateId] = useState('')
   const [loading, setLoading] = useState(true)
   const [contextReady, setContextReady] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -46,12 +50,16 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
 
     let cancelled = false
-    void getTrip(tripId)
-      .then(async (trip) => {
+    void Promise.all([
+      getTrip(tripId),
+      mode === 'create' ? listDayTemplates() : Promise.resolve([]),
+    ])
+      .then(async ([trip, availableTemplates]) => {
         if (!trip || trip.status === 'archived') throw new Error('Viaggio non disponibile per la modifica.')
         if (cancelled) return
         setTripTitle(trip.title)
         setTripRange({ startDate: trip.startDate, endDate: trip.endDate })
+        setTemplates(availableTemplates)
 
         if (mode === 'edit') {
           if (!dayId) throw new Error('Identificatore della giornata mancante.')
@@ -90,12 +98,15 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
     setError('')
     try {
       if (mode === 'create') {
-        await createTripDay(tripId, draft)
+        const createdDay = templateId
+          ? await createTripDayFromTemplate(tripId, draft, templateId)
+          : await createTripDay(tripId, draft)
+        navigate(templateId ? `/trips/${tripId}/days/${createdDay.id}` : `/trips/${tripId}`, { replace: true })
       } else {
         if (!dayId) throw new Error('Identificatore della giornata mancante.')
         await updateTripDay(tripId, dayId, draft)
+        navigate(`/trips/${tripId}`, { replace: true })
       }
-      navigate(`/trips/${tripId}`, { replace: true })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile salvare la giornata.')
       setSaving(false)
@@ -135,6 +146,44 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
           />
           {dateHint && <small>{dateHint}</small>}
         </label>
+
+        {mode === 'create' && (
+          <section className="day-template-picker" aria-labelledby="day-template-title">
+            <div className="day-template-heading">
+              <div>
+                <span className="eyebrow">Struttura iniziale</span>
+                <strong id="day-template-title">Come vuoi iniziare?</strong>
+              </div>
+              <small>Puoi modificare, spostare o eliminare tutti i blocchi dopo la creazione.</small>
+            </div>
+            <div className="day-template-grid">
+              <button
+                className={`day-template-option${!templateId ? ' day-template-option-selected' : ''}`}
+                type="button"
+                aria-pressed={!templateId}
+                disabled={!contextReady || saving}
+                onClick={() => setTemplateId('')}
+              >
+                <strong>Pagina vuota</strong>
+                <span>Inizia senza blocchi precompilati.</span>
+              </button>
+              {templates.map((template) => (
+                <button
+                  className={`day-template-option${templateId === template.id ? ' day-template-option-selected' : ''}`}
+                  type="button"
+                  key={template.id}
+                  aria-pressed={templateId === template.id}
+                  disabled={!contextReady || saving}
+                  onClick={() => setTemplateId(template.id)}
+                >
+                  <strong>{template.name}</strong>
+                  <span>{template.description}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         <label>
           <span>Titolo della giornata</span>
           <input maxLength={120} disabled={!contextReady} placeholder="Musei e passeggiata in centro" value={draft.title ?? ''} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
@@ -169,7 +218,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
         <div className="day-form-actions">
           <button className="trip-primary-action" type="submit" disabled={saving || !contextReady}>
-            {saving ? 'Salvataggio…' : mode === 'create' ? 'Crea giornata' : 'Salva giornata'}
+            {saving ? 'Salvataggio…' : mode === 'create' ? (templateId ? 'Crea e apri giornata' : 'Crea giornata') : 'Salva giornata'}
           </button>
         </div>
       </form>
