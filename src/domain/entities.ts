@@ -168,6 +168,7 @@ export interface Media extends EntityBase {
   kind: 'image' | 'video' | 'audio' | 'document'
   mimeType: string
   originalName?: string
+  caption?: string
   sizeBytes: number
   width?: number
   height?: number
