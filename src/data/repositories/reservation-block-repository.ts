@@ -1,5 +1,5 @@
 import type { Block, Itinerary, Media, Reservation } from '../../domain/entities'
-import { itineraryStatusForReservation, itineraryTypeForReservation } from '../../domain/reservation-itinerary-mapping'
+import { itineraryStatusForReservation, itineraryTypeForReservation, reservationTypeForBlockType } from '../../domain/reservation-itinerary-mapping'
 import { db } from '../db/dtagency-db'
 
 function readReservationId(block: Block): string | undefined {
@@ -7,14 +7,6 @@ function readReservationId(block: Block): string | undefined {
   if (value === undefined) return undefined
   if (typeof value !== 'string' || !value) throw new Error('Il riferimento alla prenotazione non è valido.')
   return value
-}
-
-function expectedReservationType(block: Block): Reservation['type'] | undefined {
-  if (block.type === 'transport') return 'transport'
-  if (block.type === 'accommodation') return 'accommodation'
-  if (block.type === 'restaurant') return 'restaurant'
-  if (block.type === 'activity') return 'activity'
-  return undefined
 }
 
 function assertReservationContext(
@@ -124,7 +116,7 @@ export class ReservationBlockRepository {
         throw new Error('Il blocco non appartiene a questa giornata.')
       }
 
-      const expectedType = expectedReservationType(block)
+      const expectedType = reservationTypeForBlockType(block.type)
       if (!expectedType || reservation.type !== expectedType) {
         throw new Error('Il tipo della prenotazione non corrisponde al blocco.')
       }
@@ -179,7 +171,7 @@ export class ReservationBlockRepository {
         throw new Error('Il blocco prenotazione non appartiene a questa giornata.')
       }
 
-      const expectedType = expectedReservationType(block)
+      const expectedType = reservationTypeForBlockType(block.type)
       if (!expectedType || readReservationId(block) !== reservationId) {
         throw new Error('La prenotazione non è collegata a questo blocco.')
       }
@@ -222,7 +214,7 @@ export class ReservationBlockRepository {
         throw new Error('Il blocco prenotazione non appartiene a questa giornata.')
       }
 
-      const expectedType = expectedReservationType(block)
+      const expectedType = reservationTypeForBlockType(block.type)
       if (!expectedType) throw new Error('Il blocco non è una prenotazione supportata.')
 
       const now = new Date().toISOString()
