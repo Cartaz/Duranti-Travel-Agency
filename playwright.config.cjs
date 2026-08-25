@@ -1,7 +1,5 @@
 const { defineConfig } = require('@playwright/test')
 
-const baseURL = 'http://127.0.0.1:5173/'
-
 module.exports = defineConfig({
   testDir: './tests/browser',
   testMatch: '**/*.spec.cjs',
@@ -10,14 +8,8 @@ module.exports = defineConfig({
   fullyParallel: false,
   workers: 1,
   use: {
-    baseURL,
+    baseURL: 'http://127.0.0.1:5173/',
     browserName: 'chromium',
     headless: true,
-  },
-  webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
-    url: baseURL,
-    reuseExistingServer: false,
-    timeout: 120_000,
   },
 })
