@@ -102,20 +102,21 @@ export function createDayMediaApplication(deps: DayMediaApplicationDependencies)
 
   async function listDayMediaContext(tripId: string, dayId: string): Promise<DayMediaContextOptions> {
     await assertDayContext(tripId, dayId, false)
-    const [blocks, places, itineraryItems] = await Promise.all([
-      deps.blocks.list().then((items) => items.filter((item) => item.tripId === tripId && item.dayId === dayId && item.type === 'place')),
-      deps.places.list(),
+    const [blocks, itineraryItems] = await Promise.all([
+      deps.blocks.listByDay(dayId),
       deps.itinerary.listDayItems(tripId, dayId),
     ])
-    const placeById = new Map<string, Place>(places.map((place) => [place.id, place]))
     const dayPlaceIds = new Set<string>()
     for (const block of blocks) {
+      if (block.tripId !== tripId || block.dayId !== dayId || block.type !== 'place') continue
       const placeId = placeIdFromBlockContent(block.content)
       if (placeId) dayPlaceIds.add(placeId)
     }
     for (const item of itineraryItems) {
       if (item.itinerary.placeId) dayPlaceIds.add(item.itinerary.placeId)
     }
+    const places = await deps.places.getMany([...dayPlaceIds])
+    const placeById = new Map<string, Place>(places.map((place) => [place.id, place]))
     const placeOptions = [...dayPlaceIds]
       .map((id) => placeById.get(id))
       .filter((place): place is Place => Boolean(place))

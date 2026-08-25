@@ -24,6 +24,16 @@ export class Repository<T extends EntityBase> {
     return entity
   }
 
+  async getMany(
+    ids: EntityId[],
+    options: RepositoryReadOptions = {},
+  ): Promise<T[]> {
+    const entities = await this.table.bulkGet(ids)
+    return entities.filter((entity): entity is T => Boolean(
+      entity && (options.includeDeleted || !entity.deletedAt),
+    ))
+  }
+
   async list(options: RepositoryReadOptions = {}): Promise<T[]> {
     const entities = await this.table.toArray()
     if (options.includeDeleted) return entities

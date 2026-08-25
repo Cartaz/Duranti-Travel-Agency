@@ -5,6 +5,7 @@ export type TravelerRole = 'owner' | 'companion' | 'child' | 'other'
 export interface TravelerRepositoryPort {
   list(): Promise<Traveler[]>
   get(id: string): Promise<Traveler | undefined>
+  getMany(ids: string[]): Promise<Traveler[]>
   put(value: Traveler): Promise<unknown>
 }
 

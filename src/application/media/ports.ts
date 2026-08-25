@@ -33,11 +33,11 @@ export interface DayMediaRepositoryPort {
 }
 
 export interface DayMediaBlockPort {
-  list(): Promise<Block[]>
+  listByDay(dayId: string): Promise<Block[]>
 }
 
 export interface DayMediaPlacePort {
-  list(): Promise<Place[]>
+  getMany(ids: string[]): Promise<Place[]>
   get(id: string): Promise<Place | undefined>
 }
 

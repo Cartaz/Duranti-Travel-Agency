@@ -95,12 +95,13 @@ export function createTravelerApplication(deps: TravelerApplicationDependencies)
     const trip = await deps.trips.get(tripId)
     if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
     const memberships = await deps.memberships.listActiveForTrip(tripId)
-    const participants: TripParticipant[] = []
-    for (const membership of memberships) {
-      const traveler = await deps.travelers.get(membership.travelerId)
+    const travelers = await deps.travelers.getMany(memberships.map((membership) => membership.travelerId))
+    const travelerById = new Map(travelers.map((traveler) => [traveler.id, traveler]))
+    const participants = memberships.map((membership) => {
+      const traveler = travelerById.get(membership.travelerId)
       if (!traveler) throw new Error('Il viaggio contiene un partecipante collegato a un profilo mancante o eliminato.')
-      participants.push({ membership, traveler })
-    }
+      return { membership, traveler }
+    })
     return participants.sort((left, right) => left.traveler.displayName.localeCompare(right.traveler.displayName, 'it'))
   }
   async function attachTravelerToTrip(tripId: string, travelerId: string, role: TravelerRole): Promise<TripTraveler> {
