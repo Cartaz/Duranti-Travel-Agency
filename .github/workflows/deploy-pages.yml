@@ -40,6 +40,14 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check checkpoint source invariants
+        if: github.ref == 'refs/heads/chatgpt/checkpoint-tests' || github.head_ref == 'chatgpt/checkpoint-tests'
+        run: node tests/checkpoint/static-checks.mjs
+
+      - name: Run checkpoint browser regression
+        if: github.ref == 'refs/heads/chatgpt/checkpoint-tests' || github.head_ref == 'chatgpt/checkpoint-tests'
+        run: timeout 6m node tests/checkpoint/browser-checkpoint-v2.mjs
+
       - name: Configure Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/configure-pages@v5

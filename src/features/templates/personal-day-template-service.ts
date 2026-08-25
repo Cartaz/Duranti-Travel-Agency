@@ -22,7 +22,7 @@ async function getPersonalTemplate(templateId: string): Promise<Template> {
     throw new Error('Il modello personale non è più disponibile.')
   }
   if (isBuiltInDayTemplate(template)) {
-    throw new Error('I modelli predefiniti non possono essere modificati o eliminati.')
+    throw new Error('Un modello predefinito non può essere modificato o eliminato.')
   }
   return template
 }

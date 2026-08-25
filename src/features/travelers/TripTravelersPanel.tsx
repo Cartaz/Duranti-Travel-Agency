@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import type { Traveler } from '../../domain/entities'
+import InlineConfirm from '../../ui/InlineConfirm'
+import { Link } from 'react-router-dom'
 import {
   attachTravelerToTrip,
   detachTravelerFromTrip,
@@ -25,6 +26,7 @@ export default function TripTravelersPanel({ tripId }: { tripId: string }) {
   const [selectedRole, setSelectedRole] = useState<TravelerRole>('companion')
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState('')
+  const [confirmDetachId, setConfirmDetachId] = useState('')
   const [error, setError] = useState('')
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -94,11 +96,12 @@ export default function TripTravelersPanel({ tripId }: { tripId: string }) {
   }
 
   const detach = async (participant: TripParticipant): Promise<void> => {
-    if (busyId || !window.confirm(`Rimuovere ${participant.traveler.displayName} da questo viaggio? Il profilo resterà nella rubrica.`)) return
+    if (busyId) return
     setBusyId(participant.traveler.id)
     setError('')
     try {
       await detachTravelerFromTrip(tripId, participant.traveler.id)
+      setConfirmDetachId('')
       await refresh()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile rimuovere il partecipante.')
@@ -145,7 +148,17 @@ export default function TripTravelersPanel({ tripId }: { tripId: string }) {
                 <option value={role} key={role}>{roleLabels[role]}</option>
               ))}
             </select>
-            <button type="button" disabled={Boolean(busyId)} onClick={() => void detach(participant)}>Rimuovi</button>
+            <button type="button" disabled={Boolean(busyId)} onClick={() => setConfirmDetachId(participant.traveler.id)}>Rimuovi</button>
+            {confirmDetachId === participant.traveler.id && (
+              <InlineConfirm
+                title="Rimuovere viaggiatore dal viaggio?"
+                message={`Rimuovere ${participant.traveler.displayName} da questo viaggio? Il profilo resterà nella rubrica.`}
+                confirmLabel="Rimuovi dal viaggio"
+                busy={busyId === participant.traveler.id}
+                onCancel={() => setConfirmDetachId('')}
+                onConfirm={() => void detach(participant)}
+              />
+            )}
           </div>
         ))}
       </div>
