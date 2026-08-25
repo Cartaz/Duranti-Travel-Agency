@@ -18,17 +18,19 @@ const forbiddenBridgeFiles = new Set([
   'src/features/days/day-service.ts',
   'src/features/planner/block-service.ts',
   'src/features/reservations/reservation-service.ts',
+  'src/features/media/day-media-service.ts',
 ])
 const forbiddenBridgeImportTokens = [
-  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service',
-  '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service',
-  './block-service', './reservation-service',
+  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service',
+  '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service', '../media/day-media-service',
+  './block-service', './reservation-service', './day-media-service',
 ]
 const applicationBackedFeatureRoots = [
   'src/features/trips/',
   'src/features/days/',
   'src/features/planner/',
   'src/features/reservations/',
+  'src/features/media/',
 ]
 const plannerPagePaths = new Set([
   'src/features/planner/DayPlannerPage.tsx',
