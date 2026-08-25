@@ -13,6 +13,7 @@ const legacyVaultExtension = '.' + legacyToken
 const legacyVaultMagic = 'DUR' + 'VLT'
 const legacyDocumentMagic = 'DUR' + 'DOC'
 const maximumSchemaVersionBeforeVaultMigration = 1
+const tripReadBridgePath = 'src/features/trips/trip-service.ts'
 
 const violations = []
 
@@ -29,6 +30,30 @@ function hasPersistentLegacyIdentifier(content) {
   return patterns.some((pattern) => content.toLowerCase().includes(pattern.toLowerCase()))
 }
 
+function enforceTripReadBridge(path, content) {
+  if (path !== tripReadBridgePath) return false
+
+  if (!content.includes("export const getTrip = tripApplication.getTrip")) {
+    violations.push(`${path}: transitional read bridge must expose only getTrip`)
+  }
+
+  const forbiddenMutationTokens = [
+    'createTrip',
+    'updateTrip',
+    'archiveTrip',
+    'restoreArchivedTrip',
+    'listBookTrips',
+    'listArchivedTrips',
+  ]
+  for (const token of forbiddenMutationTokens) {
+    if (content.includes(token)) {
+      violations.push(`${path}: transitional read bridge must not expose ${token}`)
+    }
+  }
+
+  return true
+}
+
 function enforceDependencyDirection(path, content) {
   const normalized = path.replaceAll('\\', '/')
   const importsDataLayer = /from\s+['"][^'"]*\/data(?:\/|['"])/.test(content)
@@ -38,8 +63,13 @@ function enforceDependencyDirection(path, content) {
     violations.push(`${path}: application layer must depend on ports/domain, never data or composition`)
   }
 
-  if (normalized.startsWith('src/features/trips/') && (importsDataLayer || importsComposition)) {
-    violations.push(`${path}: trips feature must depend on application/UI boundaries, never data or composition directly`)
+  if (normalized.startsWith('src/features/trips/')) {
+    if (importsDataLayer) {
+      violations.push(`${path}: trips feature must never import data adapters directly`)
+    }
+    if (importsComposition && !enforceTripReadBridge(normalized, content)) {
+      violations.push(`${path}: trips feature must depend on application/UI boundaries, never composition directly`)
+    }
   }
 }
 
