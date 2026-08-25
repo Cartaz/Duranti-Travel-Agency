@@ -15,6 +15,16 @@ export class ItineraryRepository extends Repository<Itinerary> {
     super(db.itineraries)
   }
 
+  async listByDay(dayId: string): Promise<Itinerary[]> {
+    return (await db.itineraries.where('dayId').equals(dayId).toArray())
+      .filter((item) => !item.deletedAt)
+  }
+
+  async listByTrip(tripId: string): Promise<Itinerary[]> {
+    return (await db.itineraries.where('tripId').equals(tripId).toArray())
+      .filter((item) => !item.deletedAt)
+  }
+
   async moveManualUntimed(
     tripId: string,
     dayId: string,
