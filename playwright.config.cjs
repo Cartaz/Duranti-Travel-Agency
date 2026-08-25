@@ -1,6 +1,6 @@
 const { defineConfig } = require('@playwright/test')
 
-const baseURL = 'http://127.0.0.1:5173/Duranti-Travel-Agency/'
+const baseURL = 'http://127.0.0.1:5173/'
 
 module.exports = defineConfig({
   testDir: './tests/browser',
