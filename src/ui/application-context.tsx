@@ -3,6 +3,7 @@ import type { PropsWithChildren } from 'react'
 import type { DayApplication } from '../application/days/day-application'
 import type { ExpenseApplication } from '../application/expenses/expense-application'
 import type { ExpenseSummaryApplication } from '../application/expenses/expense-summary'
+import type { ItineraryApplication } from '../application/itinerary/itinerary-application'
 import type { DayMediaApplication } from '../application/media/day-media-application'
 import type { PlaceApplication } from '../application/places/place-application'
 import type { PlannerApplication } from '../application/planner/planner-application'
@@ -21,6 +22,7 @@ export interface ApplicationServices {
   expenses: ExpenseApplication & ExpenseSummaryApplication
   travelers: TravelerApplication
   places: PlaceApplication
+  itinerary: ItineraryApplication
 }
 
 const ApplicationContext = createContext<ApplicationServices | null>(null)
