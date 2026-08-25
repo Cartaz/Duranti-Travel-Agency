@@ -20,6 +20,7 @@ const plannerBlockTypes = new Set<BlockType>([
   'text', 'heading', 'checklist', 'divider', 'place', 'transport', 'accommodation', 'restaurant', 'activity', 'expense',
 ])
 const basicPlannerBlockTypes = new Set<BlockType>(['text', 'heading', 'checklist', 'divider'])
+const transactionalDeleteBlockTypes = new Set<BlockType>(['transport', 'accommodation', 'restaurant', 'activity', 'expense'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -160,6 +161,9 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
     await assertPlannerDayContext(tripId, dayId, true)
     const block = await deps.blocks.get(blockId)
     if (!block || block.tripId !== tripId || block.dayId !== dayId) throw new Error('Il blocco non appartiene a questa giornata.')
+    if (transactionalDeleteBlockTypes.has(block.type)) {
+      throw new Error('Questo blocco deve essere eliminato dal suo editor dedicato per rimuovere in sicurezza i dati collegati.')
+    }
     const result = await deps.blocks.softDelete(blockId)
     if (result === 'not-found') throw new Error('Il blocco non esiste più.')
   }
