@@ -1,4 +1,5 @@
 import type { Block, Day, Itinerary, Place, Reservation } from '../../domain/entities'
+import { itineraryStatusForReservation, itineraryTypeForReservation } from '../../domain/reservation-itinerary-mapping'
 import { assertTripDayContext, requireTrip, requireTripDay } from '../shared/trip-day-context'
 import type { ItineraryApplicationDependencies } from './ports'
 
@@ -64,12 +65,6 @@ function reservationIdFromBlock(block: Block | undefined): string | undefined {
   if (value === undefined) return undefined
   if (typeof value !== 'string' || !value) throw new Error('Il planner contiene un riferimento prenotazione non valido.')
   return value
-}
-function itineraryTypeForReservation(type: Reservation['type']): Itinerary['type'] {
-  switch (type) { case 'transport': return 'transport'; case 'restaurant': return 'meal'; case 'activity': return 'activity'; case 'accommodation': return 'reservation'; default: return 'reservation' }
-}
-function itineraryStatusForReservation(status: Reservation['status']): Itinerary['status'] {
-  switch (status) { case 'booked': return 'booked'; case 'completed': return 'done'; case 'cancelled': return 'cancelled'; default: return 'planned' }
 }
 function legacyItineraryFromReservation(reservation: Reservation, block: Block): Itinerary {
   return { id: `legacy-reservation:${reservation.id}`, tripId: reservation.tripId, dayId: reservation.dayId, placeId: reservation.placeId, blockId: block.id, reservationId: reservation.id, type: itineraryTypeForReservation(reservation.type), startsAt: reservation.startsAt, endsAt: reservation.endsAt, timezone: reservation.timezone, title: reservation.title, notes: reservation.notes, status: itineraryStatusForReservation(reservation.status), bookingReference: reservation.confirmationCode, position: block.position, createdAt: reservation.createdAt, updatedAt: reservation.updatedAt }
