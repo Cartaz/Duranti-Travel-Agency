@@ -45,7 +45,7 @@ export default function StorageLabPage() {
   const [opfs, setOpfs] = useState<OpfsDiagnostics>(initialOpfs)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
-  const [password, setPassword] = useState('duranti-test')
+  const [password, setPassword] = useState('dtagency-test')
 
   const refresh = useCallback(async (delay = 0) => {
     if (delay) await new Promise((resolve) => setTimeout(resolve, delay))
@@ -88,7 +88,7 @@ export default function StorageLabPage() {
     await addRecord({
       id: crypto.randomUUID(),
       createdAt: now,
-      label: 'Duranti persistence test',
+      label: 'DTAgency persistence test',
       payload: JSON.stringify({
         createdAt: now,
         random: crypto.randomUUID(),
@@ -118,7 +118,7 @@ export default function StorageLabPage() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `DurantiStorageLab-${new Date().toISOString().replaceAll(':', '-')}.duranti-test`
+    anchor.download = `DTAgency-StorageLab-${new Date().toISOString().replaceAll(':', '-')}.dtagency-test`
     anchor.click()
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
     setMessage('Vault generated. Save the downloaded file in Files.')
@@ -226,7 +226,7 @@ export default function StorageLabPage() {
         <div className="section-heading">
           <div>
             <span className="label">2 — Recovery PoC</span>
-            <h2>Duranti Vault test</h2>
+            <h2>DTAgency Vault test</h2>
           </div>
           <span className="badge secure">AES-256-GCM</span>
         </div>
