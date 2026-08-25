@@ -9,7 +9,7 @@ export interface ExpenseSummaryDependencies {
   trips: { get(id: string): Promise<Trip | undefined> }
   days: { listByTrip(tripId: string): Promise<Day[]> }
   expenses: { listByTrip(tripId: string): Promise<Expense[]> }
-  travelers: { get(id: string): Promise<Traveler | undefined> }
+  travelers: { getMany(ids: string[]): Promise<Traveler[]> }
 }
 
 interface MutableSlice { label: string; totalMinor: number; count: number }
@@ -67,8 +67,8 @@ export function createExpenseSummaryApplication(deps: ExpenseSummaryDependencies
     if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
     const payerIds = Array.from(new Set(expenses.map((expense) => expense.paidByTravelerId).filter((id): id is string => Boolean(id))))
     const dayById = new Map(tripDays.map((day) => [day.id, day]))
-    const payerNames = new Map<string, string>()
-    await Promise.all(payerIds.map(async (id) => { const traveler = await deps.travelers.get(id); payerNames.set(id, traveler?.displayName ?? 'Profilo non disponibile') }))
+    const payerProfiles = await deps.travelers.getMany(payerIds)
+    const payerNames = new Map(payerProfiles.map((traveler) => [traveler.id, traveler.displayName]))
     const grouped = new Map<string, MutableCurrencySummary>()
     for (const expense of expenses) {
       if (!Number.isSafeInteger(expense.amountMinor) || expense.amountMinor < 0) throw new Error('Il riepilogo contiene una spesa con importo non valido.')
