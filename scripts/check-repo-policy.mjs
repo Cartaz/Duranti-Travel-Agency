@@ -29,6 +29,20 @@ function hasPersistentLegacyIdentifier(content) {
   return patterns.some((pattern) => content.toLowerCase().includes(pattern.toLowerCase()))
 }
 
+function enforceDependencyDirection(path, content) {
+  const normalized = path.replaceAll('\\', '/')
+  const importsDataLayer = /from\s+['"][^'"]*\/data(?:\/|['"])/.test(content)
+  const importsComposition = /from\s+['"][^'"]*\/composition(?:\/|['"])/.test(content)
+
+  if (normalized.startsWith('src/application/') && (importsDataLayer || importsComposition)) {
+    violations.push(`${path}: application layer must depend on ports/domain, never data or composition`)
+  }
+
+  if (normalized.startsWith('src/features/trips/') && importsDataLayer) {
+    violations.push(`${path}: trips feature must use the application boundary, not data adapters directly`)
+  }
+}
+
 async function scan(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
   for (const entry of entries) {
@@ -57,6 +71,8 @@ async function scan(directory) {
     if (content.includes(legacyProductName)) {
       violations.push(`${path}: predecessor product name is forbidden; use DTAgency`)
     }
+
+    enforceDependencyDirection(path, content)
   }
 }
 
