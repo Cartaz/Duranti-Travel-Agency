@@ -1,13 +1,25 @@
 import type { Block, Day, Itinerary, Place, Reservation, Trip } from '../../domain/entities'
 
 export interface ItineraryTripPort { get(id: string): Promise<Trip | undefined> }
-export interface ItineraryDayPort { get(id: string): Promise<Day | undefined>; list(): Promise<Day[]> }
-export interface ItineraryBlockPort { get(id: string): Promise<Block | undefined>; list(): Promise<Block[]> }
+export interface ItineraryDayPort {
+  get(id: string): Promise<Day | undefined>
+  listByTrip(tripId: string): Promise<Day[]>
+}
+export interface ItineraryBlockPort {
+  get(id: string): Promise<Block | undefined>
+  listByDay(dayId: string): Promise<Block[]>
+  listByTrip(tripId: string): Promise<Block[]>
+}
 export interface ItineraryPlacePort { get(id: string): Promise<Place | undefined>; list(): Promise<Place[]> }
-export interface ItineraryReservationPort { get(id: string): Promise<Reservation | undefined>; list(): Promise<Reservation[]> }
+export interface ItineraryReservationPort {
+  get(id: string): Promise<Reservation | undefined>
+  listByDay(dayId: string): Promise<Reservation[]>
+  listByTrip(tripId: string): Promise<Reservation[]>
+}
 export interface ItineraryRepositoryPort {
   get(id: string): Promise<Itinerary | undefined>
-  list(): Promise<Itinerary[]>
+  listByDay(dayId: string): Promise<Itinerary[]>
+  listByTrip(tripId: string): Promise<Itinerary[]>
   put(value: Itinerary): Promise<unknown>
   softDelete(id: string): Promise<unknown>
   moveManualUntimed(tripId: string, dayId: string, itineraryId: string, direction: 'up' | 'down'): Promise<boolean>
