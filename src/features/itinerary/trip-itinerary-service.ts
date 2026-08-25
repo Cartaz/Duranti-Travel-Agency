@@ -1,11 +1,13 @@
 import type { Block, Day, Itinerary, Place, Reservation } from '../../domain/entities'
+import { requireTrip } from '../../application/shared/trip-day-context'
 import {
   blockRepository,
+  dayRepository,
   itineraryRepository,
   placeRepository,
   reservationRepository,
+  tripRepository,
 } from '../../data/repositories/repositories'
-import { listTripDays } from '../days/day-service'
 import type { DayItineraryItem, ItinerarySyncState } from './itinerary-service'
 
 export interface TripItineraryDay {
@@ -185,9 +187,16 @@ function needsAttention(item: DayItineraryItem): boolean {
   return item.source === 'manual' && hasSourceReference(item)
 }
 
+async function listTripDaysForOverview(tripId: string): Promise<Day[]> {
+  await requireTrip({ trips: tripRepository }, tripId)
+  return (await dayRepository.list())
+    .filter((day) => day.tripId === tripId)
+    .sort((left, right) => left.sequence - right.sequence || left.date.localeCompare(right.date))
+}
+
 export async function listTripItineraryOverview(tripId: string): Promise<TripItineraryOverview> {
   const [days, itineraries, places, reservations, blocks] = await Promise.all([
-    listTripDays(tripId),
+    listTripDaysForOverview(tripId),
     itineraryRepository.list().then((items) => items.filter((item) => item.tripId === tripId)),
     placeRepository.list(),
     reservationRepository.list().then((items) => items.filter((item) => item.tripId === tripId)),
