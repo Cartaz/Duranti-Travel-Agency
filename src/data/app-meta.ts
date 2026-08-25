@@ -1,5 +1,5 @@
 import { VAULT_FORMAT_VERSION } from '../lib/versions'
-import { DB_VERSION, db } from './db/duranti-db'
+import { DB_VERSION, db } from './db/dtagency-db'
 
 export { VAULT_FORMAT_VERSION }
 
