@@ -1,4 +1,4 @@
-# Duranti storage architecture
+# DTAgency storage architecture
 
 ## Source-of-truth rules
 
@@ -126,7 +126,7 @@ Never import directly into live data. Stage, validate, then commit. An import fa
 The user should eventually have two levels of recovery:
 
 1. **Automatic local persistence:** IndexedDB + OPFS + persistent storage request.
-2. **Explicit portable backup:** encrypted `.duranti` Vault saved through the iOS Files/share flow.
+2. **Explicit portable backup:** encrypted `.dtagency` Vault saved through the iOS Files/share flow.
 
 The second is the authoritative disaster-recovery mechanism because browser storage can be cleared or evicted even when persistence is requested. WebKit explicitly distinguishes storage policy from a user-managed backup. citeturn0search7
 
