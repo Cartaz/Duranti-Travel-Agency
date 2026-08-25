@@ -3,25 +3,25 @@ import type { Block, Day, Itinerary, Place, Reservation, Trip } from '../../doma
 export interface ItineraryTripPort { get(id: string): Promise<Trip | undefined> }
 export interface ItineraryDayPort {
   get(id: string): Promise<Day | undefined>
-  list(): Promise<Day[]>
   listByTrip(tripId: string): Promise<Day[]>
 }
 export interface ItineraryBlockPort {
   get(id: string): Promise<Block | undefined>
-  list(): Promise<Block[]>
   listByDay(dayId: string): Promise<Block[]>
   listByTrip(tripId: string): Promise<Block[]>
 }
-export interface ItineraryPlacePort { get(id: string): Promise<Place | undefined>; list(): Promise<Place[]> }
+export interface ItineraryPlacePort {
+  get(id: string): Promise<Place | undefined>
+  getMany(ids: string[]): Promise<Place[]>
+  list(): Promise<Place[]>
+}
 export interface ItineraryReservationPort {
   get(id: string): Promise<Reservation | undefined>
-  list(): Promise<Reservation[]>
   listByDay(dayId: string): Promise<Reservation[]>
   listByTrip(tripId: string): Promise<Reservation[]>
 }
 export interface ItineraryRepositoryPort {
   get(id: string): Promise<Itinerary | undefined>
-  list(): Promise<Itinerary[]>
   listByDay(dayId: string): Promise<Itinerary[]>
   listByTrip(tripId: string): Promise<Itinerary[]>
   put(value: Itinerary): Promise<unknown>

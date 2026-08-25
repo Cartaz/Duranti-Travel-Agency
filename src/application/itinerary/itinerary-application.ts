@@ -128,6 +128,12 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
   async function assertContext(tripId: string, dayId: string, editable: boolean): Promise<void> {
     await assertTripDayContext(contextDependencies, tripId, dayId, editable, 'Ripristina il viaggio prima di modificare l’itinerario.')
   }
+  async function loadReferencedPlaces(itineraries: Itinerary[], reservations: Reservation[]): Promise<Place[]> {
+    const ids = new Set<string>()
+    for (const itinerary of itineraries) if (itinerary.placeId) ids.add(itinerary.placeId)
+    for (const reservation of reservations) if (reservation.placeId) ids.add(reservation.placeId)
+    return deps.places.getMany([...ids])
+  }
   async function normalizeManualDraft(tripId: string, dayId: string, input: ItineraryDraft): Promise<ItineraryDraft> {
     const { trip, day } = await requireTripDay(contextDependencies, tripId, dayId)
     const title = input.title.trim()
@@ -151,11 +157,15 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
   async function listDayItineraryItems(tripId: string, dayId: string): Promise<DayItineraryItem[]> {
     await assertContext(tripId, dayId, false)
     const day = await deps.days.get(dayId); if (!day || day.tripId !== tripId) throw new Error('La giornata non appartiene a questo viaggio.')
-    const [itineraries, places, reservations, blocks] = await Promise.all([
-      deps.itineraries.list().then((items) => items.filter((item) => item.tripId === tripId && item.dayId === dayId)),
-      deps.places.list(), deps.reservations.list().then((items) => items.filter((item) => item.tripId === tripId && item.dayId === dayId)),
-      deps.blocks.list().then((items) => items.filter((item) => item.tripId === tripId && item.dayId === dayId)),
+    const [itinerariesByDay, reservationsByDay, blocksByDay] = await Promise.all([
+      deps.itineraries.listByDay(dayId),
+      deps.reservations.listByDay(dayId),
+      deps.blocks.listByDay(dayId),
     ])
+    const itineraries = itinerariesByDay.filter((item) => item.tripId === tripId && item.dayId === dayId)
+    const reservations = reservationsByDay.filter((item) => item.tripId === tripId && item.dayId === dayId)
+    const blocks = blocksByDay.filter((item) => item.tripId === tripId && item.dayId === dayId)
+    const places = await loadReferencedPlaces(itineraries, reservations)
     return buildDayItems(day, itineraries, places, reservations, blocks)
   }
   async function saveManualItineraryItem(tripId: string, dayId: string, itineraryId: string | undefined, input: ItineraryDraft): Promise<Itinerary> {
@@ -165,7 +175,10 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
     if (current && (current.reservationId || current.blockId)) throw new Error('Le tappe derivate da prenotazioni si modificano dal relativo blocco del planner.')
     if (current && (current.tripId !== tripId || current.dayId !== dayId)) throw new Error('La tappa non appartiene a questa giornata.')
     const now = deps.now(); let position = current?.position
-    if (!current) { const siblings = (await deps.itineraries.list()).filter((item) => item.tripId === tripId && item.dayId === dayId); position = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1 }
+    if (!current) {
+      const siblings = (await deps.itineraries.listByDay(dayId)).filter((item) => item.tripId === tripId && item.dayId === dayId)
+      position = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
+    }
     const itinerary: Itinerary = current ? { ...current, ...draft, tripId, dayId, position, updatedAt: now } : { id: deps.newId(), ...draft, tripId, dayId, position, createdAt: now, updatedAt: now }
     await deps.itineraries.put(itinerary); return itinerary
   }
@@ -177,7 +190,12 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
   }
   async function reconcileDayReservationItineraries(tripId: string, dayId: string): Promise<number> {
     await assertContext(tripId, dayId, true)
-    const [blocks, reservations] = await Promise.all([deps.blocks.list().then((items) => items.filter((item) => item.tripId === tripId && item.dayId === dayId)), deps.reservations.list().then((items) => items.filter((item) => item.tripId === tripId && item.dayId === dayId))])
+    const [blocksByDay, reservationsByDay] = await Promise.all([
+      deps.blocks.listByDay(dayId),
+      deps.reservations.listByDay(dayId),
+    ])
+    const blocks = blocksByDay.filter((item) => item.tripId === tripId && item.dayId === dayId)
+    const reservations = reservationsByDay.filter((item) => item.tripId === tripId && item.dayId === dayId)
     const reservationById = new Map(reservations.map((reservation) => [reservation.id, reservation])); let reconciled = 0
     for (const block of blocks) { const reservationId = reservationIdFromBlock(block); if (!reservationId) continue; const reservation = reservationById.get(reservationId); if (!reservation) continue; await deps.reservationSync.saveReservationForBlock(block.id, tripId, dayId, reservation); reconciled += 1 }
     return reconciled
@@ -191,7 +209,7 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
     if (!itinerary) throw new Error('La tappa non esiste più.')
     if (itinerary.tripId !== tripId || itinerary.dayId !== dayId) throw new Error('La tappa non appartiene a questa giornata.')
     if (!itinerary.reservationId && !itinerary.blockId) throw new Error('La tappa è già manuale e non richiede una riconciliazione.')
-    const blocks = (await deps.blocks.list()).filter((block) => block.tripId === tripId && block.dayId === dayId)
+    const blocks = (await deps.blocks.listByDay(dayId)).filter((block) => block.tripId === tripId && block.dayId === dayId)
     const linkedBlock = itinerary.blockId ? blocks.find((block) => block.id === itinerary.blockId) : undefined
     const reservationId = itinerary.reservationId ?? reservationIdFromBlock(linkedBlock)
     if (reservationId) {
@@ -201,17 +219,23 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
       if (reservation && sourceBlocks.length === 1) throw new Error('La sorgente della tappa è di nuovo disponibile. Usa “Riallinea” invece di scollegarla.')
     }
     if (action === 'delete') { await deps.itineraries.softDelete(itinerary.id); return }
-    const siblings = (await deps.itineraries.list()).filter((item) => item.tripId === tripId && item.dayId === dayId && !item.reservationId && !item.blockId && !item.startsAt)
+    const siblings = (await deps.itineraries.listByDay(dayId)).filter((item) => item.tripId === tripId && item.dayId === dayId && !item.reservationId && !item.blockId && !item.startsAt)
     const nextPosition = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
     await deps.itineraries.put({ ...itinerary, reservationId: undefined, blockId: undefined, position: itinerary.startsAt ? itinerary.position : nextPosition, updatedAt: deps.now() })
   }
   async function listTripItineraryOverview(tripId: string): Promise<TripItineraryOverview> {
     await requireTrip({ trips: deps.trips }, tripId)
-    const [days, itineraries, places, reservations, blocks] = await Promise.all([
-      deps.days.list().then((items) => items.filter((day) => day.tripId === tripId).sort((a, b) => a.sequence - b.sequence || a.date.localeCompare(b.date))),
-      deps.itineraries.list().then((items) => items.filter((item) => item.tripId === tripId)), deps.places.list(),
-      deps.reservations.list().then((items) => items.filter((item) => item.tripId === tripId)), deps.blocks.list().then((items) => items.filter((item) => item.tripId === tripId)),
+    const [tripDays, tripItineraries, tripReservations, tripBlocks] = await Promise.all([
+      deps.days.listByTrip(tripId),
+      deps.itineraries.listByTrip(tripId),
+      deps.reservations.listByTrip(tripId),
+      deps.blocks.listByTrip(tripId),
     ])
+    const days = tripDays.filter((day) => day.tripId === tripId).sort((a, b) => a.sequence - b.sequence || a.date.localeCompare(b.date))
+    const itineraries = tripItineraries.filter((item) => item.tripId === tripId)
+    const reservations = tripReservations.filter((item) => item.tripId === tripId)
+    const blocks = tripBlocks.filter((item) => item.tripId === tripId)
+    const places = await loadReferencedPlaces(itineraries, reservations)
     const itineraryDays = days.map((day) => ({ day, items: buildDayItems(day, itineraries, places, reservations, blocks) }))
     return { days: itineraryDays, stopCount: itineraryDays.reduce((total, section) => total + section.items.length, 0), warningCount: itineraryDays.reduce((total, section) => total + section.items.filter(needsAttention).length, 0) }
   }
