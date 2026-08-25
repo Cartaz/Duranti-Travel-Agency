@@ -12,13 +12,13 @@ test('DTAgency application use-case contracts', async ({ page }) => {
   expect(response.status(), `Application harness returned HTTP ${response.status()}.`).toBeLessThan(400)
 
   await page.waitForFunction(
-    () => Array.isArray(window.__DTAGENCY_APPLICATION_RESULTS__) && window.__DTAGENCY_APPLICATION_RESULTS__.length === 2,
+    () => Array.isArray(window.__DTAGENCY_APPLICATION_RESULTS__) && window.__DTAGENCY_APPLICATION_RESULTS__.length === 3,
     null,
     { timeout: 30_000 },
   )
 
   const results = await page.evaluate(() => window.__DTAGENCY_APPLICATION_RESULTS__)
   expect(consoleErrors, `Browser console errors:\n${consoleErrors.join('\n')}`).toEqual([])
-  expect(results).toHaveLength(2)
+  expect(results).toHaveLength(3)
   expect(results.filter((result) => !result.ok), `Application contract failures:\n${JSON.stringify(results, null, 2)}`).toEqual([])
 })
