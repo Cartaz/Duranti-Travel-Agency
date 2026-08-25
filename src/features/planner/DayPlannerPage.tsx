@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Block, Day, Place, Trip } from '../../domain/entities'
+import type {
+  ChecklistItemDraft,
+  PlannerBlockDraft,
+  PlannerBlockType,
+} from '../../application/planner/planner-application'
 import InlineConfirm from '../../ui/InlineConfirm'
-import { getTripDay } from '../days/day-service'
+import { useApplicationServices } from '../../ui/application-context'
 import ExpenseBlockEditor from '../expenses/ExpenseBlockEditor'
 import DayItinerarySummary from '../itinerary/DayItinerarySummary'
 import { listDayItineraryItems, type DayItineraryItem } from '../itinerary/itinerary-service'
@@ -15,18 +20,6 @@ import {
   type PlaceDraft,
 } from '../places/place-service'
 import ReservationBlockEditor from '../reservations/ReservationBlockEditor'
-import { getTrip } from '../trips/trip-service'
-import {
-  createPlannerBlock,
-  deletePlannerBlock,
-  listDayPlannerBlocks,
-  movePlannerBlock,
-  readPlannerBlockDraft,
-  updatePlannerBlock,
-  type ChecklistItemDraft,
-  type PlannerBlockDraft,
-  type PlannerBlockType,
-} from './block-service'
 import './planner.css'
 
 const blockLabels: Record<PlannerBlockType, string> = {
@@ -96,6 +89,7 @@ function placeDraftFromFormState(state: PlaceFormState): PlaceDraft {
 
 export default function DayPlannerPage() {
   const { tripId, dayId } = useParams<{ tripId: string; dayId: string }>()
+  const { trips, days, planner } = useApplicationServices()
   const [trip, setTrip] = useState<Trip>()
   const [day, setDay] = useState<Day>()
   const [blocks, setBlocks] = useState<Block[]>([])
@@ -107,12 +101,12 @@ export default function DayPlannerPage() {
   const refreshBlocks = useCallback(async (): Promise<void> => {
     if (!tripId || !dayId) return
     const [loadedBlocks, loadedItinerary] = await Promise.all([
-      listDayPlannerBlocks(tripId, dayId),
+      planner.listDayPlannerBlocks(tripId, dayId),
       listDayItineraryItems(tripId, dayId),
     ])
     setBlocks(loadedBlocks)
     setItineraryItems(loadedItinerary)
-  }, [dayId, tripId])
+  }, [dayId, planner, tripId])
 
   useEffect(() => {
     if (!tripId || !dayId) {
@@ -123,9 +117,9 @@ export default function DayPlannerPage() {
 
     let cancelled = false
     void Promise.all([
-      getTrip(tripId),
-      getTripDay(tripId, dayId),
-      listDayPlannerBlocks(tripId, dayId),
+      trips.getTrip(tripId),
+      days.getTripDay(tripId, dayId),
+      planner.listDayPlannerBlocks(tripId, dayId),
       listDayItineraryItems(tripId, dayId),
     ])
       .then(([loadedTrip, loadedDay, loadedBlocks, loadedItinerary]) => {
@@ -146,14 +140,14 @@ export default function DayPlannerPage() {
     return () => {
       cancelled = true
     }
-  }, [dayId, tripId])
+  }, [dayId, days, planner, tripId, trips])
 
   const addBlock = async (type: PlannerBlockType): Promise<void> => {
     if (!tripId || !dayId || busy) return
     setBusy(true)
     setError('')
     try {
-      await createPlannerBlock(tripId, dayId, type)
+      await planner.createPlannerBlock(tripId, dayId, type)
       await refreshBlocks()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile aggiungere il blocco.')
@@ -302,15 +296,16 @@ function PlannerBasicBlockEditor({
   canMoveDown,
   onChanged,
 }: PlannerBlockEditorProps) {
-  const [draft, setDraft] = useState<PlannerBlockDraft>(() => readPlannerBlockDraft(block))
+  const { planner } = useApplicationServices()
+  const [draft, setDraft] = useState<PlannerBlockDraft>(() => planner.readPlannerBlockDraft(block))
   const [saving, setSaving] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    setDraft(readPlannerBlockDraft(block))
+    setDraft(planner.readPlannerBlockDraft(block))
     setConfirmingRemove(false)
-  }, [block])
+  }, [block, planner])
 
   const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
@@ -318,7 +313,7 @@ function PlannerBasicBlockEditor({
     setSaving(true)
     setError('')
     try {
-      await updatePlannerBlock(tripId, dayId, block.id, draft)
+      await planner.updatePlannerBlock(tripId, dayId, block.id, draft)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile salvare il blocco.')
@@ -333,7 +328,7 @@ function PlannerBasicBlockEditor({
     setSaving(true)
     setError('')
     try {
-      await deletePlannerBlock(tripId, dayId, block.id)
+      await planner.deletePlannerBlock(tripId, dayId, block.id)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile eliminare il blocco.')
@@ -346,7 +341,7 @@ function PlannerBasicBlockEditor({
     setSaving(true)
     setError('')
     try {
-      await movePlannerBlock(tripId, dayId, block.id, direction)
+      await planner.movePlannerBlock(tripId, dayId, block.id, direction)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile spostare il blocco.')
@@ -443,6 +438,7 @@ function PlannerPlaceBlockEditor({
   canMoveDown,
   onChanged,
 }: PlannerBlockEditorProps) {
+  const { planner } = useApplicationServices()
   const [place, setPlace] = useState<Place>()
   const [state, setState] = useState<PlaceFormState>(() => placeFormStateFromDraft(EMPTY_PLACE_DRAFT))
   const [loading, setLoading] = useState(true)
@@ -497,7 +493,7 @@ function PlannerPlaceBlockEditor({
     setSaving(true)
     setError('')
     try {
-      await deletePlannerBlock(tripId, dayId, block.id)
+      await planner.deletePlannerBlock(tripId, dayId, block.id)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile rimuovere il luogo.')
@@ -510,7 +506,7 @@ function PlannerPlaceBlockEditor({
     setSaving(true)
     setError('')
     try {
-      await movePlannerBlock(tripId, dayId, block.id, direction)
+      await planner.movePlannerBlock(tripId, dayId, block.id, direction)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile spostare il luogo.')
