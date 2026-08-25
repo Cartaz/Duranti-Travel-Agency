@@ -67,9 +67,7 @@ export function createDayApplication(deps: DayApplicationDependencies): DayAppli
   }
 
   async function listTripDays(tripId: string): Promise<Day[]> {
-    const days = await deps.days.list()
-    return days
-      .filter((day) => day.tripId === tripId)
+    return (await deps.days.listByTrip(tripId))
       .sort((left, right) => left.sequence - right.sequence || left.date.localeCompare(right.date))
   }
 
