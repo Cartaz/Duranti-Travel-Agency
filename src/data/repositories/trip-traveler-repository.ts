@@ -70,7 +70,11 @@ export class TripTravelerRepository {
   }
 
   async detachMembership(tripId: string, travelerId: string): Promise<'detached' | 'not-found'> {
-    return db.transaction('rw', db.tripTravelers, async () => {
+    return db.transaction('rw', db.trips, db.tripTravelers, async () => {
+      const trip = await db.trips.get(tripId)
+      if (!trip || trip.deletedAt) throw new Error('Il viaggio non esiste o è stato eliminato.')
+      if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di modificarne i partecipanti.')
+
       const matches = await db.tripTravelers
         .where('[tripId+travelerId]')
         .equals([tripId, travelerId])
