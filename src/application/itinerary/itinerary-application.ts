@@ -1,5 +1,5 @@
 import type { Block, Day, Itinerary, Place, Reservation } from '../../domain/entities'
-import { itineraryStatusForReservation, itineraryTypeForReservation } from '../../domain/reservation-itinerary-mapping'
+import { itineraryStatusForReservation, itineraryTypeForReservation, reservationTypeForBlockType } from '../../domain/reservation-itinerary-mapping'
 import { assertTripDayContext, requireTrip, requireTripDay } from '../shared/trip-day-context'
 import type { ItineraryApplicationDependencies } from './ports'
 
@@ -40,7 +40,6 @@ export interface ItineraryApplication {
 
 const itineraryTypes = new Set<EditableItineraryType>(['transport', 'activity', 'meal', 'reservation', 'free-time', 'custom'])
 const itineraryStatuses = new Set<EditableItineraryStatus>(['idea', 'planned', 'booked', 'done', 'cancelled'])
-const reservationBlockTypes = new Set<Block['type']>(['transport', 'accommodation', 'restaurant', 'activity'])
 
 function cleanOptional(value: string | undefined): string | undefined { const cleaned = value?.trim(); return cleaned ? cleaned : undefined }
 function validateOptionalText(value: string | undefined, label: string, maxLength: number): string | undefined {
@@ -60,7 +59,7 @@ function validateTimezone(value: string | undefined): string | undefined {
   return cleaned
 }
 function reservationIdFromBlock(block: Block | undefined): string | undefined {
-  if (!block || !reservationBlockTypes.has(block.type)) return undefined
+  if (!block || !reservationTypeForBlockType(block.type)) return undefined
   const value = block.content.reservationId
   if (value === undefined) return undefined
   if (typeof value !== 'string' || !value) throw new Error('Il planner contiene un riferimento prenotazione non valido.')
