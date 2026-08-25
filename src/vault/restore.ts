@@ -1,4 +1,4 @@
-import { DB_NAME, DB_VERSION, db } from '../data/db/duranti-db'
+import { DB_NAME, DB_VERSION, db } from '../data/db/dtagency-db'
 import { scanMediaIntegrity, type MediaIntegrityReport } from '../data/storage/media-integrity'
 import { lockLocalEncryption } from '../security/local-encryption'
 import {
@@ -10,7 +10,7 @@ import {
 } from './format'
 import type { StagedVaultImport } from './import'
 
-const ROOT_DIRECTORY = 'duranti'
+const ROOT_DIRECTORY = 'dtagency'
 const MEDIA_DIRECTORY = 'media'
 const PRIVATE_DIRECTORY = 'private'
 const PRIVATE_DOCUMENT_DIRECTORY = 'traveler-documents'
@@ -58,10 +58,7 @@ interface RestoreJournal {
   updatedAt: string
 }
 
-export type VaultRestoreRecoveryResult =
-  | 'none'
-  | 'rolled-back'
-  | 'finalized-committed'
+export type VaultRestoreRecoveryResult = 'none' | 'rolled-back' | 'finalized-committed'
 
 export type VaultRestorePhase =
   | 'recovering'
@@ -115,15 +112,14 @@ async function getRootDirectory(): Promise<FileSystemDirectoryHandle> {
 async function getDirectoryEntries(
   directory: FileSystemDirectoryHandle,
 ): Promise<Array<[string, FileSystemHandle]>> {
-  const iterableDirectory = directory as FileSystemDirectoryHandle & {
+  const iterable = directory as FileSystemDirectoryHandle & {
     entries?: () => AsyncIterableIterator<[string, FileSystemHandle]>
   }
-  if (typeof iterableDirectory.entries !== 'function') {
+  if (typeof iterable.entries !== 'function') {
     throw new Error('OPFS directory iteration is not available in this browser build.')
   }
-
   const entries: Array<[string, FileSystemHandle]> = []
-  for await (const entry of iterableDirectory.entries()) entries.push(entry)
+  for await (const entry of iterable.entries()) entries.push(entry)
   return entries
 }
 
@@ -175,6 +171,10 @@ async function removeEntryIfExists(
   }
 }
 
+function assertSafeIdentifier(value: string, label: string): void {
+  if (!SAFE_IDENTIFIER.test(value)) throw new Error(`${label} is invalid.`)
+}
+
 function emitProgress(
   callback: CommitStagedVaultImportOptions['onProgress'],
   progress: VaultRestoreProgress,
@@ -182,12 +182,8 @@ function emitProgress(
   try {
     callback?.(progress)
   } catch {
-    // Rendering progress must never change restore semantics.
+    // Progress rendering must never affect restore semantics.
   }
-}
-
-function assertSafeIdentifier(value: string, label: string): void {
-  if (!SAFE_IDENTIFIER.test(value)) throw new Error(`${label} is invalid.`)
 }
 
 function stagedFileName(index: number): string {
@@ -206,10 +202,7 @@ function managedPrefix(namespace: VaultManagedNamespace): string[] {
     : [ROOT_DIRECTORY, PRIVATE_DIRECTORY, PRIVATE_DOCUMENT_DIRECTORY]
 }
 
-function validateManagedPath(
-  namespace: VaultManagedNamespace,
-  path: string,
-): string[] {
+function validateManagedPath(namespace: VaultManagedNamespace, path: string): string[] {
   const segments = path.split('/')
   if (
     segments.some((segment) => !segment || segment === '.' || segment === '..') ||
@@ -226,7 +219,6 @@ function validateManagedPath(
   ) {
     throw new Error(`Managed restore path ${path} does not match namespace ${namespace}.`)
   }
-
   return segments
 }
 
@@ -237,23 +229,15 @@ async function writeFile(
 ): Promise<void> {
   const handle = await directory.getFileHandle(name, { create: true })
   const writable = await handle.createWritable()
-
   try {
     await writable.write(source)
     await writable.close()
   } catch (error) {
-    try {
-      await writable.abort()
-    } catch {
-      // Preserve the original write error.
-    }
+    try { await writable.abort() } catch { /* preserve original error */ }
     throw error
   }
-
   const written = await handle.getFile()
-  if (written.size !== source.size) {
-    throw new Error(`OPFS write verification failed for ${name}.`)
-  }
+  if (written.size !== source.size) throw new Error(`OPFS write verification failed for ${name}.`)
 }
 
 async function writeManagedFile(
@@ -274,22 +258,15 @@ async function collectFilesRecursively(
   output: ManagedFileSnapshot[],
 ): Promise<void> {
   const entries = await getDirectoryEntries(directory)
-  entries.sort(([a], [b]) => a.localeCompare(b))
-
+  entries.sort(([left], [right]) => left.localeCompare(right))
   for (const [name, handle] of entries) {
     const path = `${pathPrefix}/${name}`
     if (handle.kind === 'file') {
       const file = await (handle as FileSystemFileHandle).getFile()
       output.push({ namespace, path, sizeBytes: file.size, file })
-      continue
+    } else {
+      await collectFilesRecursively(handle as FileSystemDirectoryHandle, path, namespace, output)
     }
-
-    await collectFilesRecursively(
-      handle as FileSystemDirectoryHandle,
-      path,
-      namespace,
-      output,
-    )
   }
 }
 
@@ -299,12 +276,7 @@ async function collectManagedLiveFiles(): Promise<ManagedFileSnapshot[]> {
 
   const media = await getExistingNestedDirectory(root, [ROOT_DIRECTORY, MEDIA_DIRECTORY])
   if (media) {
-    await collectFilesRecursively(
-      media,
-      `${ROOT_DIRECTORY}/${MEDIA_DIRECTORY}`,
-      'media',
-      output,
-    )
+    await collectFilesRecursively(media, `${ROOT_DIRECTORY}/${MEDIA_DIRECTORY}`, 'media', output)
   }
 
   const privateDocuments = await getExistingNestedDirectory(root, [
@@ -321,25 +293,19 @@ async function collectManagedLiveFiles(): Promise<ManagedFileSnapshot[]> {
     )
   }
 
-  return output.sort((a, b) => a.path.localeCompare(b.path))
+  return output.sort((left, right) => left.path.localeCompare(right.path))
 }
 
 async function clearManagedLiveFiles(): Promise<void> {
   const root = await getRootDirectory()
-  const duranti = await getExistingDirectory(root, ROOT_DIRECTORY)
-  if (!duranti) return
-
-  await removeEntryIfExists(duranti, MEDIA_DIRECTORY, true)
-
-  const privateDirectory = await getExistingDirectory(duranti, PRIVATE_DIRECTORY)
-  if (privateDirectory) {
-    await removeEntryIfExists(privateDirectory, PRIVATE_DOCUMENT_DIRECTORY, true)
-  }
+  const appRoot = await getExistingDirectory(root, ROOT_DIRECTORY)
+  if (!appRoot) return
+  await removeEntryIfExists(appRoot, MEDIA_DIRECTORY, true)
+  const privateDirectory = await getExistingDirectory(appRoot, PRIVATE_DIRECTORY)
+  if (privateDirectory) await removeEntryIfExists(privateDirectory, PRIVATE_DOCUMENT_DIRECTORY, true)
 }
 
-async function getImportStageFilesDirectory(
-  stageId: string,
-): Promise<FileSystemDirectoryHandle> {
+async function getImportStageFilesDirectory(stageId: string): Promise<FileSystemDirectoryHandle> {
   assertSafeIdentifier(stageId, 'Vault staging ID')
   const root = await getRootDirectory()
   const directory = await getExistingNestedDirectory(root, [
@@ -364,34 +330,26 @@ async function getStagedFile(
   return file
 }
 
-async function getRestoreStateDirectory(
-  create: boolean,
-): Promise<FileSystemDirectoryHandle | null> {
+async function getRestoreStateDirectory(create: boolean): Promise<FileSystemDirectoryHandle | null> {
   const root = await getRootDirectory()
-  const duranti = create
+  const appRoot = create
     ? await root.getDirectoryHandle(ROOT_DIRECTORY, { create: true })
     : await getExistingDirectory(root, ROOT_DIRECTORY)
-  if (!duranti) return null
-
-  if (create) {
-    return duranti.getDirectoryHandle(RESTORE_STATE_DIRECTORY, { create: true })
-  }
-  return getExistingDirectory(duranti, RESTORE_STATE_DIRECTORY)
+  if (!appRoot) return null
+  return create
+    ? appRoot.getDirectoryHandle(RESTORE_STATE_DIRECTORY, { create: true })
+    : getExistingDirectory(appRoot, RESTORE_STATE_DIRECTORY)
 }
 
-async function getRestoreBackupRoot(
-  create: boolean,
-): Promise<FileSystemDirectoryHandle | null> {
+async function getRestoreBackupRoot(create: boolean): Promise<FileSystemDirectoryHandle | null> {
   const root = await getRootDirectory()
-  const duranti = create
+  const appRoot = create
     ? await root.getDirectoryHandle(ROOT_DIRECTORY, { create: true })
     : await getExistingDirectory(root, ROOT_DIRECTORY)
-  if (!duranti) return null
-
-  if (create) {
-    return duranti.getDirectoryHandle(RESTORE_BACKUP_DIRECTORY, { create: true })
-  }
-  return getExistingDirectory(duranti, RESTORE_BACKUP_DIRECTORY)
+  if (!appRoot) return null
+  return create
+    ? appRoot.getDirectoryHandle(RESTORE_BACKUP_DIRECTORY, { create: true })
+    : getExistingDirectory(appRoot, RESTORE_BACKUP_DIRECTORY)
 }
 
 async function writeJsonFile(
@@ -407,13 +365,9 @@ async function writeJsonFile(
   }
 }
 
-async function readJsonFile(
-  directory: FileSystemDirectoryHandle,
-  name: string,
-): Promise<unknown> {
+async function readJsonFile(directory: FileSystemDirectoryHandle, name: string): Promise<unknown> {
   const handle = await directory.getFileHandle(name)
-  const file = await handle.getFile()
-  const bytes = new Uint8Array(await file.arrayBuffer())
+  const bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer())
   try {
     return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
   } catch {
@@ -430,25 +384,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function assertStagedVaultImportReady(staged: StagedVaultImport): void {
   assertSafeIdentifier(staged.stageId, 'Vault staging ID')
   assertSafeIdentifier(staged.archiveId, 'Vault archive ID')
-
   if (
-    staged.manifest.format !== 'duranti-vault' ||
+    staged.manifest.format !== 'dtagency-vault' ||
     staged.manifest.version !== 1 ||
     staged.manifest.archiveId !== staged.archiveId ||
     staged.manifest.createdAt !== staged.archiveCreatedAt ||
     staged.manifest.database.name !== DB_NAME ||
     staged.manifest.database.schemaVersion !== DB_VERSION
   ) {
-    throw new Error('Vault staged manifest identity is no longer compatible with this app version.')
+    throw new Error('Vault staged manifest identity is incompatible with this app version.')
   }
 
-  const expectedTableNames = db.tables
-    .map((table) => table.name)
-    .sort((a, b) => a.localeCompare(b))
-  const actualTableNames = staged.manifest.database.tables
-    .map((table) => table.name)
-    .sort((a, b) => a.localeCompare(b))
-
+  const expectedTableNames = db.tables.map((table) => table.name).sort((a, b) => a.localeCompare(b))
+  const actualTableNames = staged.manifest.database.tables.map((table) => table.name).sort((a, b) => a.localeCompare(b))
   if (
     actualTableNames.length !== expectedTableNames.length ||
     actualTableNames.some((name, index) => name !== expectedTableNames[index])
@@ -456,62 +404,26 @@ function assertStagedVaultImportReady(staged: StagedVaultImport): void {
     throw new Error('Vault staged database table set is incompatible with this app version.')
   }
 
-  for (const snapshot of staged.manifest.database.tables) {
-    const table = db.tables.find((candidate) => candidate.name === snapshot.name)
-    const keyPath = table?.schema.primKey.keyPath
-    if (typeof keyPath !== 'string' || keyPath.length === 0) {
-      throw new Error(`Vault staged table ${snapshot.name} has an unsupported primary key.`)
-    }
-
-    const seenKeys = new Set<string>()
-    for (const row of snapshot.rows) {
-      if (!isRecord(row)) throw new Error(`Vault staged table ${snapshot.name} contains an invalid row.`)
-      const key = row[keyPath]
-      if (typeof key !== 'string' || key.length === 0 || seenKeys.has(key)) {
-        throw new Error(`Vault staged table ${snapshot.name} contains an invalid or duplicate primary key.`)
-      }
-      seenKeys.add(key)
-    }
-  }
-
-  let sourceBytes = 0
   const seenPaths = new Set<string>()
+  let sourceBytes = 0
   for (let index = 0; index < staged.manifest.files.length; index += 1) {
     const entry = staged.manifest.files[index]
     if (
       entry.index !== index ||
       (entry.namespace !== 'media' && entry.namespace !== 'private-document') ||
-      !Number.isSafeInteger(entry.sizeBytes) ||
-      entry.sizeBytes < 0 ||
-      !Number.isSafeInteger(entry.chunkCount) ||
-      entry.chunkCount < 0
+      !Number.isSafeInteger(entry.sizeBytes) || entry.sizeBytes < 0 ||
+      !Number.isSafeInteger(entry.chunkCount) || entry.chunkCount < 0
     ) {
       throw new Error(`Vault staged file entry ${index} is invalid.`)
     }
-
     validateManagedPath(entry.namespace, entry.path)
-    if (seenPaths.has(entry.path)) {
-      throw new Error(`Vault staged manifest contains duplicate path ${entry.path}.`)
-    }
+    if (seenPaths.has(entry.path)) throw new Error(`Vault staged manifest contains duplicate path ${entry.path}.`)
     seenPaths.add(entry.path)
-
-    const expectedChunks = entry.sizeBytes === 0
-      ? 0
-      : Math.ceil(entry.sizeBytes / VAULT_CHUNK_BYTES)
-    if (entry.chunkCount !== expectedChunks) {
-      throw new Error(`Vault staged file entry ${index} has an inconsistent chunk count.`)
-    }
-
-    if (sourceBytes > Number.MAX_SAFE_INTEGER - entry.sizeBytes) {
-      throw new Error('Vault staged source size exceeds the supported integer range.')
-    }
+    const expectedChunks = entry.sizeBytes === 0 ? 0 : Math.ceil(entry.sizeBytes / VAULT_CHUNK_BYTES)
+    if (entry.chunkCount !== expectedChunks) throw new Error(`Vault staged file entry ${index} has an inconsistent chunk count.`)
     sourceBytes += entry.sizeBytes
   }
-
-  if (
-    staged.sourceFileCount !== staged.manifest.files.length ||
-    staged.sourceBytes !== sourceBytes
-  ) {
+  if (staged.sourceFileCount !== staged.manifest.files.length || staged.sourceBytes !== sourceBytes) {
     throw new Error('Vault staged summary no longer matches its authenticated manifest.')
   }
 }
@@ -526,15 +438,10 @@ function assertRestoreJournal(value: unknown): asserts value is RestoreJournal {
     typeof value.targetDatabaseSha256 !== 'string' ||
     typeof value.createdAt !== 'string' ||
     typeof value.updatedAt !== 'string' ||
-    (
-      value.phase !== 'files-mutating' &&
-      value.phase !== 'files-promoted' &&
-      value.phase !== 'committed'
-    )
+    !['files-mutating', 'files-promoted', 'committed'].includes(String(value.phase))
   ) {
     throw new Error('Vault restore journal has an unsupported shape.')
   }
-
   assertSafeIdentifier(value.restoreId, 'Vault restore ID')
   assertSafeIdentifier(value.stageId, 'Vault staging ID')
   assertSafeIdentifier(value.archiveId, 'Vault archive ID')
@@ -544,47 +451,25 @@ function assertRestoreJournal(value: unknown): asserts value is RestoreJournal {
 }
 
 function assertBackupManifest(value: unknown, restoreId: string): RestoreBackupManifest {
-  if (!isRecord(value) || value.version !== 1 || value.restoreId !== restoreId) {
+  if (!isRecord(value) || value.version !== 1 || value.restoreId !== restoreId || !Array.isArray(value.files)) {
     throw new Error('Vault restore backup manifest is invalid.')
   }
-  if (typeof value.createdAt !== 'string' || !Array.isArray(value.files)) {
-    throw new Error('Vault restore backup manifest is incomplete.')
-  }
-
-  const files: RestoreBackupEntry[] = []
-  const seenPaths = new Set<string>()
-
-  for (let index = 0; index < value.files.length; index += 1) {
-    const raw = value.files[index]
+  const files: RestoreBackupEntry[] = value.files.map((raw, index) => {
     if (
-      !isRecord(raw) ||
-      raw.index !== index ||
+      !isRecord(raw) || raw.index !== index ||
       (raw.namespace !== 'media' && raw.namespace !== 'private-document') ||
-      typeof raw.path !== 'string' ||
-      typeof raw.sizeBytes !== 'number' ||
-      !Number.isSafeInteger(raw.sizeBytes) ||
-      raw.sizeBytes < 0
+      typeof raw.path !== 'string' || typeof raw.sizeBytes !== 'number' ||
+      !Number.isSafeInteger(raw.sizeBytes) || raw.sizeBytes < 0
     ) {
       throw new Error(`Vault restore backup entry ${index} is invalid.`)
     }
-
     validateManagedPath(raw.namespace, raw.path)
-    if (seenPaths.has(raw.path)) {
-      throw new Error(`Vault restore backup contains duplicate path ${raw.path}.`)
-    }
-    seenPaths.add(raw.path)
-    files.push({
-      index,
-      namespace: raw.namespace,
-      path: raw.path,
-      sizeBytes: raw.sizeBytes,
-    })
-  }
-
+    return { index, namespace: raw.namespace, path: raw.path, sizeBytes: raw.sizeBytes }
+  })
   return {
     version: 1,
     restoreId,
-    createdAt: value.createdAt,
+    createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date(0).toISOString(),
     files,
   }
 }
@@ -599,7 +484,6 @@ async function readRestoreJournal(): Promise<RestoreJournal | undefined> {
   if (!hasOpfsSupport()) return undefined
   const directory = await getRestoreStateDirectory(false)
   if (!directory) return undefined
-
   try {
     const value = await readJsonFile(directory, RESTORE_JOURNAL_FILE)
     assertRestoreJournal(value)
@@ -612,87 +496,50 @@ async function readRestoreJournal(): Promise<RestoreJournal | undefined> {
 
 async function deleteRestoreJournal(): Promise<void> {
   const directory = await getRestoreStateDirectory(false)
-  if (!directory) return
-  await removeEntryIfExists(directory, RESTORE_JOURNAL_FILE)
+  if (directory) await removeEntryIfExists(directory, RESTORE_JOURNAL_FILE)
 }
 
-async function createBackup(
-  restoreId: string,
-  files: ManagedFileSnapshot[],
-): Promise<RestoreBackupManifest> {
-  assertSafeIdentifier(restoreId, 'Vault restore ID')
+async function createBackup(restoreId: string, files: ManagedFileSnapshot[]): Promise<void> {
   const root = await getRestoreBackupRoot(true)
   if (!root) throw new Error('Vault restore backup root could not be created.')
-
   await removeEntryIfExists(root, restoreId, true)
   const backup = await root.getDirectoryHandle(restoreId, { create: true })
   const backupFiles = await backup.getDirectoryHandle(BACKUP_FILES_DIRECTORY, { create: true })
-
   const entries: RestoreBackupEntry[] = []
   for (let index = 0; index < files.length; index += 1) {
     const source = files[index]
     await writeFile(backupFiles, backupFileName(index), source.file)
-    entries.push({
-      index,
-      namespace: source.namespace,
-      path: source.path,
-      sizeBytes: source.sizeBytes,
-    })
+    entries.push({ index, namespace: source.namespace, path: source.path, sizeBytes: source.sizeBytes })
   }
-
-  const manifest: RestoreBackupManifest = {
+  await writeJsonFile(backup, BACKUP_MANIFEST_FILE, {
     version: 1,
     restoreId,
     createdAt: new Date().toISOString(),
     files: entries,
-  }
-  await writeJsonFile(backup, BACKUP_MANIFEST_FILE, manifest)
-  return manifest
-}
-
-async function readBackupManifest(restoreId: string): Promise<RestoreBackupManifest> {
-  assertSafeIdentifier(restoreId, 'Vault restore ID')
-  const root = await getRestoreBackupRoot(false)
-  if (!root) throw new Error(`Vault restore backup ${restoreId} is missing.`)
-  const backup = await root.getDirectoryHandle(restoreId)
-  return assertBackupManifest(await readJsonFile(backup, BACKUP_MANIFEST_FILE), restoreId)
+  } satisfies RestoreBackupManifest)
 }
 
 async function deleteBackup(restoreId: string): Promise<void> {
-  assertSafeIdentifier(restoreId, 'Vault restore ID')
   const root = await getRestoreBackupRoot(false)
-  if (!root) return
-  await removeEntryIfExists(root, restoreId, true)
+  if (root) await removeEntryIfExists(root, restoreId, true)
 }
 
 async function restoreBackupFiles(restoreId: string): Promise<void> {
-  const manifest = await readBackupManifest(restoreId)
   const root = await getRestoreBackupRoot(false)
   if (!root) throw new Error(`Vault restore backup ${restoreId} is missing.`)
   const backup = await root.getDirectoryHandle(restoreId)
-  const filesDirectory = await backup.getDirectoryHandle(BACKUP_FILES_DIRECTORY)
+  const manifest = assertBackupManifest(await readJsonFile(backup, BACKUP_MANIFEST_FILE), restoreId)
+  const backupFiles = await backup.getDirectoryHandle(BACKUP_FILES_DIRECTORY)
   const opfsRoot = await getRootDirectory()
-
   await clearManagedLiveFiles()
-
   for (const entry of manifest.files) {
-    const handle = await filesDirectory.getFileHandle(backupFileName(entry.index))
-    const file = await handle.getFile()
-    if (file.size !== entry.sizeBytes) {
-      throw new Error(`Vault restore backup file ${entry.index} failed its size check.`)
-    }
+    const file = await (await backupFiles.getFileHandle(backupFileName(entry.index))).getFile()
+    if (file.size !== entry.sizeBytes) throw new Error(`Vault restore backup file ${entry.index} failed its size check.`)
     await writeManagedFile(opfsRoot, entry.namespace, entry.path, file)
-  }
-
-  const actual = await collectManagedLiveFiles()
-  if (!fileInventoriesMatch(manifest.files, actual)) {
-    throw new Error('Vault rollback file verification failed.')
   }
 }
 
-function normalizeManifestFiles(
-  files: VaultFileManifestEntry[],
-): RestoreBackupEntry[] {
+function normalizeManifestFiles(files: VaultFileManifestEntry[]): RestoreBackupEntry[] {
   return files.map((entry) => ({
     index: entry.index,
     namespace: entry.namespace,
@@ -706,99 +553,65 @@ function fileInventoriesMatch(
   actual: ManagedFileSnapshot[],
 ): boolean {
   if (expected.length !== actual.length) return false
-
-  const expectedSorted = [...expected].sort((a, b) => a.path.localeCompare(b.path))
-  const actualSorted = [...actual].sort((a, b) => a.path.localeCompare(b.path))
-
-  return expectedSorted.every((item, index) => {
-    const candidate = actualSorted[index]
-    return (
-      candidate !== undefined &&
-      candidate.namespace === item.namespace &&
-      candidate.path === item.path &&
-      candidate.sizeBytes === item.sizeBytes
-    )
+  const left = [...expected].sort((a, b) => a.path.localeCompare(b.path))
+  const right = [...actual].sort((a, b) => a.path.localeCompare(b.path))
+  return left.every((item, index) => {
+    const candidate = right[index]
+    return candidate?.namespace === item.namespace && candidate.path === item.path && candidate.sizeBytes === item.sizeBytes
   })
 }
 
-async function snapshotStagedFiles(
-  staged: StagedVaultImport,
-): Promise<Map<number, File>> {
-  const stageFiles = await getImportStageFilesDirectory(staged.stageId)
+async function snapshotStagedFiles(staged: StagedVaultImport): Promise<Map<number, File>> {
+  const directory = await getImportStageFilesDirectory(staged.stageId)
   const snapshots = new Map<number, File>()
-
-  for (const entry of staged.manifest.files) {
-    snapshots.set(entry.index, await getStagedFile(stageFiles, entry))
-  }
-
+  for (const entry of staged.manifest.files) snapshots.set(entry.index, await getStagedFile(directory, entry))
   return snapshots
 }
 
-async function promoteStagedFiles(
-  staged: StagedVaultImport,
-  snapshots: Map<number, File>,
-): Promise<void> {
+async function promoteStagedFiles(staged: StagedVaultImport, snapshots: Map<number, File>): Promise<void> {
   const root = await getRootDirectory()
-
   await clearManagedLiveFiles()
-
   for (const entry of staged.manifest.files) {
     const file = snapshots.get(entry.index)
     if (!file) throw new Error(`Vault staged file ${entry.index} snapshot is missing.`)
     await writeManagedFile(root, entry.namespace, entry.path, file)
   }
-
-  const actual = await collectManagedLiveFiles()
-  if (!fileInventoriesMatch(normalizeManifestFiles(staged.manifest.files), actual)) {
+  if (!fileInventoriesMatch(normalizeManifestFiles(staged.manifest.files), await collectManagedLiveFiles())) {
     throw new Error('Vault promoted OPFS files failed final inventory verification.')
   }
 }
 
 async function snapshotDatabase(): Promise<VaultTableSnapshot[]> {
   const tables = [...db.tables].sort((a, b) => a.name.localeCompare(b.name))
-
   return db.transaction('r', tables, async () => {
     const snapshots: VaultTableSnapshot[] = []
-    for (const table of tables) {
-      snapshots.push({
-        name: table.name,
-        rows: await table.toArray(),
-      })
-    }
+    for (const table of tables) snapshots.push({ name: table.name, rows: await table.toArray() })
     return snapshots
   })
 }
 
 function canonicalizeDatabaseTables(tables: VaultTableSnapshot[]): VaultTableSnapshot[] {
-  return [...tables]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((snapshot) => {
-      const table = db.tables.find((candidate) => candidate.name === snapshot.name)
-      const keyPath = table?.schema.primKey.keyPath
-      if (typeof keyPath !== 'string' || keyPath.length === 0) {
-        throw new Error(`Vault database fingerprint cannot resolve primary key for ${snapshot.name}.`)
+  return [...tables].sort((a, b) => a.name.localeCompare(b.name)).map((snapshot) => {
+    const table = db.tables.find((candidate) => candidate.name === snapshot.name)
+    const keyPath = table?.schema.primKey.keyPath
+    if (typeof keyPath !== 'string' || !keyPath) {
+      throw new Error(`Vault database fingerprint cannot resolve primary key for ${snapshot.name}.`)
+    }
+    const rows = [...snapshot.rows].sort((left, right) => {
+      if (!isRecord(left) || !isRecord(right)) throw new Error(`Invalid row in ${snapshot.name}.`)
+      const leftKey = left[keyPath]
+      const rightKey = right[keyPath]
+      if (typeof leftKey !== 'string' || typeof rightKey !== 'string') {
+        throw new Error(`Invalid primary key in ${snapshot.name}.`)
       }
-
-      const rows = [...snapshot.rows].sort((left, right) => {
-        if (!isRecord(left) || !isRecord(right)) {
-          throw new Error(`Vault database fingerprint found invalid row in ${snapshot.name}.`)
-        }
-        const leftKey = left[keyPath]
-        const rightKey = right[keyPath]
-        if (typeof leftKey !== 'string' || typeof rightKey !== 'string') {
-          throw new Error(`Vault database fingerprint found invalid primary key in ${snapshot.name}.`)
-        }
-        return leftKey.localeCompare(rightKey)
-      })
-
-      return { name: snapshot.name, rows }
+      return leftKey.localeCompare(rightKey)
     })
+    return { name: snapshot.name, rows }
+  })
 }
 
 async function databaseSha256(tables: VaultTableSnapshot[]): Promise<string> {
-  const encoded = new TextEncoder().encode(
-    stableJsonStringify(canonicalizeDatabaseTables(tables)),
-  )
+  const encoded = new TextEncoder().encode(stableJsonStringify(canonicalizeDatabaseTables(tables)))
   try {
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', encoded))
     return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
@@ -813,55 +626,31 @@ async function currentDatabaseSha256(): Promise<string> {
 
 async function replaceDatabase(tables: VaultTableSnapshot[]): Promise<void> {
   const liveTables = [...db.tables]
-
   await db.transaction('rw', liveTables, async () => {
     for (const table of liveTables) await table.clear()
-
     for (const snapshot of tables) {
       const table = db.tables.find((candidate) => candidate.name === snapshot.name)
       if (!table) throw new Error(`Vault restore target table ${snapshot.name} no longer exists.`)
-      if (snapshot.rows.length > 0) {
-        await table.bulkPut(snapshot.rows as Array<Record<string, unknown>>)
-      }
+      if (snapshot.rows.length > 0) await table.bulkPut(snapshot.rows as Array<Record<string, unknown>>)
     }
   })
 }
 
 async function deleteImportStageDirectory(stageId: string): Promise<void> {
-  assertSafeIdentifier(stageId, 'Vault staging ID')
   const root = await getRootDirectory()
-  const duranti = await getExistingDirectory(root, ROOT_DIRECTORY)
-  if (!duranti) return
-  const stagingRoot = await getExistingDirectory(duranti, IMPORT_STAGING_DIRECTORY)
-  if (!stagingRoot) return
-  await removeEntryIfExists(stagingRoot, stageId, true)
+  const appRoot = await getExistingDirectory(root, ROOT_DIRECTORY)
+  if (!appRoot) return
+  const staging = await getExistingDirectory(appRoot, IMPORT_STAGING_DIRECTORY)
+  if (staging) await removeEntryIfExists(staging, stageId, true)
 }
 
-async function cleanupRestoreArtifacts(
-  journal: RestoreJournal,
-): Promise<boolean> {
+async function cleanupRestoreArtifacts(journal: RestoreJournal): Promise<boolean> {
   let complete = true
-
-  try {
-    await deleteImportStageDirectory(journal.stageId)
-  } catch {
-    complete = false
-  }
-
-  try {
-    await deleteBackup(journal.restoreId)
-  } catch {
-    complete = false
-  }
-
+  try { await deleteImportStageDirectory(journal.stageId) } catch { complete = false }
+  try { await deleteBackup(journal.restoreId) } catch { complete = false }
   if (complete) {
-    try {
-      await deleteRestoreJournal()
-    } catch {
-      complete = false
-    }
+    try { await deleteRestoreJournal() } catch { complete = false }
   }
-
   return complete
 }
 
@@ -881,17 +670,10 @@ export async function recoverInterruptedVaultRestore(): Promise<VaultRestoreReco
     return 'finalized-committed'
   }
 
-  if (journal.phase === 'files-promoted') {
-    const fingerprint = await currentDatabaseSha256()
-    if (fingerprint === journal.targetDatabaseSha256) {
-      lockLocalEncryption()
-      await cleanupRestoreArtifacts({
-        ...journal,
-        phase: 'committed',
-        updatedAt: new Date().toISOString(),
-      })
-      return 'finalized-committed'
-    }
+  if (journal.phase === 'files-promoted' && await currentDatabaseSha256() === journal.targetDatabaseSha256) {
+    lockLocalEncryption()
+    await cleanupRestoreArtifacts({ ...journal, phase: 'committed', updatedAt: new Date().toISOString() })
+    return 'finalized-committed'
   }
 
   await rollbackJournal(journal)
@@ -903,19 +685,13 @@ export async function commitStagedVaultImport(
   options: CommitStagedVaultImportOptions,
 ): Promise<VaultRestoreResult> {
   if (options.mode !== 'replace') throw new Error('Vault restore requires explicit replace mode.')
-  assertSafeIdentifier(staged.stageId, 'Vault staging ID')
-  assertSafeIdentifier(staged.archiveId, 'Vault archive ID')
   assertStagedVaultImportReady(staged)
   const stagedFiles = await snapshotStagedFiles(staged)
 
   emitProgress(options.onProgress, {
-    phase: 'recovering',
-    filesCompleted: 0,
-    filesTotal: staged.sourceFileCount,
-    bytesCompleted: 0,
-    bytesTotal: staged.sourceBytes,
+    phase: 'recovering', filesCompleted: 0, filesTotal: staged.sourceFileCount,
+    bytesCompleted: 0, bytesTotal: staged.sourceBytes,
   })
-
   await recoverInterruptedVaultRestore()
 
   const restoreId = crypto.randomUUID()
@@ -925,23 +701,10 @@ export async function commitStagedVaultImport(
   const liveBytes = liveFiles.reduce((total, file) => total + file.sizeBytes, 0)
 
   emitProgress(options.onProgress, {
-    phase: 'backup',
-    filesCompleted: 0,
-    filesTotal: liveFiles.length,
-    bytesCompleted: 0,
-    bytesTotal: liveBytes,
+    phase: 'backup', filesCompleted: 0, filesTotal: liveFiles.length,
+    bytesCompleted: 0, bytesTotal: liveBytes,
   })
-
-  try {
-    await createBackup(restoreId, liveFiles)
-  } catch (error) {
-    try {
-      await deleteBackup(restoreId)
-    } catch {
-      // Preserve the original backup failure.
-    }
-    throw error
-  }
+  await createBackup(restoreId, liveFiles)
 
   let journal: RestoreJournal = {
     version: RESTORE_JOURNAL_VERSION,
@@ -953,54 +716,26 @@ export async function commitStagedVaultImport(
     createdAt,
     updatedAt: createdAt,
   }
-  try {
-    await writeRestoreJournal(journal)
-  } catch (error) {
-    try {
-      await deleteBackup(restoreId)
-    } catch {
-      // Preserve the original journal failure.
-    }
-    throw error
-  }
+  await writeRestoreJournal(journal)
 
   let databaseCommitted = false
-
   try {
     emitProgress(options.onProgress, {
-      phase: 'promoting-files',
-      filesCompleted: 0,
-      filesTotal: staged.sourceFileCount,
-      bytesCompleted: 0,
-      bytesTotal: staged.sourceBytes,
+      phase: 'promoting-files', filesCompleted: 0, filesTotal: staged.sourceFileCount,
+      bytesCompleted: 0, bytesTotal: staged.sourceBytes,
     })
-
     await promoteStagedFiles(staged, stagedFiles)
-
-    journal = {
-      ...journal,
-      phase: 'files-promoted',
-      updatedAt: new Date().toISOString(),
-    }
+    journal = { ...journal, phase: 'files-promoted', updatedAt: new Date().toISOString() }
     await writeRestoreJournal(journal)
 
     emitProgress(options.onProgress, {
-      phase: 'committing-database',
-      filesCompleted: staged.sourceFileCount,
-      filesTotal: staged.sourceFileCount,
-      bytesCompleted: staged.sourceBytes,
-      bytesTotal: staged.sourceBytes,
+      phase: 'committing-database', filesCompleted: staged.sourceFileCount, filesTotal: staged.sourceFileCount,
+      bytesCompleted: staged.sourceBytes, bytesTotal: staged.sourceBytes,
     })
-
     await replaceDatabase(staged.manifest.database.tables)
     databaseCommitted = true
     lockLocalEncryption()
-
-    journal = {
-      ...journal,
-      phase: 'committed',
-      updatedAt: new Date().toISOString(),
-    }
+    journal = { ...journal, phase: 'committed', updatedAt: new Date().toISOString() }
     await writeRestoreJournal(journal)
   } catch (error) {
     if (!databaseCommitted) {
@@ -1008,18 +743,15 @@ export async function commitStagedVaultImport(
         await restoreBackupFiles(restoreId)
         await cleanupRestoreArtifacts(journal)
       } catch {
-        // Keep the journal and backup for startup recovery.
+        // Journal and backup remain for bootstrap recovery.
       }
     }
     throw error
   }
 
   emitProgress(options.onProgress, {
-    phase: 'verifying',
-    filesCompleted: staged.sourceFileCount,
-    filesTotal: staged.sourceFileCount,
-    bytesCompleted: staged.sourceBytes,
-    bytesTotal: staged.sourceBytes,
+    phase: 'verifying', filesCompleted: staged.sourceFileCount, filesTotal: staged.sourceFileCount,
+    bytesCompleted: staged.sourceBytes, bytesTotal: staged.sourceBytes,
   })
 
   const verificationErrors: string[] = []
@@ -1028,17 +760,14 @@ export async function commitStagedVaultImport(
   let mediaIntegrity: MediaIntegrityReport | undefined
 
   try {
-    databaseVerified = (await currentDatabaseSha256()) === targetDatabaseSha256
+    databaseVerified = await currentDatabaseSha256() === targetDatabaseSha256
     if (!databaseVerified) verificationErrors.push('Restored database fingerprint does not match the Vault target.')
   } catch (error) {
     verificationErrors.push(`Database verification failed: ${error instanceof Error ? error.message : String(error)}`)
   }
 
   try {
-    filesVerified = fileInventoriesMatch(
-      normalizeManifestFiles(staged.manifest.files),
-      await collectManagedLiveFiles(),
-    )
+    filesVerified = fileInventoriesMatch(normalizeManifestFiles(staged.manifest.files), await collectManagedLiveFiles())
     if (!filesVerified) verificationErrors.push('Restored OPFS inventory does not match the Vault target.')
   } catch (error) {
     verificationErrors.push(`OPFS verification failed: ${error instanceof Error ? error.message : String(error)}`)
@@ -1051,21 +780,14 @@ export async function commitStagedVaultImport(
   }
 
   emitProgress(options.onProgress, {
-    phase: 'cleanup',
-    filesCompleted: staged.sourceFileCount,
-    filesTotal: staged.sourceFileCount,
-    bytesCompleted: staged.sourceBytes,
-    bytesTotal: staged.sourceBytes,
+    phase: 'cleanup', filesCompleted: staged.sourceFileCount, filesTotal: staged.sourceFileCount,
+    bytesCompleted: staged.sourceBytes, bytesTotal: staged.sourceBytes,
   })
-
   const cleanupComplete = await cleanupRestoreArtifacts(journal)
 
   emitProgress(options.onProgress, {
-    phase: 'complete',
-    filesCompleted: staged.sourceFileCount,
-    filesTotal: staged.sourceFileCount,
-    bytesCompleted: staged.sourceBytes,
-    bytesTotal: staged.sourceBytes,
+    phase: 'complete', filesCompleted: staged.sourceFileCount, filesTotal: staged.sourceFileCount,
+    bytesCompleted: staged.sourceBytes, bytesTotal: staged.sourceBytes,
   })
 
   return {
