@@ -7,7 +7,10 @@ test('DTAgency persistence and Vault browser contracts', async ({ page }) => {
   })
   page.on('pageerror', (error) => consoleErrors.push(`${error.name}: ${error.message}`))
 
-  await page.goto('tests/browser/index.html')
+  const response = await page.goto('/Duranti-Travel-Agency/tests/browser/index.html')
+  expect(response, 'Browser harness did not return an HTTP response.').not.toBeNull()
+  expect(response.status(), `Browser harness returned HTTP ${response.status()}.`).toBeLessThan(400)
+
   await page.waitForFunction(
     () => Array.isArray(window.__DTAGENCY_BROWSER_RESULTS__) && window.__DTAGENCY_BROWSER_RESULTS__.length === 5,
     null,
