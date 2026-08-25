@@ -1,9 +1,14 @@
 import type { Block, Media, Place, Reservation } from '../../domain/entities'
+import { assertTripDayContext, requireTripDay } from '../../application/shared/trip-day-context'
 import { reservationBlockRepository } from '../../data/repositories/reservation-block-repository'
-import { blockRepository, mediaRepository, placeRepository, reservationRepository } from '../../data/repositories/repositories'
-import { getTripDay } from '../days/day-service'
-import { assertPlannerDayContext } from '../planner/block-service'
-import { getTrip } from '../trips/trip-service'
+import {
+  blockRepository,
+  dayRepository,
+  mediaRepository,
+  placeRepository,
+  reservationRepository,
+  tripRepository,
+} from '../../data/repositories/repositories'
 
 export type PlannerReservationType = Extract<Reservation['type'], 'transport' | 'accommodation' | 'restaurant' | 'activity'>
 export type PlannerReservationStatus = NonNullable<Reservation['status']>
@@ -44,6 +49,7 @@ const attachmentMimeByExtension: Record<string, string> = {
   webp: 'image/webp',
   gif: 'image/gif',
 }
+const contextDependencies = { trips: tripRepository, days: dayRepository }
 
 function cleanOptional(value: string | undefined): string | undefined {
   const cleaned = value?.trim()
@@ -96,15 +102,11 @@ function formatDisplayDateTime(value: string): string {
 
 function timingLabels(type: PlannerReservationType): { start: string; end: string; subject: string } {
   switch (type) {
-    case 'transport':
-      return { start: 'partenza', end: 'arrivo', subject: 'trasporto' }
-    case 'accommodation':
-      return { start: 'check-in', end: 'check-out', subject: 'alloggio' }
-    case 'restaurant':
-      return { start: 'inizio', end: 'fine', subject: 'ristorante' }
+    case 'transport': return { start: 'partenza', end: 'arrivo', subject: 'trasporto' }
+    case 'accommodation': return { start: 'check-in', end: 'check-out', subject: 'alloggio' }
+    case 'restaurant': return { start: 'inizio', end: 'fine', subject: 'ristorante' }
     case 'activity':
-    default:
-      return { start: 'inizio', end: 'fine', subject: 'attività' }
+    default: return { start: 'inizio', end: 'fine', subject: 'attività' }
   }
 }
 
@@ -156,11 +158,7 @@ function assertReservationContext(
   dayId: string,
   type: PlannerReservationType,
 ): void {
-  if (
-    reservation.tripId !== tripId ||
-    reservation.dayId !== dayId ||
-    reservation.type !== type
-  ) {
+  if (reservation.tripId !== tripId || reservation.dayId !== dayId || reservation.type !== type) {
     throw new Error('La prenotazione collegata non appartiene a questo blocco.')
   }
 }
@@ -176,9 +174,7 @@ function assertAttachmentContext(media: Media, tripId: string, dayId: string, bl
 
 function attachmentDescriptor(file: File): { mimeType: string; kind: Media['kind']; originalName: string } {
   if (file.size <= 0) throw new Error('Il file selezionato è vuoto.')
-  if (file.size > MAX_RESERVATION_ATTACHMENT_BYTES) {
-    throw new Error('L’allegato supera il limite di 25 MiB.')
-  }
+  if (file.size > MAX_RESERVATION_ATTACHMENT_BYTES) throw new Error('L’allegato supera il limite di 25 MiB.')
 
   const originalName = file.name.trim()
   if (!originalName) throw new Error('Il file deve avere un nome.')
@@ -211,15 +207,23 @@ async function getReservationBlock(tripId: string, dayId: string, blockId: strin
   return block
 }
 
+async function assertReservationDayContext(tripId: string, dayId: string, editable: boolean) {
+  return assertTripDayContext(
+    contextDependencies,
+    tripId,
+    dayId,
+    editable,
+    'Ripristina il viaggio prima di modificare le prenotazioni.',
+  )
+}
+
 async function normalizeDraft(
   tripId: string,
   dayId: string,
   reservationType: PlannerReservationType,
   input: ReservationDraft,
 ): Promise<ReservationDraft> {
-  const trip = await getTrip(tripId)
-  const day = await getTripDay(tripId, dayId)
-  if (!trip || !day) throw new Error('Viaggio o giornata non disponibili.')
+  const { trip, day } = await requireTripDay(contextDependencies, tripId, dayId)
 
   const title = input.title.trim()
   if (!title) throw new Error('Il titolo della prenotazione è obbligatorio.')
@@ -252,9 +256,7 @@ async function normalizeDraft(
   }
 
   const placeId = cleanOptional(input.placeId)
-  if (placeId && !(await placeRepository.get(placeId))) {
-    throw new Error('Il luogo associato non esiste più.')
-  }
+  if (placeId && !(await placeRepository.get(placeId))) throw new Error('Il luogo associato non esiste più.')
 
   return {
     title,
@@ -286,8 +288,7 @@ export function reservationToDraft(reservation: Reservation): ReservationDraft {
 }
 
 export async function listSavedPlaces(): Promise<Place[]> {
-  return (await placeRepository.list())
-    .sort((left, right) => left.name.localeCompare(right.name, 'it'))
+  return (await placeRepository.list()).sort((left, right) => left.name.localeCompare(right.name, 'it'))
 }
 
 export async function getPlannerReservation(
@@ -295,7 +296,7 @@ export async function getPlannerReservation(
   dayId: string,
   blockId: string,
 ): Promise<Reservation | undefined> {
-  await assertPlannerDayContext(tripId, dayId, false)
+  await assertReservationDayContext(tripId, dayId, false)
   const block = await getReservationBlock(tripId, dayId, blockId)
   const type = reservationTypeFromBlock(block)
   if (!type) throw new Error('Tipo di prenotazione non supportato.')
@@ -332,7 +333,7 @@ export async function attachPlannerReservationFile(
   blockId: string,
   file: File,
 ): Promise<ReservationAttachmentResult> {
-  await assertPlannerDayContext(tripId, dayId, true)
+  await assertReservationDayContext(tripId, dayId, true)
   const reservation = await getPlannerReservation(tripId, dayId, blockId)
   if (!reservation) throw new Error('Salva prima la prenotazione, poi aggiungi l’allegato.')
 
@@ -381,7 +382,7 @@ export async function removePlannerReservationAttachment(
   dayId: string,
   blockId: string,
 ): Promise<Reservation> {
-  await assertPlannerDayContext(tripId, dayId, true)
+  await assertReservationDayContext(tripId, dayId, true)
   const reservation = await getPlannerReservation(tripId, dayId, blockId)
   if (!reservation) throw new Error('La prenotazione non esiste ancora.')
   if (!reservation.attachmentMediaId) return reservation
@@ -409,7 +410,7 @@ export async function savePlannerReservation(
   blockId: string,
   input: ReservationDraft,
 ): Promise<Reservation> {
-  await assertPlannerDayContext(tripId, dayId, true)
+  await assertReservationDayContext(tripId, dayId, true)
   const block = await getReservationBlock(tripId, dayId, blockId)
   const reservationType = reservationTypeFromBlock(block)
   if (!reservationType) throw new Error('Tipo di prenotazione non supportato.')
@@ -422,23 +423,8 @@ export async function savePlannerReservation(
   const now = new Date().toISOString()
 
   const reservation: Reservation = current
-    ? {
-        ...current,
-        ...draft,
-        type: reservationType,
-        tripId,
-        dayId,
-        updatedAt: now,
-      }
-    : {
-        id: crypto.randomUUID(),
-        ...draft,
-        type: reservationType,
-        tripId,
-        dayId,
-        createdAt: now,
-        updatedAt: now,
-      }
+    ? { ...current, ...draft, type: reservationType, tripId, dayId, updatedAt: now }
+    : { id: crypto.randomUUID(), ...draft, type: reservationType, tripId, dayId, createdAt: now, updatedAt: now }
 
   await reservationBlockRepository.saveReservationForBlock(blockId, tripId, dayId, reservation)
   return reservation
@@ -449,6 +435,6 @@ export async function deletePlannerReservationBlock(
   dayId: string,
   blockId: string,
 ): Promise<void> {
-  await assertPlannerDayContext(tripId, dayId, true)
+  await assertReservationDayContext(tripId, dayId, true)
   await reservationBlockRepository.softDeleteReservationBlock(blockId, tripId, dayId)
 }
