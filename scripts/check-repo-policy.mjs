@@ -9,6 +9,7 @@ const textExtensions = new Set([
 
 const forbiddenVaultExtension = '.' + 'duranti'
 const forbiddenLegacyProductName = 'Duranti' + ' Travel Agency'
+const maximumSchemaVersionBeforeVaultMigration = 3
 
 const violations = []
 
@@ -37,7 +38,24 @@ async function scan(directory) {
   }
 }
 
+async function enforceDatabaseVersionGate() {
+  const databaseSource = await readFile(join(root, 'src/data/db/duranti-db.ts'), 'utf8')
+  const match = databaseSource.match(/export const DB_VERSION = (\d+)/)
+  if (!match) {
+    violations.push('src/data/db/duranti-db.ts: DB_VERSION could not be verified')
+    return
+  }
+
+  const version = Number(match[1])
+  if (version > maximumSchemaVersionBeforeVaultMigration) {
+    violations.push(
+      `src/data/db/duranti-db.ts: DB_VERSION ${version} is blocked by ADR-004 until backward-compatible Vault snapshot migration and regression tests exist`,
+    )
+  }
+}
+
 await scan(root)
+await enforceDatabaseVersionGate()
 
 if (violations.length > 0) {
   console.error('DTAgency repository policy violations:')
