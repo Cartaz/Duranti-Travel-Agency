@@ -10,7 +10,7 @@ export interface Pbkdf2BenchmarkOptions {
 
 const DEFAULT_ITERATIONS = [200_000, 300_000, 400_000, 600_000]
 const DEFAULT_RUNS = 2
-const BENCHMARK_PASSPHRASE = 'duranti-local-kdf-benchmark-only'
+const BENCHMARK_PASSPHRASE = 'dtagency-local-kdf-benchmark-only'
 
 function assertIterations(value: number): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
