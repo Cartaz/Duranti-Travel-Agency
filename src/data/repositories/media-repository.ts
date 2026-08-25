@@ -1,5 +1,5 @@
 import type { Media } from '../../domain/entities'
-import { db } from '../db/duranti-db'
+import { db } from '../db/dtagency-db'
 import { assertEntityBase } from '../db/validate'
 import {
   deleteMediaFile,
@@ -191,8 +191,6 @@ export class MediaRepository {
       throw new Error(`Media ${id} must be tombstoned before it can be purged.`)
     }
 
-    // Delete the binary first. If the app stops before metadata deletion, the tombstone
-    // remains and the integrity scanner can safely finish the purge later.
     try {
       await deleteMediaFile(id)
     } catch (error) {
