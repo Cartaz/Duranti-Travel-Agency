@@ -16,6 +16,10 @@ const maximumSchemaVersionBeforeVaultMigration = 1
 const tripReadBridgePath = 'src/features/trips/trip-service.ts'
 const dayBridgePath = 'src/features/days/day-service.ts'
 const plannerBridgePath = 'src/features/planner/block-service.ts'
+const plannerPagePaths = new Set([
+  'src/features/planner/DayPlannerPage.tsx',
+  'src/features/planner/GuidedDayPlannerPage.tsx',
+])
 
 const violations = []
 
@@ -83,6 +87,23 @@ function enforcePlannerBridge(path, content) {
   return true
 }
 
+function enforcePlannerPageBoundary(path, content) {
+  if (!plannerPagePaths.has(path)) return
+  const forbiddenServiceImports = [
+    "../trips/trip-service",
+    "../days/day-service",
+    "./block-service",
+  ]
+  for (const token of forbiddenServiceImports) {
+    if (content.includes(token)) {
+      violations.push(`${path}: planner pages must use ApplicationProvider instead of transitional service bridge ${token}`)
+    }
+  }
+  if (!content.includes('useApplicationServices')) {
+    violations.push(`${path}: planner pages must resolve application capabilities through useApplicationServices`)
+  }
+}
+
 function enforceDependencyDirection(path, content) {
   const normalized = path.replaceAll('\\', '/')
   const importsDataLayer = /from\s+['"][^'"]*\/data(?:\/|['"])/.test(content)
@@ -111,6 +132,7 @@ function enforceDependencyDirection(path, content) {
     if (importsComposition && !enforcePlannerBridge(normalized, content)) {
       violations.push(`${path}: planner feature must depend on application/UI boundaries, never composition directly`)
     }
+    enforcePlannerPageBoundary(normalized, content)
   }
 }
 
