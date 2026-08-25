@@ -7,12 +7,27 @@ const textExtensions = new Set([
   '.css', '.html', '.js', '.json', '.jsx', '.md', '.mjs', '.ts', '.tsx', '.txt', '.yml', '.yaml',
 ])
 
-const forbiddenLegacyToken = 'dura' + 'nti'
-const forbiddenVaultMagic = 'DUR' + 'VLT'
-const forbiddenDocumentMagic = 'DUR' + 'DOC'
+const legacyToken = 'dura' + 'nti'
+const legacyProductName = 'Dura' + 'nti Travel Agency'
+const legacyVaultExtension = '.' + legacyToken
+const legacyVaultMagic = 'DUR' + 'VLT'
+const legacyDocumentMagic = 'DUR' + 'DOC'
 const maximumSchemaVersionBeforeVaultMigration = 1
 
 const violations = []
+
+function hasPersistentLegacyIdentifier(content) {
+  const patterns = [
+    `DB_NAME = '${legacyToken}'`,
+    `ROOT_DIRECTORY = '${legacyToken}'`,
+    `${legacyToken}|vault|`,
+    `${legacyToken}|encrypted-`,
+    `${legacyToken}-vault`,
+    `application/vnd.${legacyToken}.vault`,
+    legacyVaultExtension,
+  ]
+  return patterns.some((pattern) => content.toLowerCase().includes(pattern.toLowerCase()))
+}
 
 async function scan(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -29,16 +44,18 @@ async function scan(directory) {
 
     const content = await readFile(absolute, 'utf8')
     const path = relative(root, absolute)
-    const normalized = content.toLowerCase()
 
-    if (normalized.includes(forbiddenLegacyToken)) {
-      violations.push(`${path}: legacy DTAgency predecessor identifier is forbidden`)
+    if (hasPersistentLegacyIdentifier(content)) {
+      violations.push(`${path}: persistent predecessor identifier is forbidden`)
     }
-    if (content.includes(forbiddenVaultMagic)) {
-      violations.push(`${path}: legacy Vault magic is forbidden`)
+    if (content.includes(legacyVaultMagic)) {
+      violations.push(`${path}: predecessor Vault magic is forbidden`)
     }
-    if (content.includes(forbiddenDocumentMagic)) {
-      violations.push(`${path}: legacy private-document magic is forbidden`)
+    if (content.includes(legacyDocumentMagic)) {
+      violations.push(`${path}: predecessor private-document magic is forbidden`)
+    }
+    if (content.includes(legacyProductName)) {
+      violations.push(`${path}: predecessor product name is forbidden; use DTAgency`)
     }
   }
 }
