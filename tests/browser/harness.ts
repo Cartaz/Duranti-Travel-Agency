@@ -61,6 +61,14 @@ async function readText(file: File): Promise<string> {
   return new TextDecoder().decode(await file.arrayBuffer())
 }
 
+async function copyFileToMemory(file: File): Promise<File> {
+  const bytes = await file.arrayBuffer()
+  return new File([bytes], file.name, {
+    type: file.type,
+    lastModified: file.lastModified,
+  })
+}
+
 async function writeOpfsFile(
   directory: FileSystemDirectoryHandle,
   name: string,
@@ -196,7 +204,8 @@ await run('Vault export wipe import restore round-trips IndexedDB and OPFS', asy
   const seeded = await seedRoundTripState()
   const passphrase = 'browser-integration-passphrase-2026'
   const prepared = await prepareVaultExport(passphrase)
-  const vaultFile = await loadPreparedVaultFile(prepared)
+  const opfsVaultFile = await loadPreparedVaultFile(prepared)
+  const vaultFile = await copyFileToMemory(opfsVaultFile)
   assert(prepared.sourceFileCount === 1, `Expected one managed file, got ${prepared.sourceFileCount}.`)
 
   await resetEnvironment()
