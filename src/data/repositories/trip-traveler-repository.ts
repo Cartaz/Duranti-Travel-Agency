@@ -1,5 +1,5 @@
 import type { TripTraveler } from '../../domain/entities'
-import { db } from '../db/duranti-db'
+import { db } from '../db/dtagency-db'
 
 export type TripTravelerRole = NonNullable<TripTraveler['role']>
 
