@@ -15,6 +15,7 @@ const legacyDocumentMagic = 'DUR' + 'DOC'
 const maximumSchemaVersionBeforeVaultMigration = 1
 const tripReadBridgePath = 'src/features/trips/trip-service.ts'
 const dayBridgePath = 'src/features/days/day-service.ts'
+const plannerBridgePath = 'src/features/planner/block-service.ts'
 
 const violations = []
 
@@ -33,25 +34,16 @@ function hasPersistentLegacyIdentifier(content) {
 
 function enforceTripReadBridge(path, content) {
   if (path !== tripReadBridgePath) return false
-
   if (!content.includes("export const getTrip = tripApplication.getTrip")) {
     violations.push(`${path}: transitional read bridge must expose only getTrip`)
   }
 
   const forbiddenMutationTokens = [
-    'createTrip',
-    'updateTrip',
-    'archiveTrip',
-    'restoreArchivedTrip',
-    'listBookTrips',
-    'listArchivedTrips',
+    'createTrip', 'updateTrip', 'archiveTrip', 'restoreArchivedTrip', 'listBookTrips', 'listArchivedTrips',
   ]
   for (const token of forbiddenMutationTokens) {
-    if (content.includes(token)) {
-      violations.push(`${path}: transitional read bridge must not expose ${token}`)
-    }
+    if (content.includes(token)) violations.push(`${path}: transitional read bridge must not expose ${token}`)
   }
-
   return true
 }
 
@@ -69,6 +61,28 @@ function enforceDayBridge(path, content) {
   return true
 }
 
+function enforcePlannerBridge(path, content) {
+  if (path !== plannerBridgePath) return false
+  const required = [
+    'assertPlannerDayContext',
+    'listDayPlannerBlocks',
+    'readPlannerBlockDraft',
+    'createPlannerBlock',
+    'updatePlannerBlock',
+    'movePlannerBlock',
+    'deletePlannerBlock',
+  ]
+  for (const token of required) {
+    if (!content.includes(`plannerApplication.${token}`)) {
+      violations.push(`${path}: transitional planner bridge must delegate ${token} to PlannerApplication`)
+    }
+  }
+  if (content.includes('/data/') || content.includes('../trips/trip-service') || content.includes('../days/day-service')) {
+    violations.push(`${path}: transitional planner bridge must never reach data or feature services`)
+  }
+  return true
+}
+
 function enforceDependencyDirection(path, content) {
   const normalized = path.replaceAll('\\', '/')
   const importsDataLayer = /from\s+['"][^'"]*\/data(?:\/|['"])/.test(content)
@@ -79,20 +93,23 @@ function enforceDependencyDirection(path, content) {
   }
 
   if (normalized.startsWith('src/features/trips/')) {
-    if (importsDataLayer) {
-      violations.push(`${path}: trips feature must never import data adapters directly`)
-    }
+    if (importsDataLayer) violations.push(`${path}: trips feature must never import data adapters directly`)
     if (importsComposition && !enforceTripReadBridge(normalized, content)) {
       violations.push(`${path}: trips feature must depend on application/UI boundaries, never composition directly`)
     }
   }
 
   if (normalized.startsWith('src/features/days/')) {
-    if (importsDataLayer) {
-      violations.push(`${path}: days feature must never import data adapters directly`)
-    }
+    if (importsDataLayer) violations.push(`${path}: days feature must never import data adapters directly`)
     if (importsComposition && !enforceDayBridge(normalized, content)) {
       violations.push(`${path}: days feature must depend on application/UI boundaries, never composition directly`)
+    }
+  }
+
+  if (normalized.startsWith('src/features/planner/')) {
+    if (importsDataLayer) violations.push(`${path}: planner feature must never import data adapters directly`)
+    if (importsComposition && !enforcePlannerBridge(normalized, content)) {
+      violations.push(`${path}: planner feature must depend on application/UI boundaries, never composition directly`)
     }
   }
 }
@@ -113,18 +130,10 @@ async function scan(directory) {
     const content = await readFile(absolute, 'utf8')
     const path = relative(root, absolute)
 
-    if (hasPersistentLegacyIdentifier(content)) {
-      violations.push(`${path}: persistent predecessor identifier is forbidden`)
-    }
-    if (content.includes(legacyVaultMagic)) {
-      violations.push(`${path}: predecessor Vault magic is forbidden`)
-    }
-    if (content.includes(legacyDocumentMagic)) {
-      violations.push(`${path}: predecessor private-document magic is forbidden`)
-    }
-    if (content.includes(legacyProductName)) {
-      violations.push(`${path}: predecessor product name is forbidden; use DTAgency`)
-    }
+    if (hasPersistentLegacyIdentifier(content)) violations.push(`${path}: persistent predecessor identifier is forbidden`)
+    if (content.includes(legacyVaultMagic)) violations.push(`${path}: predecessor Vault magic is forbidden`)
+    if (content.includes(legacyDocumentMagic)) violations.push(`${path}: predecessor private-document magic is forbidden`)
+    if (content.includes(legacyProductName)) violations.push(`${path}: predecessor product name is forbidden; use DTAgency`)
 
     enforceDependencyDirection(path, content)
   }
@@ -141,9 +150,7 @@ async function enforceDatabaseVersionGate() {
 
   const version = Number(match[1])
   if (version > maximumSchemaVersionBeforeVaultMigration) {
-    violations.push(
-      `${databasePath}: DB_VERSION ${version} is blocked until Vault snapshot migration and regression tests exist`,
-    )
+    violations.push(`${databasePath}: DB_VERSION ${version} is blocked until Vault snapshot migration and regression tests exist`)
   }
 }
 
