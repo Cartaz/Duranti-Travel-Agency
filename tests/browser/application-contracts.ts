@@ -1,5 +1,6 @@
-import type { Day, Trip } from '../../src/domain/entities'
+import type { Day, Expense, Trip } from '../../src/domain/entities'
 import { createDayApplication } from '../../src/application/days/day-application'
+import { createExpenseSummaryApplication } from '../../src/application/expenses/expense-summary'
 import { createTripApplication } from '../../src/application/trips/trip-application'
 
 export interface ApplicationContractResult {
@@ -114,6 +115,60 @@ export async function runApplicationContractTests(): Promise<ApplicationContract
     const created = await application.createTripDay(trip.id, { date: '2026-09-04', title: 'Fourth day' })
     assert(created.sequence === 4, `Expected sequence 4, got ${created.sequence}.`)
     assert(saved?.id === created.id, 'Created day was not persisted through the port.')
+  }))
+
+  results.push(await contract('Expense summary includes explicit FX conversions in trip budget', async () => {
+    const timestamp = '2026-08-25T12:00:00.000Z'
+    const trip: Trip = {
+      id: 'trip-1',
+      title: 'Budget trip',
+      status: 'planned',
+      currency: 'EUR',
+      budgetMinor: 20_000,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }
+    const expenses: Expense[] = [
+      {
+        id: 'expense-eur',
+        tripId: trip.id,
+        amountMinor: 5_000,
+        currency: 'EUR',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+      {
+        id: 'expense-usd',
+        tripId: trip.id,
+        amountMinor: 10_000,
+        currency: 'USD',
+        fx: { targetCurrency: 'EUR', rate: '0.9', convertedAmountMinor: 9_000 },
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+      {
+        id: 'expense-gbp',
+        tripId: trip.id,
+        amountMinor: 2_000,
+        currency: 'GBP',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    ]
+
+    const application = createExpenseSummaryApplication({
+      trips: { get: async (id) => id === trip.id ? trip : undefined },
+      days: { listByTrip: async () => [] },
+      expenses: { listByTrip: async (id) => id === trip.id ? expenses : [] },
+      travelers: { get: async () => undefined },
+    })
+
+    const summary = await application.getTripExpenseSummary(trip.id)
+    assert(summary.budget?.spentMinor === 14_000, `Expected budget spend 14000, got ${summary.budget?.spentMinor}.`)
+    assert(summary.budget?.remainingMinor === 6_000, `Expected remaining budget 6000, got ${summary.budget?.remainingMinor}.`)
+    assert(summary.budget?.directExpenseCount === 1, 'Direct expense count is incorrect.')
+    assert(summary.budget?.convertedExpenseCount === 1, 'Converted expense count is incorrect.')
+    assert(summary.budget?.excludedExpenseCount === 1, 'Unconverted foreign expense was not excluded.')
   }))
 
   return results
