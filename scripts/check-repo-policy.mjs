@@ -38,8 +38,8 @@ function enforceDependencyDirection(path, content) {
     violations.push(`${path}: application layer must depend on ports/domain, never data or composition`)
   }
 
-  if (normalized.startsWith('src/features/trips/') && importsDataLayer) {
-    violations.push(`${path}: trips feature must use the application boundary, not data adapters directly`)
+  if (normalized.startsWith('src/features/trips/') && (importsDataLayer || importsComposition)) {
+    violations.push(`${path}: trips feature must depend on application/UI boundaries, never data or composition directly`)
   }
 }
 
