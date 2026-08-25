@@ -3,9 +3,7 @@ import { extname, join, relative } from 'node:path'
 
 const root = process.cwd()
 const ignoredDirectories = new Set(['.git', 'node_modules', 'dist', 'coverage'])
-const textExtensions = new Set([
-  '.css', '.html', '.js', '.json', '.jsx', '.md', '.mjs', '.ts', '.tsx', '.txt', '.yml', '.yaml',
-])
+const textExtensions = new Set(['.css', '.html', '.js', '.json', '.jsx', '.md', '.mjs', '.ts', '.tsx', '.txt', '.yml', '.yaml'])
 
 const legacyToken = 'dura' + 'nti'
 const legacyProductName = 'Dura' + 'nti Travel Agency'
@@ -19,23 +17,18 @@ const forbiddenBridgeFiles = new Set([
   'src/features/planner/block-service.ts',
   'src/features/reservations/reservation-service.ts',
   'src/features/media/day-media-service.ts',
+  'src/features/templates/day-template-service.ts',
+  'src/features/templates/personal-day-template-service.ts',
 ])
 const forbiddenBridgeImportTokens = [
-  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service',
-  '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service', '../media/day-media-service',
-  './block-service', './reservation-service', './day-media-service',
+  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service', '/templates/day-template-service', '/templates/personal-day-template-service',
+  '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service', '../media/day-media-service', '../templates/day-template-service', '../templates/personal-day-template-service',
+  './block-service', './reservation-service', './day-media-service', './day-template-service', './personal-day-template-service',
 ]
 const applicationBackedFeatureRoots = [
-  'src/features/trips/',
-  'src/features/days/',
-  'src/features/planner/',
-  'src/features/reservations/',
-  'src/features/media/',
+  'src/features/trips/', 'src/features/days/', 'src/features/planner/', 'src/features/reservations/', 'src/features/media/', 'src/features/templates/',
 ]
-const plannerPagePaths = new Set([
-  'src/features/planner/DayPlannerPage.tsx',
-  'src/features/planner/GuidedDayPlannerPage.tsx',
-])
+const plannerPagePaths = new Set(['src/features/planner/DayPlannerPage.tsx', 'src/features/planner/GuidedDayPlannerPage.tsx'])
 
 const violations = []
 
@@ -81,10 +74,7 @@ async function scan(directory) {
   for (const entry of entries) {
     if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue
     const absolute = join(directory, entry.name)
-    if (entry.isDirectory()) {
-      await scan(absolute)
-      continue
-    }
+    if (entry.isDirectory()) { await scan(absolute); continue }
     if (!entry.isFile() || !textExtensions.has(extname(entry.name))) continue
 
     const content = await readFile(absolute, 'utf8')
@@ -102,14 +92,9 @@ async function enforceDatabaseVersionGate() {
   const databasePath = 'src/data/db/dtagency-db.ts'
   const databaseSource = await readFile(join(root, databasePath), 'utf8')
   const match = databaseSource.match(/export const DB_VERSION = (\d+)/)
-  if (!match) {
-    violations.push(`${databasePath}: DB_VERSION could not be verified`)
-    return
-  }
+  if (!match) { violations.push(`${databasePath}: DB_VERSION could not be verified`); return }
   const version = Number(match[1])
-  if (version > maximumSchemaVersionBeforeVaultMigration) {
-    violations.push(`${databasePath}: DB_VERSION ${version} is blocked until Vault snapshot migration and regression tests exist`)
-  }
+  if (version > maximumSchemaVersionBeforeVaultMigration) violations.push(`${databasePath}: DB_VERSION ${version} is blocked until Vault snapshot migration and regression tests exist`)
 }
 
 await scan(root)
