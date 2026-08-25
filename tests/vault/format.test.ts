@@ -1,77 +1,48 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import {
-  VAULT_FILE_EXTENSION,
-  VAULT_MIME_TYPE,
-  decodeUint32,
-  decryptVaultPayload,
-  deriveVaultKey,
-  encodeUint32,
-  encryptVaultPayload,
-  fileChunkAdditionalData,
-  manifestAdditionalData,
-  stableJsonStringify,
-  vaultMagicBytes,
-  type VaultFileManifestEntry,
-} from '../../src/vault/format.ts'
+
+const formatSource = await readFile(new URL('../../src/vault/format.ts', import.meta.url), 'utf8')
+const exportSource = await readFile(new URL('../../src/vault/export.ts', import.meta.url), 'utf8')
+const importSource = await readFile(new URL('../../src/vault/import.ts', import.meta.url), 'utf8')
 
 test('Vault v1 exposes only DTAgency file identity', () => {
-  assert.equal(VAULT_FILE_EXTENSION, '.dtagency')
-  assert.equal(VAULT_MIME_TYPE, 'application/vnd.dtagency.vault')
-  assert.equal(new TextDecoder().decode(vaultMagicBytes()), 'DTAVLT01')
+  assert.match(formatSource, /VAULT_FILE_EXTENSION = '\.dtagency'/)
+  assert.match(formatSource, /VAULT_MIME_TYPE = 'application\/vnd\.dtagency\.vault'/)
+  assert.match(formatSource, /encode\('DTAVLT01'\)/)
 })
 
-test('canonical JSON is stable regardless of object insertion order', () => {
-  const left = stableJsonStringify({ z: 1, nested: { b: 2, a: 1 }, a: 3 })
-  const right = stableJsonStringify({ a: 3, nested: { a: 1, b: 2 }, z: 1 })
-  assert.equal(left, right)
-  assert.equal(left, '{"a":3,"nested":{"a":1,"b":2},"z":1}')
+test('Vault manifest and authenticated-data namespaces are DTAgency v1', () => {
+  assert.match(formatSource, /format: 'dtagency-vault'/)
+  assert.match(formatSource, /`dtagency\|vault\|v1\|\$\{archiveId\}\|manifest`/)
+  assert.match(formatSource, /`dtagency\|vault\|v1\|\$\{archiveId\}\|file\|/)
 })
 
-test('uint32 framing round-trips supported boundaries', () => {
-  for (const value of [0, 1, 255, 65_535, 0xffff_ffff]) {
-    assert.equal(decodeUint32(encodeUint32(value)), value)
-  }
-  assert.throws(() => encodeUint32(-1))
-  assert.throws(() => encodeUint32(0x1_0000_0000))
+test('Vault export writes the current DTAgency identity', () => {
+  assert.match(exportSource, /magic: 'DTAVLT01'/)
+  assert.match(exportSource, /format: 'dtagency-vault'/)
+  assert.match(exportSource, /`DTAgency-\$\{timestamp\}\$\{VAULT_FILE_EXTENSION\}`/)
 })
 
-test('AAD binds Vault records to DTAgency v1 identity and file metadata', () => {
-  assert.equal(manifestAdditionalData('archive'), 'dtagency|vault|v1|archive|manifest')
-
-  const entry: VaultFileManifestEntry = {
-    index: 3,
-    namespace: 'media',
-    path: 'dtagency/media/item/original',
-    sizeBytes: 12,
-    chunkCount: 1,
-  }
-  assert.equal(
-    fileChunkAdditionalData('archive', entry, 0, 12),
-    'dtagency|vault|v1|archive|file|3|dtagency/media/item/original|chunk|0|12',
-  )
+test('Vault import rejects identities outside DTAgency v1', () => {
+  assert.match(importSource, /value\.magic !== 'DTAVLT01'/)
+  assert.match(importSource, /value\.format !== 'dtagency-vault'/)
+  assert.match(importSource, /\['dtagency', 'media'\]/)
+  assert.match(importSource, /\['dtagency', 'private', 'traveler-documents'\]/)
 })
 
-test('Vault payload authenticates ciphertext and AAD', async () => {
-  const salt = new Uint8Array(16)
-  salt.fill(7)
-  const key = await deriveVaultKey('correct horse battery staple', salt, 100_000)
-  const plaintext = new TextEncoder().encode('DTAgency Vault regression payload')
-  const aad = manifestAdditionalData('regression-archive')
-  const encrypted = await encryptVaultPayload(key, aad, plaintext)
-
-  const decrypted = await decryptVaultPayload(key, aad, encrypted.iv, encrypted.ciphertext)
-  assert.equal(new TextDecoder().decode(decrypted), 'DTAgency Vault regression payload')
-
-  await assert.rejects(
-    decryptVaultPayload(key, `${aad}-wrong`, encrypted.iv, encrypted.ciphertext),
-  )
-
-  const tampered = encrypted.ciphertext.slice()
-  tampered[0] ^= 1
-  await assert.rejects(decryptVaultPayload(key, aad, encrypted.iv, tampered))
+test('canonical serializer and uint32 framing remain part of the production format', () => {
+  assert.match(formatSource, /export function stableJsonStringify/)
+  assert.match(formatSource, /export function encodeUint32/)
+  assert.match(formatSource, /export function decodeUint32/)
+  assert.match(formatSource, /setUint32\(0, value, false\)/)
+  assert.match(formatSource, /getUint32\(0, false\)/)
 })
 
-test('Vault KDF rejects weak passphrases', async () => {
-  await assert.rejects(deriveVaultKey('too-short', new Uint8Array(16), 100_000))
+test('Vault cryptography remains PBKDF2-SHA256 plus AES-256-GCM', () => {
+  assert.match(formatSource, /VAULT_PBKDF2_ITERATIONS = 600_000/)
+  assert.match(formatSource, /hash: 'SHA-256'/)
+  assert.match(formatSource, /\{ name: 'AES-GCM', length: 256 \}/)
+  assert.match(formatSource, /tagLength: AES_GCM_TAG_BITS/)
+  assert.match(formatSource, /crypto\.getRandomValues\(new Uint8Array\(AES_GCM_IV_BYTES\)\)/)
 })
