@@ -1,4 +1,5 @@
 import { createExpenseApplication } from '../application/expenses/expense-application'
+import { createExpenseSummaryApplication } from '../application/expenses/expense-summary'
 import { expenseBlockRepository } from '../data/repositories/expense-block-repository'
 import {
   blockRepository,
@@ -9,7 +10,7 @@ import {
   tripTravelerRepository,
 } from '../data/repositories/repositories'
 
-export const expenseApplication = createExpenseApplication({
+const expenseCommands = createExpenseApplication({
   trips: tripRepository,
   days: dayRepository,
   blocks: blockRepository,
@@ -26,3 +27,12 @@ export const expenseApplication = createExpenseApplication({
   now: () => new Date().toISOString(),
   newId: () => crypto.randomUUID(),
 })
+
+const expenseSummary = createExpenseSummaryApplication({
+  trips: tripRepository,
+  days: dayRepository,
+  expenses: expenseRepository,
+  travelers: travelerRepository,
+})
+
+export const expenseApplication = { ...expenseCommands, ...expenseSummary }
