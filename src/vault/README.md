@@ -9,8 +9,8 @@ Production Vault v1 implements the complete storage pipeline: chunked encrypted 
 The export contains:
 
 - a canonical snapshot of every DTAgency Dexie table, including `appMeta` and the wrapped local document-encryption key envelope;
-- every file under the legacy-compatible managed media namespace;
-- every file under the legacy-compatible managed private-document namespace.
+- every file under `dtagency/media/`;
+- every file under `dtagency/private/traveler-documents/`.
 
 Managed OPFS trees are exported completely, including recoverable orphan files. Reconciliation decides what is stale after restore; export must not silently discard user bytes.
 
@@ -20,6 +20,13 @@ The production backup filename uses the `.dtagency` extension.
 
 The plaintext header contains only format/KDF/algorithm metadata plus a random archive ID and creation timestamp. The database snapshot, managed file paths and file metadata live inside the encrypted manifest.
 
+DTAgency Vault v1 identity is intentionally explicit:
+
+- file magic: `DTAVLT01`;
+- manifest identity: `dtagency-vault`;
+- database baseline: `dtagency`, schema v1;
+- AAD namespace: `dtagency|vault|v1|...`.
+
 Encryption rules:
 
 - PBKDF2-HMAC-SHA256 derives an AES-256-GCM Vault key from the export passphrase and a fresh random salt;
@@ -27,7 +34,7 @@ Encryption rules:
 - AES-GCM AAD binds frames to archive ID, record type, file index/path, chunk index and plaintext chunk length;
 - ordinary media and already-encrypted private-document files are encrypted again by the portable Vault key.
 
-Large files are processed in 4 MiB chunks and the archive is written incrementally to the managed Vault staging namespace rather than accumulated in JavaScript memory.
+Large files are processed in 4 MiB chunks and the archive is written incrementally to `dtagency/vault-staging/` rather than accumulated in JavaScript memory.
 
 ## Consistent export snapshot
 
@@ -44,9 +51,13 @@ The passphrase is never persisted.
 
 ## Import staging
 
-`stageVaultImport()` never writes to live IndexedDB or live managed OPFS trees. It validates magic/header/version/KDF/encryption, derives the password key, authenticates and decrypts the manifest, validates current-schema tables/keys and managed paths, authenticates every file chunk, and writes only to an isolated import-staging namespace.
+`stageVaultImport()` never writes to live IndexedDB or live managed OPFS trees. It validates magic/header/version/KDF/encryption, derives the password key, authenticates and decrypts the manifest, validates current-schema tables/keys and managed paths, authenticates every file chunk, and writes only to:
 
-Original managed paths remain authenticated metadata and are revalidated before live mutation. Production v1 currently accepts only the exact current database schema version. This is a known strategic limitation: before the next database schema version is introduced, Vault import must gain explicit snapshot migration support and regression fixtures for older backups.
+```text
+dtagency/vault-import-staging/<stageId>/files/<fileIndex>.bin
+```
+
+Production v1 accepts database snapshot schema v1. Before database schema v2 can be introduced, Vault import must gain explicit snapshot migration support and regression coverage as required by ADR-004.
 
 ## Live restore protocol
 
@@ -85,6 +96,18 @@ The Dexie replacement is one transaction across all tables. No OPFS or Web Crypt
 ## Crash recovery
 
 IndexedDB and OPFS cannot participate in one browser transaction, so restore uses a temporary rollback copy of the previous managed OPFS files plus a small OPFS journal.
+
+Rollback files live under:
+
+```text
+dtagency/vault-restore-backup/<restoreId>/
+```
+
+The journal lives under:
+
+```text
+dtagency/vault-restore-state/current.json
+```
 
 The journal contains restore identifiers, phase metadata and the SHA-256 fingerprint of the target database snapshot. It does not persist a plaintext duplicate of the previous IndexedDB database.
 
