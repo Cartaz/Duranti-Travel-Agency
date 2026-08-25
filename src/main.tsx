@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { dayApplication } from './composition/days'
 import { expenseApplication } from './composition/expenses'
+import { itineraryApplication } from './composition/itinerary'
 import { dayMediaApplication } from './composition/media'
 import { placeApplication } from './composition/places'
 import { plannerApplication } from './composition/planner'
@@ -34,6 +35,7 @@ async function startApplication(): Promise<void> {
           expenses: expenseApplication,
           travelers: travelerApplication,
           places: placeApplication,
+          itinerary: itineraryApplication,
         }}>
           <App />
         </ApplicationProvider>
