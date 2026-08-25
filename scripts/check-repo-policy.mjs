@@ -7,9 +7,10 @@ const textExtensions = new Set([
   '.css', '.html', '.js', '.json', '.jsx', '.md', '.mjs', '.ts', '.tsx', '.txt', '.yml', '.yaml',
 ])
 
-const forbiddenVaultExtension = '.' + 'duranti'
-const forbiddenLegacyProductName = 'Duranti' + ' Travel Agency'
-const maximumSchemaVersionBeforeVaultMigration = 3
+const forbiddenLegacyToken = 'dura' + 'nti'
+const forbiddenVaultMagic = 'DUR' + 'VLT'
+const forbiddenDocumentMagic = 'DUR' + 'DOC'
+const maximumSchemaVersionBeforeVaultMigration = 1
 
 const violations = []
 
@@ -28,28 +29,33 @@ async function scan(directory) {
 
     const content = await readFile(absolute, 'utf8')
     const path = relative(root, absolute)
+    const normalized = content.toLowerCase()
 
-    if (content.includes(forbiddenVaultExtension)) {
-      violations.push(`${path}: legacy Vault extension is forbidden; use .dtagency`)
+    if (normalized.includes(forbiddenLegacyToken)) {
+      violations.push(`${path}: legacy DTAgency predecessor identifier is forbidden`)
     }
-    if (content.includes(forbiddenLegacyProductName)) {
-      violations.push(`${path}: legacy product name is forbidden; use DTAgency`)
+    if (content.includes(forbiddenVaultMagic)) {
+      violations.push(`${path}: legacy Vault magic is forbidden`)
+    }
+    if (content.includes(forbiddenDocumentMagic)) {
+      violations.push(`${path}: legacy private-document magic is forbidden`)
     }
   }
 }
 
 async function enforceDatabaseVersionGate() {
-  const databaseSource = await readFile(join(root, 'src/data/db/duranti-db.ts'), 'utf8')
+  const databasePath = 'src/data/db/dtagency-db.ts'
+  const databaseSource = await readFile(join(root, databasePath), 'utf8')
   const match = databaseSource.match(/export const DB_VERSION = (\d+)/)
   if (!match) {
-    violations.push('src/data/db/duranti-db.ts: DB_VERSION could not be verified')
+    violations.push(`${databasePath}: DB_VERSION could not be verified`)
     return
   }
 
   const version = Number(match[1])
   if (version > maximumSchemaVersionBeforeVaultMigration) {
     violations.push(
-      `src/data/db/duranti-db.ts: DB_VERSION ${version} is blocked by ADR-004 until backward-compatible Vault snapshot migration and regression tests exist`,
+      `${databasePath}: DB_VERSION ${version} is blocked until Vault snapshot migration and regression tests exist`,
     )
   }
 }
