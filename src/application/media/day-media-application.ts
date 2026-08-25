@@ -157,7 +157,7 @@ export function createDayMediaApplication(deps: DayMediaApplicationDependencies)
     if (!media || media.tripId !== tripId || media.dayId !== dayId || media.blockId) throw new Error('La foto o il video non appartiene a questa giornata.')
     if (input.caption.length > MAX_DAY_MEDIA_CAPTION_LENGTH) throw new Error(`La didascalia può contenere al massimo ${MAX_DAY_MEDIA_CAPTION_LENGTH} caratteri.`)
     const placeId = input.placeId?.trim() || undefined
-    if (placeId && !(await deps.places.get(placeId))) throw new Error('Il luogo collegato non esiste più.')
+    if (placeId && placeId !== media.placeId && !(await deps.places.get(placeId))) throw new Error('Il luogo collegato non esiste più.')
     let itineraryId: string | undefined
     let reservationId: string | undefined
     const itineraryKey = input.itineraryKey?.trim() || undefined
