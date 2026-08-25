@@ -1,17 +1,19 @@
 import { db } from '../db/dtagency-db'
 import { Repository } from './base-repository'
 import { plannerBlockRepository } from './block-repository'
+import { dayRepository } from './day-repository'
 import { itineraryRepository } from './itinerary-repository'
 import { mediaFileRepository } from './media-repository'
+import { tripRepository } from './trip-repository'
 import { tripTravelerRepository } from './trip-traveler-repository'
 import { secureTravelerDocumentRepository } from './traveler-document-repository'
 import type { DatabaseTables } from '../db/schema'
 
-export const tripRepository = new Repository<DatabaseTables['trips']>(db.trips)
+export { tripRepository }
 export const travelerRepository = new Repository<DatabaseTables['travelers']>(db.travelers)
 export const travelerDocumentRepository = secureTravelerDocumentRepository
 export { tripTravelerRepository }
-export const dayRepository = new Repository<DatabaseTables['days']>(db.days)
+export { dayRepository }
 export const blockRepository = plannerBlockRepository
 export const placeRepository = new Repository<DatabaseTables['places']>(db.places)
 export const mediaRepository = mediaFileRepository
