@@ -1,7 +1,7 @@
-const DB_NAME = 'DurantiStorageLab'
+const DB_NAME = 'DTAgencyStorageLab'
 const STORE_NAME = 'test-records'
 const DB_VERSION = 1
-const PROBE_PREFIX = 'storage-lab-'
+const PROBE_PREFIX = 'dtagency-storage-lab-'
 const CHUNK_SIZE = 1024 * 1024
 const PROBE_CHUNK_BYTES = 100 * 1024 * 1024
 
