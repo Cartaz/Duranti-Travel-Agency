@@ -6,7 +6,8 @@ These rules apply to every code, documentation and architecture change in this r
 
 - The application is called **DTAgency** in UI, documentation, comments, errors, generated filenames and new code.
 - Production Vault files use the **`.dtagency`** extension.
-- Do not rename persisted legacy storage identifiers merely for branding. Existing IndexedDB names, OPFS namespaces, cryptographic markers and authenticated format identifiers are compatibility contracts until an explicit migration replaces them.
+- The current persistence baseline is DTAgency v1. Do not introduce predecessor storage names, OPFS namespaces, cryptographic markers, MIME identities or authenticated format identifiers.
+- From the first release containing meaningful user data onward, persisted identifiers become compatibility contracts and may change only through an explicit, tested migration.
 
 ## Engineering philosophy
 
@@ -23,7 +24,7 @@ Every change must optimize for long-term simplicity and data safety, not only im
 - Prefer explicit state/data flow over forced remounts, DOM synchronization, timers or observers.
 - Strengthen types when doing so removes invalid states or repeated runtime parsing.
 - Add tests around critical invariants before or with risky refactors.
-- Treat schema versions, storage identifiers, cryptographic framing and backup formats as compatibility contracts.
+- Treat schema versions, storage identifiers, cryptographic framing and backup formats as compatibility contracts once released with meaningful user data.
 - Make failures visible, actionable and recoverable.
 - Refactor incrementally; avoid rewrites unless incremental migration is demonstrably less safe.
 
@@ -33,7 +34,7 @@ Do not introduce:
 
 - silent persistence failures;
 - unversioned schema changes;
-- destructive storage renames without migration;
+- destructive storage renames after user data exists without a tested migration;
 - new domain dependencies on React, browser storage or UI code;
 - feature-to-feature coupling when an application-level use case is the correct owner;
 - full-table scans when a suitable indexed query can be exposed;
@@ -45,7 +46,7 @@ For a meaningful change, verify:
 
 1. build/typecheck passes;
 2. repository policy checks pass;
-3. affected invariants are covered by tests when a test harness exists;
+3. affected invariants are covered by tests;
 4. persisted-data and Vault compatibility have been considered explicitly;
 5. documentation/ADR is updated when the change creates or modifies an architectural contract;
 6. no temporary workaround is left unexplained.
