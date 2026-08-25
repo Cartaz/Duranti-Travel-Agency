@@ -1,4 +1,4 @@
-import { db } from '../db/duranti-db'
+import { db } from '../db/dtagency-db'
 import {
   buildMediaPath,
   deleteMediaFile,
@@ -44,18 +44,12 @@ export interface MediaIntegrityReport {
 }
 
 function errorDetails(error: unknown): { errorName: string; message: string } {
-  if (error instanceof DOMException) {
-    return { errorName: error.name, message: error.message }
-  }
-  if (error instanceof Error) {
-    return { errorName: error.name, message: error.message }
-  }
+  if (error instanceof DOMException) return { errorName: error.name, message: error.message }
+  if (error instanceof Error) return { errorName: error.name, message: error.message }
   return { errorName: 'UnknownError', message: String(error) }
 }
 
 export async function scanMediaIntegrity(): Promise<MediaIntegrityReport> {
-  // Keep IndexedDB work and OPFS work in separate async phases. OPFS calls must not
-  // be awaited inside a Dexie transaction because IndexedDB transactions may auto-commit.
   const metadata = await db.media.toArray()
   const opfsDirectoryIds = await listMediaDirectoryIds()
   const metadataIds = new Set(metadata.map((item) => item.id))
@@ -73,11 +67,7 @@ export async function scanMediaIntegrity(): Promise<MediaIntegrityReport> {
   for (const item of metadata) {
     const expectedPath = buildMediaPath(item.id)
     if (item.opfsPath !== expectedPath) {
-      pathMismatches.push({
-        id: item.id,
-        storedPath: item.opfsPath,
-        expectedPath,
-      })
+      pathMismatches.push({ id: item.id, storedPath: item.opfsPath, expectedPath })
     }
 
     if (item.deletedAt) {
@@ -85,8 +75,7 @@ export async function scanMediaIntegrity(): Promise<MediaIntegrityReport> {
         if (await mediaFileExists(item.id)) tombstonesWithFileIds.push(item.id)
         else tombstonesWithoutFileIds.push(item.id)
       } catch (error) {
-        const details = errorDetails(error)
-        unreadableEntries.push({ id: item.id, ...details })
+        unreadableEntries.push({ id: item.id, ...errorDetails(error) })
       }
       continue
     }
@@ -95,19 +84,14 @@ export async function scanMediaIntegrity(): Promise<MediaIntegrityReport> {
     try {
       const file = await readMediaFile(item.id)
       if (file.size !== item.sizeBytes) {
-        sizeMismatches.push({
-          id: item.id,
-          metadataBytes: item.sizeBytes,
-          actualBytes: file.size,
-        })
+        sizeMismatches.push({ id: item.id, metadataBytes: item.sizeBytes, actualBytes: file.size })
         healthy = false
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'NotFoundError') {
         missingFileIds.push(item.id)
       } else {
-        const details = errorDetails(error)
-        unreadableEntries.push({ id: item.id, ...details })
+        unreadableEntries.push({ id: item.id, ...errorDetails(error) })
       }
       healthy = false
     }
@@ -149,10 +133,7 @@ export async function purgeTombstonedMedia(id: string): Promise<PurgeMediaResult
 
 export async function removeOrphanMediaDirectory(id: string): Promise<void> {
   const metadata = await db.media.get(id)
-  if (metadata) {
-    throw new Error(`Media directory ${id} is not orphaned because metadata still exists.`)
-  }
-
+  if (metadata) throw new Error(`Media directory ${id} is not orphaned because metadata still exists.`)
   try {
     await deleteMediaFile(id)
   } catch (error) {
