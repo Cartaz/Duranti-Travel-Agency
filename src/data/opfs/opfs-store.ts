@@ -1,4 +1,4 @@
-const ROOT_DIRECTORY = 'duranti'
+const ROOT_DIRECTORY = 'dtagency'
 const MEDIA_DIRECTORY = 'media'
 
 function assertOpfsSupport(): void {
@@ -14,16 +14,16 @@ async function getRootDirectory(): Promise<FileSystemDirectoryHandle> {
 
 async function getMediaDirectory(): Promise<FileSystemDirectoryHandle> {
   const root = await getRootDirectory()
-  const duranti = await root.getDirectoryHandle(ROOT_DIRECTORY, { create: true })
-  return duranti.getDirectoryHandle(MEDIA_DIRECTORY, { create: true })
+  const dtagency = await root.getDirectoryHandle(ROOT_DIRECTORY, { create: true })
+  return dtagency.getDirectoryHandle(MEDIA_DIRECTORY, { create: true })
 }
 
 async function getExistingMediaDirectory(): Promise<FileSystemDirectoryHandle | null> {
   const root = await getRootDirectory()
 
   try {
-    const duranti = await root.getDirectoryHandle(ROOT_DIRECTORY)
-    return await duranti.getDirectoryHandle(MEDIA_DIRECTORY)
+    const dtagency = await root.getDirectoryHandle(ROOT_DIRECTORY)
+    return await dtagency.getDirectoryHandle(MEDIA_DIRECTORY)
   } catch (error) {
     if (error instanceof DOMException && error.name === 'NotFoundError') return null
     throw error
@@ -33,7 +33,7 @@ async function getExistingMediaDirectory(): Promise<FileSystemDirectoryHandle | 
 async function requireExistingMediaDirectory(): Promise<FileSystemDirectoryHandle> {
   const directory = await getExistingMediaDirectory()
   if (directory) return directory
-  throw new DOMException('Duranti media directory was not found.', 'NotFoundError')
+  throw new DOMException('DTAgency media directory was not found.', 'NotFoundError')
 }
 
 async function getDirectoryEntries(
