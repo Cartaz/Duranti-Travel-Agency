@@ -6,19 +6,13 @@ import type {
   PlannerBlockDraft,
   PlannerBlockType,
 } from '../../application/planner/planner-application'
+import { EMPTY_PLACE_DRAFT, type PlaceDraft } from '../../application/places/place-application'
 import InlineConfirm from '../../ui/InlineConfirm'
 import { useApplicationServices } from '../../ui/application-context'
 import ExpenseBlockEditor from '../expenses/ExpenseBlockEditor'
 import DayItinerarySummary from '../itinerary/DayItinerarySummary'
 import { listDayItineraryItems, type DayItineraryItem } from '../itinerary/itinerary-service'
 import { googleMapsUrlForPlace } from '../places/maps-url'
-import {
-  EMPTY_PLACE_DRAFT,
-  getPlannerPlace,
-  placeToDraft,
-  savePlannerPlace,
-  type PlaceDraft,
-} from '../places/place-service'
 import ReservationBlockEditor from '../reservations/ReservationBlockEditor'
 import './planner.css'
 
@@ -438,7 +432,7 @@ function PlannerPlaceBlockEditor({
   canMoveDown,
   onChanged,
 }: PlannerBlockEditorProps) {
-  const { planner } = useApplicationServices()
+  const { planner, places } = useApplicationServices()
   const [place, setPlace] = useState<Place>()
   const [state, setState] = useState<PlaceFormState>(() => placeFormStateFromDraft(EMPTY_PLACE_DRAFT))
   const [loading, setLoading] = useState(true)
@@ -450,11 +444,11 @@ function PlannerPlaceBlockEditor({
     let cancelled = false
     setLoading(true)
     setConfirmingRemove(false)
-    void getPlannerPlace(tripId, dayId, block.id)
+    void places.getPlannerPlace(tripId, dayId, block.id)
       .then((loadedPlace) => {
         if (cancelled) return
         setPlace(loadedPlace)
-        setState(placeFormStateFromDraft(loadedPlace ? placeToDraft(loadedPlace) : EMPTY_PLACE_DRAFT))
+        setState(placeFormStateFromDraft(loadedPlace ? places.placeToDraft(loadedPlace) : EMPTY_PLACE_DRAFT))
       })
       .catch((cause) => {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Impossibile leggere il luogo.')
@@ -466,7 +460,7 @@ function PlannerPlaceBlockEditor({
     return () => {
       cancelled = true
     }
-  }, [block.id, block.updatedAt, dayId, tripId])
+  }, [block.id, block.updatedAt, dayId, places, tripId])
 
   const patch = (changes: Partial<PlaceFormState>): void => setState((current) => ({ ...current, ...changes }))
 
@@ -476,9 +470,9 @@ function PlannerPlaceBlockEditor({
     setSaving(true)
     setError('')
     try {
-      const saved = await savePlannerPlace(tripId, dayId, block.id, placeDraftFromFormState(state))
+      const saved = await places.savePlannerPlace(tripId, dayId, block.id, placeDraftFromFormState(state))
       setPlace(saved)
-      setState(placeFormStateFromDraft(placeToDraft(saved)))
+      setState(placeFormStateFromDraft(places.placeToDraft(saved)))
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile salvare il luogo.')
