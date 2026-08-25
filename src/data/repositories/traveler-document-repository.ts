@@ -10,7 +10,7 @@ import {
   encryptJson,
   isEncryptedPayloadV1,
 } from '../../security/local-encryption'
-import { db } from '../db/duranti-db'
+import { db } from '../db/dtagency-db'
 import {
   deleteEncryptedDocumentAttachment,
   deleteEncryptedDocumentDirectory,
@@ -28,7 +28,6 @@ export interface CreateTravelerDocumentInput {
 }
 
 export type TravelerDocumentMetadata = Omit<TravelerDocument, 'encryptedPayload'>
-
 export type TravelerDocumentView = TravelerDocumentMetadata & {
   secret: TravelerDocumentSecret
   attachment?: TravelerDocumentAttachment
@@ -43,26 +42,22 @@ export type TravelerDocumentRestoreResult = 'not-found' | 'already-active' | 're
 export type TravelerDocumentPurgeResult = 'not-found' | 'purged'
 export type TravelerDocumentAttachmentRemoveResult = 'not-found' | 'no-attachment' | 'removed'
 
-export class LegacyTravelerDocumentError extends Error {
-  constructor(id: string) {
-    super(`Traveler document ${id} uses the legacy plaintext format and requires secure migration.`)
-    this.name = 'LegacyTravelerDocumentError'
-  }
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : undefined
-}
-
 function isSecureRecord(value: unknown): value is TravelerDocument {
-  const record = asRecord(value)
-  return Boolean(
-    record &&
+  if (typeof value !== 'object' || value === null) return false
+  const record = value as Record<string, unknown>
+  return (
     typeof record.id === 'string' &&
     typeof record.travelerId === 'string' &&
     typeof record.type === 'string' &&
-    isEncryptedPayloadV1(record.encryptedPayload),
+    isEncryptedPayloadV1(record.encryptedPayload)
   )
+}
+
+function requireSecureRecord(value: unknown, id: string): TravelerDocument {
+  if (!isSecureRecord(value)) {
+    throw new Error(`Traveler document ${id} does not match the DTAgency v1 encrypted format.`)
+  }
+  return value
 }
 
 function metadataFrom(record: TravelerDocument): TravelerDocumentMetadata {
@@ -77,11 +72,7 @@ function metadataFrom(record: TravelerDocument): TravelerDocumentMetadata {
 }
 
 async function decryptPrivateData(record: TravelerDocument): Promise<TravelerDocumentPrivateData> {
-  return decryptJson<TravelerDocumentPrivateData>(
-    ENCRYPTION_PURPOSE,
-    record.id,
-    record.encryptedPayload,
-  )
+  return decryptJson<TravelerDocumentPrivateData>(ENCRYPTION_PURPOSE, record.id, record.encryptedPayload)
 }
 
 function viewFrom(
@@ -104,7 +95,7 @@ async function deleteAttachmentBestEffort(documentId: string, attachmentId: stri
   try {
     await deleteEncryptedDocumentAttachment(documentId, attachmentId)
   } catch {
-    // A later private-file integrity pass can remove an orphan left by an interrupted cleanup.
+    // A later private-file integrity pass can remove an orphan left by interrupted cleanup.
   }
 }
 
@@ -113,11 +104,7 @@ export class TravelerDocumentRepository {
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
     const privateData: TravelerDocumentPrivateData = { ...input.secret }
-    const encryptedPayload = await encryptJson(
-      ENCRYPTION_PURPOSE,
-      id,
-      privateData,
-    )
+    const encryptedPayload = await encryptJson(ENCRYPTION_PURPOSE, id, privateData)
 
     const entity: TravelerDocument = {
       id,
@@ -138,8 +125,7 @@ export class TravelerDocumentRepository {
   ): Promise<TravelerDocumentView | undefined> {
     const raw = await db.travelerDocuments.get(id)
     if (!raw || (!options.includeDeleted && raw.deletedAt)) return undefined
-    if (!isSecureRecord(raw)) throw new LegacyTravelerDocumentError(id)
-    return decryptRecord(raw)
+    return decryptRecord(requireSecureRecord(raw, id))
   }
 
   async listMetadata(
@@ -148,7 +134,7 @@ export class TravelerDocumentRepository {
     const records = await db.travelerDocuments.toArray()
     return records
       .filter((record) => options.includeDeleted || !record.deletedAt)
-      .map((record) => metadataFrom(record))
+      .map((record) => metadataFrom(requireSecureRecord(record, record.id)))
   }
 
   async list(
@@ -156,32 +142,23 @@ export class TravelerDocumentRepository {
   ): Promise<TravelerDocumentView[]> {
     const records = await db.travelerDocuments.toArray()
     const result: TravelerDocumentView[] = []
-
     for (const raw of records) {
       if (!options.includeDeleted && raw.deletedAt) continue
-      const candidate: unknown = raw
-      if (!isSecureRecord(candidate)) throw new LegacyTravelerDocumentError(raw.id)
-      result.push(await decryptRecord(candidate))
+      result.push(await decryptRecord(requireSecureRecord(raw, raw.id)))
     }
-
     return result
   }
 
   async updateSecret(id: string, secret: TravelerDocumentSecret): Promise<void> {
     const raw = await db.travelerDocuments.get(id)
     if (!raw || raw.deletedAt) throw new Error(`Active traveler document ${id} was not found.`)
-    if (!isSecureRecord(raw)) throw new LegacyTravelerDocumentError(id)
-
-    const current = await decryptPrivateData(raw)
+    const record = requireSecureRecord(raw, id)
+    const current = await decryptPrivateData(record)
     const privateData: TravelerDocumentPrivateData = {
       ...secret,
       ...(current.attachment ? { attachment: current.attachment } : {}),
     }
-    const encryptedPayload: EncryptedPayloadV1 = await encryptJson(
-      ENCRYPTION_PURPOSE,
-      id,
-      privateData,
-    )
+    const encryptedPayload: EncryptedPayloadV1 = await encryptJson(ENCRYPTION_PURPOSE, id, privateData)
     const updated = await db.travelerDocuments.update(id, {
       encryptedPayload,
       updatedAt: new Date().toISOString(),
@@ -192,9 +169,8 @@ export class TravelerDocumentRepository {
   async attachFile(id: string, source: File): Promise<TravelerDocumentAttachment> {
     const raw = await db.travelerDocuments.get(id)
     if (!raw || raw.deletedAt) throw new Error(`Active traveler document ${id} was not found.`)
-    if (!isSecureRecord(raw)) throw new LegacyTravelerDocumentError(id)
-
-    const current = await decryptPrivateData(raw)
+    const record = requireSecureRecord(raw, id)
+    const current = await decryptPrivateData(record)
     const attachmentId = crypto.randomUUID()
     const opfsPath = await writeEncryptedDocumentAttachment(id, attachmentId, source)
     const attachment: TravelerDocumentAttachment = {
@@ -221,19 +197,14 @@ export class TravelerDocumentRepository {
       throw error
     }
 
-    if (current.attachment) {
-      await deleteAttachmentBestEffort(id, current.attachment.id)
-    }
-
+    if (current.attachment) await deleteAttachmentBestEffort(id, current.attachment.id)
     return attachment
   }
 
   async getAttachment(id: string): Promise<File | undefined> {
     const raw = await db.travelerDocuments.get(id)
     if (!raw || raw.deletedAt) return undefined
-    if (!isSecureRecord(raw)) throw new LegacyTravelerDocumentError(id)
-
-    const privateData = await decryptPrivateData(raw)
+    const privateData = await decryptPrivateData(requireSecureRecord(raw, id))
     const attachment = privateData.attachment
     if (!attachment) return undefined
 
@@ -252,9 +223,7 @@ export class TravelerDocumentRepository {
   async removeAttachment(id: string): Promise<TravelerDocumentAttachmentRemoveResult> {
     const raw = await db.travelerDocuments.get(id)
     if (!raw || raw.deletedAt) return 'not-found'
-    if (!isSecureRecord(raw)) throw new LegacyTravelerDocumentError(id)
-
-    const privateData = await decryptPrivateData(raw)
+    const privateData = await decryptPrivateData(requireSecureRecord(raw, id))
     if (!privateData.attachment) return 'no-attachment'
 
     const attachment = privateData.attachment
@@ -280,19 +249,16 @@ export class TravelerDocumentRepository {
     if (record.deletedAt) return 'already-deleted'
 
     const now = new Date().toISOString()
-    const updated = await db.travelerDocuments.update(id, {
-      deletedAt: now,
-      updatedAt: now,
-    })
+    const updated = await db.travelerDocuments.update(id, { deletedAt: now, updatedAt: now })
     if (updated !== 1) throw new Error(`Traveler document ${id} could not be tombstoned.`)
     return 'tombstoned'
   }
 
   async restore(id: string): Promise<TravelerDocumentRestoreResult> {
-    const record = await db.travelerDocuments.get(id)
-    if (!record) return 'not-found'
-    if (!record.deletedAt) return 'already-active'
-    if (!isSecureRecord(record)) throw new LegacyTravelerDocumentError(id)
+    const raw = await db.travelerDocuments.get(id)
+    if (!raw) return 'not-found'
+    if (!raw.deletedAt) return 'already-active'
+    const record = requireSecureRecord(raw, id)
 
     const privateData = await decryptPrivateData(record)
     if (
@@ -325,17 +291,6 @@ export class TravelerDocumentRepository {
 
     await db.travelerDocuments.delete(id)
     return 'purged'
-  }
-
-  async listLegacyPlaintextIds(): Promise<string[]> {
-    const rawRecords = await db.travelerDocuments.toArray()
-    return rawRecords
-      .filter((record) => {
-        const candidate: unknown = record
-        return !isSecureRecord(candidate)
-      })
-      .map((record) => record.id)
-      .filter((id): id is string => typeof id === 'string' && id.length > 0)
   }
 }
 
