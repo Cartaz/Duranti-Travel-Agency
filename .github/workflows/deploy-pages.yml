@@ -49,6 +49,19 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Start browser integration server
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 5173 --strictPort > /tmp/dtagency-vite.log 2>&1 &
+          echo $! > /tmp/dtagency-vite.pid
+          for attempt in {1..30}; do
+            if curl -sS http://127.0.0.1:5173/ -o /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/dtagency-vite.log
+          exit 1
+
       - name: Browser persistence integration tests
         run: npx playwright test --config=playwright.config.cjs
 
