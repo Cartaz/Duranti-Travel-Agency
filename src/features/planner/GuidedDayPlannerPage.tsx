@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import type { PlannerBlockType } from '../../application/planner/planner-application'
+import { useApplicationServices } from '../../ui/application-context'
 import DayMediaGallery from '../media/DayMediaGallery'
 import DayTemplateSaver from '../templates/DayTemplateSaver'
-import { getTrip } from '../trips/trip-service'
 import DayPlannerPage from './DayPlannerPage'
-import { createPlannerBlock, type PlannerBlockType } from './block-service'
 import './planner-quick-add.css'
 
 interface AddChoice {
@@ -35,6 +35,7 @@ function choiceLabel(type: PlannerBlockType): string {
 
 export default function GuidedDayPlannerPage() {
   const { tripId, dayId } = useParams<{ tripId: string; dayId: string }>()
+  const { trips: tripApplication, planner: plannerApplication } = useApplicationServices()
   const [revision, setRevision] = useState(0)
   const [busyType, setBusyType] = useState<PlannerBlockType>()
   const [canEdit, setCanEdit] = useState(false)
@@ -51,7 +52,7 @@ export default function GuidedDayPlannerPage() {
     }
 
     let cancelled = false
-    void getTrip(tripId)
+    void tripApplication.getTrip(tripId)
       .then((trip) => {
         if (!cancelled) setCanEdit(Boolean(trip && trip.status !== 'archived'))
       })
@@ -62,7 +63,7 @@ export default function GuidedDayPlannerPage() {
     return () => {
       cancelled = true
     }
-  }, [tripId, revision])
+  }, [revision, tripApplication, tripId])
 
   useEffect(() => {
     if (!status) return
@@ -105,7 +106,7 @@ export default function GuidedDayPlannerPage() {
     setStatus('')
 
     try {
-      await createPlannerBlock(tripId, dayId, type)
+      await plannerApplication.createPlannerBlock(tripId, dayId, type)
       setStatus(`${choiceLabel(type)} aggiunto. Compila i dettagli nel nuovo blocco.`)
       setPendingScroll(true)
       setRevision((current) => current + 1)
