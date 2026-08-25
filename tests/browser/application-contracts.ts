@@ -161,7 +161,7 @@ export async function runApplicationContractTests(): Promise<ApplicationContract
       trips: { get: async (id) => id === trip.id ? trip : undefined },
       days: { listByTrip: async () => [] },
       expenses: { listByTrip: async (id) => id === trip.id ? expenses : [] },
-      travelers: { get: async () => undefined },
+      travelers: { getMany: async () => [] },
     })
 
     const summary = await application.getTripExpenseSummary(trip.id)
