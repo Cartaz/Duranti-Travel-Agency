@@ -1,4 +1,4 @@
-import { DB_NAME, DB_VERSION, db } from '../data/db/duranti-db'
+import { DB_NAME, DB_VERSION, db } from '../data/db/dtagency-db'
 import { assertBlock, assertEntityBase, isRecord } from '../data/db/validate'
 import {
   MAX_VAULT_MANIFEST_BYTES,
@@ -21,7 +21,7 @@ import {
   type VaultTableSnapshot,
 } from './format'
 
-const ROOT_DIRECTORY = 'duranti'
+const ROOT_DIRECTORY = 'dtagency'
 const IMPORT_STAGING_DIRECTORY = 'vault-import-staging'
 const STAGED_FILES_DIRECTORY = 'files'
 const HEADER_LIMIT_BYTES = 64 * 1024
@@ -148,8 +148,8 @@ function assertHeader(value: unknown): asserts value is VaultHeaderV1 {
   assertSafeIdentifier(value.archiveId, 'Vault archive ID')
   assertIsoTimestamp(value.createdAt, 'Vault creation time')
 
-  if (value.magic !== 'DURVLT01' || value.version !== VAULT_FORMAT_VERSION) {
-    throw new Error('Unsupported Duranti Vault header version.')
+  if (value.magic !== 'DTAVLT01' || value.version !== VAULT_FORMAT_VERSION) {
+    throw new Error('Unsupported DTAgency Vault header version.')
   }
 
   if (!isRecord(value.kdf)) throw new Error('Vault KDF metadata is missing.')
@@ -206,8 +206,8 @@ function validateManagedPath(namespace: VaultManagedNamespace, path: unknown): a
   }
 
   const prefix = namespace === 'media'
-    ? ['duranti', 'media']
-    : ['duranti', 'private', 'traveler-documents']
+    ? ['dtagency', 'media']
+    : ['dtagency', 'private', 'traveler-documents']
 
   if (
     segments.length <= prefix.length ||
@@ -344,7 +344,7 @@ function validateManifest(value: unknown, header: VaultHeaderV1): {
 } {
   if (!isRecord(value)) throw new Error('Vault manifest is not an object.')
   if (
-    value.format !== 'duranti-vault' ||
+    value.format !== 'dtagency-vault' ||
     value.version !== VAULT_FORMAT_VERSION ||
     value.archiveId !== header.archiveId ||
     value.createdAt !== header.createdAt
@@ -362,7 +362,7 @@ function validateManifest(value: unknown, header: VaultHeaderV1): {
 
   return {
     manifest: {
-      format: 'duranti-vault',
+      format: 'dtagency-vault',
       version: VAULT_FORMAT_VERSION,
       archiveId: header.archiveId,
       createdAt: header.createdAt,
@@ -387,8 +387,8 @@ async function getRootDirectory(): Promise<FileSystemDirectoryHandle> {
 async function getImportStagingRoot(create: boolean): Promise<FileSystemDirectoryHandle | null> {
   const root = await getRootDirectory()
   try {
-    const duranti = await root.getDirectoryHandle(ROOT_DIRECTORY, { create })
-    return await duranti.getDirectoryHandle(IMPORT_STAGING_DIRECTORY, { create })
+    const dtagency = await root.getDirectoryHandle(ROOT_DIRECTORY, { create })
+    return await dtagency.getDirectoryHandle(IMPORT_STAGING_DIRECTORY, { create })
   } catch (error) {
     if (!create && error instanceof DOMException && error.name === 'NotFoundError') return null
     throw error
@@ -435,7 +435,7 @@ function assertMagic(actual: Uint8Array<ArrayBuffer>): void {
     actual.byteLength !== expected.byteLength ||
     actual.some((byte, index) => byte !== expected[index])
   ) {
-    throw new Error('File is not a Duranti Vault v1 archive.')
+    throw new Error('File is not a DTAgency Vault v1 archive.')
   }
 }
 
