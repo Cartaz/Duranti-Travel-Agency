@@ -82,8 +82,6 @@ export default function AppShell() {
       && !(target instanceof HTMLTextAreaElement)
       && !(target instanceof HTMLSelectElement)) return
 
-    // A single submit can dispatch invalid on several controls. Keep the first
-    // useful error so the message and focus do not jump between fields.
     if (validationLockRef.current) return
     validationLockRef.current = true
     window.requestAnimationFrame(() => {
@@ -104,10 +102,10 @@ export default function AppShell() {
       }}
     >
       <header className="app-topbar">
-        <NavLink to="/" className="app-brand" aria-label="Duranti Travel Agency — viaggi">
-          <span className="app-brand-mark" aria-hidden="true">D</span>
+        <NavLink to="/" className="app-brand" aria-label="DTAgency — viaggi">
+          <span className="app-brand-mark" aria-hidden="true">DT</span>
           <span>
-            <strong>Duranti Travel Agency</strong>
+            <strong>DTAgency</strong>
             <small>viaggia con noi, viaggio, con i topi</small>
           </span>
         </NavLink>
