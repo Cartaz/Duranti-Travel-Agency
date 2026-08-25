@@ -1,18 +1,20 @@
-# Vault
+# DTAgency Vault
 
 Portable encrypted backup independent of origin storage.
 
 ## Production format v1
 
-Production Vault v1 now implements the complete storage pipeline: chunked encrypted export, strict parse/decrypt/validation, isolated import staging, explicit live replacement, crash recovery/rollback and post-restore verification.
+Production Vault v1 implements the complete storage pipeline: chunked encrypted export, strict parse/decrypt/validation, isolated import staging, explicit live replacement, crash recovery/rollback and post-restore verification.
 
 The export contains:
 
-- a canonical snapshot of every Duranti Dexie table, including `appMeta` and the wrapped local document-encryption key envelope;
-- every file under `duranti/media/`;
-- every file under `duranti/private/traveler-documents/`.
+- a canonical snapshot of every DTAgency Dexie table, including `appMeta` and the wrapped local document-encryption key envelope;
+- every file under the legacy-compatible managed media namespace;
+- every file under the legacy-compatible managed private-document namespace.
 
 Managed OPFS trees are exported completely, including recoverable orphan files. Reconciliation decides what is stale after restore; export must not silently discard user bytes.
+
+The production backup filename uses the `.dtagency` extension.
 
 ## Envelope
 
@@ -25,7 +27,7 @@ Encryption rules:
 - AES-GCM AAD binds frames to archive ID, record type, file index/path, chunk index and plaintext chunk length;
 - ordinary media and already-encrypted private-document files are encrypted again by the portable Vault key.
 
-Large files are processed in 4 MiB chunks and the archive is written incrementally to `duranti/vault-staging/` rather than accumulated in JavaScript memory.
+Large files are processed in 4 MiB chunks and the archive is written incrementally to the managed Vault staging namespace rather than accumulated in JavaScript memory.
 
 ## Consistent export snapshot
 
@@ -35,24 +37,20 @@ Export takes Dexie snapshot A, immutable `File` snapshots of the managed OPFS tr
 
 The intended UI is two-stage because preparing a backup may outlive transient user activation:
 
-1. **Prepare backup** — create the encrypted staged `.duranti` file.
+1. **Prepare backup** — create the encrypted staged `.dtagency` file.
 2. **Save/Share backup** — a fresh user tap invokes Web Share; download fallback remains available.
 
 The passphrase is never persisted.
 
 ## Import staging
 
-`stageVaultImport()` never writes to live IndexedDB or live managed OPFS trees. It validates magic/header/version/KDF/encryption, derives the password key, authenticates and decrypts the manifest, validates current-schema tables/keys and managed paths, authenticates every file chunk, and writes only to:
+`stageVaultImport()` never writes to live IndexedDB or live managed OPFS trees. It validates magic/header/version/KDF/encryption, derives the password key, authenticates and decrypts the manifest, validates current-schema tables/keys and managed paths, authenticates every file chunk, and writes only to an isolated import-staging namespace.
 
-```text
-duranti/vault-import-staging/<stageId>/files/<fileIndex>.bin
-```
-
-Original managed paths remain authenticated metadata and are revalidated before live mutation. Production v1 accepts only the exact current database schema version.
+Original managed paths remain authenticated metadata and are revalidated before live mutation. Production v1 currently accepts only the exact current database schema version. This is a known strategic limitation: before the next database schema version is introduced, Vault import must gain explicit snapshot migration support and regression fixtures for older backups.
 
 ## Live restore protocol
 
-`commitStagedVaultImport()` requires explicit `{ mode: 'replace' }`. UI must obtain user confirmation before invoking it because current live Duranti data is replaced.
+`commitStagedVaultImport()` requires explicit `{ mode: 'replace' }`. UI must obtain user confirmation before invoking it because current live DTAgency data is replaced.
 
 ```text
 revalidate staged manifest + staged File snapshots
@@ -88,18 +86,6 @@ The Dexie replacement is one transaction across all tables. No OPFS or Web Crypt
 
 IndexedDB and OPFS cannot participate in one browser transaction, so restore uses a temporary rollback copy of the previous managed OPFS files plus a small OPFS journal.
 
-Rollback files:
-
-```text
-duranti/vault-restore-backup/<restoreId>/
-```
-
-Journal:
-
-```text
-duranti/vault-restore-state/current.json
-```
-
 The journal contains restore identifiers, phase metadata and the SHA-256 fingerprint of the target database snapshot. It does not persist a plaintext duplicate of the previous IndexedDB database.
 
 Recovery runs during application bootstrap before `ensureInstallationMetadata()` can update `appMeta`:
@@ -112,7 +98,7 @@ This also handles a crash after Dexie commits but before the journal update: the
 
 ## Post-restore verification
 
-After a successful Dexie commit Duranti verifies the canonical database SHA-256 fingerprint, exact managed OPFS path/byte inventory and ordinary-media integrity with `scanMediaIntegrity()`.
+After a successful Dexie commit DTAgency verifies the canonical database SHA-256 fingerprint, exact managed OPFS path/byte inventory and ordinary-media integrity with `scanMediaIntegrity()`.
 
 The local sensitive-document DEK is intentionally locked after database replacement because restored `appMeta` may contain a different wrapped key envelope. Full relational private-document integrity scanning therefore runs after the user unlocks the restored sensitive store. The Vault layer has already authenticated every restored private-file byte and restore verifies its path and size.
 
