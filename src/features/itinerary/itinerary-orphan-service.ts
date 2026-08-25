@@ -1,10 +1,12 @@
 import type { Block, Itinerary } from '../../domain/entities'
+import { assertTripDayContext } from '../../application/shared/trip-day-context'
 import {
   blockRepository,
+  dayRepository,
   itineraryRepository,
   reservationRepository,
+  tripRepository,
 } from '../../data/repositories/repositories'
-import { assertPlannerDayContext } from '../planner/block-service'
 
 export type OrphanResolutionAction = 'convert-to-manual' | 'delete'
 
@@ -53,7 +55,13 @@ export async function resolveOrphanedItineraryItem(
   itineraryId: string,
   action: OrphanResolutionAction,
 ): Promise<void> {
-  await assertPlannerDayContext(tripId, dayId, true)
+  await assertTripDayContext(
+    { trips: tripRepository, days: dayRepository },
+    tripId,
+    dayId,
+    true,
+    'Ripristina il viaggio prima di modificare l’itinerario.',
+  )
   const itinerary = await itineraryRepository.get(itineraryId)
   if (!itinerary) throw new Error('La tappa non esiste più.')
   if (itinerary.tripId !== tripId || itinerary.dayId !== dayId) {
