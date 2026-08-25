@@ -4,6 +4,7 @@ import App from './App'
 import { dayApplication } from './composition/days'
 import { expenseApplication } from './composition/expenses'
 import { dayMediaApplication } from './composition/media'
+import { placeApplication } from './composition/places'
 import { plannerApplication } from './composition/planner'
 import { reservationApplication } from './composition/reservations'
 import { dayTemplateApplication } from './composition/templates'
@@ -32,6 +33,7 @@ async function startApplication(): Promise<void> {
           templates: dayTemplateApplication,
           expenses: expenseApplication,
           travelers: travelerApplication,
+          places: placeApplication,
         }}>
           <App />
         </ApplicationProvider>
