@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import type { EditableTripStatus, TripDraft } from '../../application/trips/trip-application'
 import type { Trip } from '../../domain/entities'
 import { majorAmountToMinor, minorAmountToMajor } from '../../lib/currency'
-import { createTrip, getTrip, updateTrip, type EditableTripStatus, type TripDraft } from './trip-service'
+import { useApplicationServices } from '../../ui/application-context'
 import './trips.css'
 
 interface TripFormState {
@@ -58,6 +59,7 @@ function formToDraft(form: TripFormState): TripDraft {
 }
 
 export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
+  const { trips: tripApplication } = useApplicationServices()
   const { tripId } = useParams<{ tripId: string }>()
   const navigate = useNavigate()
   const [form, setForm] = useState<TripFormState>(emptyForm)
@@ -74,7 +76,7 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
 
     let cancelled = false
-    void getTrip(tripId)
+    void tripApplication.getTrip(tripId)
       .then((trip) => {
         if (cancelled) return
         if (!trip) {
@@ -93,7 +95,7 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
     return () => {
       cancelled = true
     }
-  }, [mode, tripId])
+  }, [mode, tripApplication, tripId])
 
   const setField = <K extends keyof TripFormState>(key: K, value: TripFormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }))
@@ -116,8 +118,8 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
     try {
       const trip = mode === 'create'
-        ? await createTrip(formToDraft(form))
-        : await updateTrip(tripId ?? '', formToDraft(form))
+        ? await tripApplication.createTrip(formToDraft(form))
+        : await tripApplication.updateTrip(tripId ?? '', formToDraft(form))
       navigate(`/trips/${trip.id}`, { replace: mode === 'create' })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile salvare il viaggio.')
