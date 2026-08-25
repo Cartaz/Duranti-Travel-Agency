@@ -1,8 +1,7 @@
 import type { Media, Place } from '../../domain/entities'
-import { blockRepository, mediaRepository, placeRepository } from '../../data/repositories/repositories'
-import { getTripDay } from '../days/day-service'
+import { assertTripDayContext } from '../../application/shared/trip-day-context'
+import { blockRepository, dayRepository, mediaRepository, placeRepository, tripRepository } from '../../data/repositories/repositories'
 import { listDayItineraryItems } from '../itinerary/itinerary-service'
-import { getTrip } from '../trips/trip-service'
 
 export const DAY_MEDIA_ACCEPT = 'image/*,video/*'
 export const MAX_DAY_IMAGE_BYTES = 25 * 1024 * 1024
@@ -86,11 +85,13 @@ function mediaDescriptor(file: File): { kind: 'image' | 'video'; mimeType: strin
 }
 
 async function assertDayContext(tripId: string, dayId: string, editable: boolean): Promise<void> {
-  const [trip, day] = await Promise.all([getTrip(tripId), getTripDay(tripId, dayId)])
-  if (!trip || !day) throw new Error('Viaggio o giornata non disponibili.')
-  if (editable && trip.status === 'archived') {
-    throw new Error('Ripristina il viaggio prima di modificare foto e video.')
-  }
+  await assertTripDayContext(
+    { trips: tripRepository, days: dayRepository },
+    tripId,
+    dayId,
+    editable,
+    'Ripristina il viaggio prima di modificare foto e video.',
+  )
 }
 
 function placeIdFromBlockContent(content: Record<string, unknown>): string | undefined {
