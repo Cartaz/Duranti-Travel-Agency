@@ -1,4 +1,5 @@
 import type { Block, Media, Place, Reservation } from '../../domain/entities'
+import { reservationTypeForBlockType } from '../../domain/reservation-itinerary-mapping'
 import { assertTripDayContext, requireTripDay } from '../shared/trip-day-context'
 import type { ReservationApplicationDependencies } from './ports'
 
@@ -97,11 +98,6 @@ function validateUrl(value: string | undefined): string | undefined {
   return parsed.toString()
 }
 
-function reservationTypeFromBlock(block: Block): PlannerReservationType | undefined {
-  if (block.type === 'transport' || block.type === 'accommodation' || block.type === 'restaurant' || block.type === 'activity') return block.type
-  return undefined
-}
-
 function reservationIdFromBlock(block: Block): string | undefined {
   const value = block.content.reservationId
   if (value === undefined) return undefined
@@ -152,7 +148,7 @@ export function createReservationApplication(deps: ReservationApplicationDepende
 
   async function getReservationBlock(tripId: string, dayId: string, blockId: string): Promise<Block> {
     const block = await deps.blocks.get(blockId)
-    if (!block || block.tripId !== tripId || block.dayId !== dayId || !reservationTypeFromBlock(block)) {
+    if (!block || block.tripId !== tripId || block.dayId !== dayId || !reservationTypeForBlockType(block.type)) {
       throw new Error('Il blocco prenotazione non appartiene a questa giornata.')
     }
     return block
@@ -218,7 +214,7 @@ export function createReservationApplication(deps: ReservationApplicationDepende
   async function getPlannerReservation(tripId: string, dayId: string, blockId: string): Promise<Reservation | undefined> {
     await assertReservationDayContext(tripId, dayId, false)
     const block = await getReservationBlock(tripId, dayId, blockId)
-    const type = reservationTypeFromBlock(block)
+    const type = reservationTypeForBlockType(block.type)
     if (!type) throw new Error('Tipo di prenotazione non supportato.')
     const reservationId = reservationIdFromBlock(block)
     if (!reservationId) return undefined
@@ -274,7 +270,7 @@ export function createReservationApplication(deps: ReservationApplicationDepende
   async function savePlannerReservation(tripId: string, dayId: string, blockId: string, input: ReservationDraft): Promise<Reservation> {
     await assertReservationDayContext(tripId, dayId, true)
     const block = await getReservationBlock(tripId, dayId, blockId)
-    const reservationType = reservationTypeFromBlock(block)
+    const reservationType = reservationTypeForBlockType(block.type)
     if (!reservationType) throw new Error('Tipo di prenotazione non supportato.')
     const reservationId = reservationIdFromBlock(block)
     const current = reservationId ? await deps.reservations.get(reservationId) : undefined
