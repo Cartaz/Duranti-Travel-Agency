@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Block, Media, Place, Reservation } from '../../domain/entities'
 import InlineConfirm from '../../ui/InlineConfirm'
-import { movePlannerBlock } from '../planner/block-service'
+import { useApplicationServices } from '../../ui/application-context'
 import {
   attachPlannerReservationFile,
   deletePlannerReservationBlock,
@@ -130,6 +130,7 @@ export default function ReservationBlockEditor({
   canMoveDown: boolean
   onChanged: () => Promise<void>
 }) {
+  const { planner } = useApplicationServices()
   const blockType = reservationBlockType(block)
   const config = blockConfigs[blockType]
   const [reservation, setReservation] = useState<Reservation>()
@@ -302,7 +303,7 @@ export default function ReservationBlockEditor({
     setSaving(true)
     setError('')
     try {
-      await movePlannerBlock(tripId, dayId, block.id, direction)
+      await planner.movePlannerBlock(tripId, dayId, block.id, direction)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile spostare la prenotazione.')
