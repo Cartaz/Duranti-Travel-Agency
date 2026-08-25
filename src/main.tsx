@@ -6,7 +6,7 @@ import './styles.css'
 import './ui/guided-ux.css'
 
 const rootElement = document.getElementById('root')
-if (!rootElement) throw new Error('Duranti root element was not found.')
+if (!rootElement) throw new Error('DTAgency root element was not found.')
 
 const root = ReactDOM.createRoot(rootElement)
 
@@ -19,10 +19,10 @@ async function startApplication(): Promise<void> {
       </React.StrictMode>,
     )
   } catch (error) {
-    console.error('Duranti local bootstrap failed.', error)
+    console.error('DTAgency local bootstrap failed.', error)
     root.render(
       <main>
-        <h1>Duranti Travel Agency</h1>
+        <h1>DTAgency</h1>
         <p>Impossibile inizializzare l’archivio locale su questo dispositivo.</p>
       </main>,
     )
