@@ -103,8 +103,8 @@ export function createTripApplication(dependencies: TripApplicationDependencies)
     tripId: string,
     range: Pick<Trip, 'startDate' | 'endDate'>,
   ): Promise<void> {
-    const invalidDays = (await days.list())
-      .filter((day) => day.tripId === tripId && !isDayDateWithinTripRange(range, day.date))
+    const invalidDays = (await days.listByTrip(tripId))
+      .filter((day) => !isDayDateWithinTripRange(range, day.date))
       .sort((left, right) => left.date.localeCompare(right.date))
 
     if (invalidDays.length === 0) return
@@ -119,14 +119,12 @@ export function createTripApplication(dependencies: TripApplicationDependencies)
 
   return {
     async listBookTrips(): Promise<Trip[]> {
-      return (await trips.list())
-        .filter((trip) => trip.status !== 'archived')
+      return (await trips.listBookTrips())
         .sort((left, right) => tripSortValue(left).localeCompare(tripSortValue(right)))
     },
 
     async listArchivedTrips(): Promise<Trip[]> {
-      return (await trips.list())
-        .filter((trip) => trip.status === 'archived')
+      return (await trips.listArchivedTrips())
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     },
 
