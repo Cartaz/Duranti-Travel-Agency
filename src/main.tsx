@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { dayApplication } from './composition/days'
 import { tripApplication } from './composition/trips'
 import { bootstrapApplication } from './data/bootstrap'
 import { ApplicationProvider } from './ui/application-context'
@@ -17,7 +18,7 @@ async function startApplication(): Promise<void> {
     await bootstrapApplication()
     root.render(
       <React.StrictMode>
-        <ApplicationProvider services={{ trips: tripApplication }}>
+        <ApplicationProvider services={{ trips: tripApplication, days: dayApplication }}>
           <App />
         </ApplicationProvider>
       </React.StrictMode>,
