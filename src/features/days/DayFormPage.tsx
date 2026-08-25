@@ -1,14 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Template } from '../../domain/entities'
-import { createTripDay, getTripDay, updateTripDay, type DayDraft } from './day-service'
+import type { DayDraft } from '../../application/days/day-application'
+import { useApplicationServices } from '../../ui/application-context'
 import DayTemplateManager from '../templates/DayTemplateManager'
 import {
   createTripDayFromTemplate,
   isBuiltInDayTemplate,
   listDayTemplates,
 } from '../templates/day-template-service'
-import { getTrip } from '../trips/trip-service'
 import './days.css'
 
 function formatDisplayDate(value: string): string {
@@ -37,6 +37,7 @@ function rangeHint(startDate?: string, endDate?: string): string | undefined {
 export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { tripId, dayId } = useParams<{ tripId: string; dayId: string }>()
   const navigate = useNavigate()
+  const { trips: tripApplication, days: dayApplication } = useApplicationServices()
   const [tripTitle, setTripTitle] = useState('')
   const [tripRange, setTripRange] = useState<{ startDate?: string; endDate?: string }>({})
   const [draft, setDraft] = useState<DayDraft>({ date: '', title: '', summary: '', journalText: '' })
@@ -56,7 +57,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
     let cancelled = false
     void Promise.all([
-      getTrip(tripId),
+      tripApplication.getTrip(tripId),
       mode === 'create' ? listDayTemplates() : Promise.resolve([]),
     ])
       .then(async ([trip, availableTemplates]) => {
@@ -68,7 +69,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
         if (mode === 'edit') {
           if (!dayId) throw new Error('Identificatore della giornata mancante.')
-          const day = await getTripDay(tripId, dayId)
+          const day = await dayApplication.getTripDay(tripId, dayId)
           if (!day) throw new Error('Giornata non trovata in questo viaggio.')
           if (cancelled) return
           setDraft({
@@ -93,7 +94,7 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
     return () => {
       cancelled = true
     }
-  }, [dayId, mode, tripId])
+  }, [dayApplication, dayId, mode, tripApplication, tripId])
 
   const refreshTemplates = async (): Promise<void> => {
     const availableTemplates = await listDayTemplates()
@@ -113,11 +114,11 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
       if (mode === 'create') {
         const createdDay = templateId
           ? await createTripDayFromTemplate(tripId, draft, templateId)
-          : await createTripDay(tripId, draft)
+          : await dayApplication.createTripDay(tripId, draft)
         navigate(templateId ? `/trips/${tripId}/days/${createdDay.id}` : `/trips/${tripId}`, { replace: true })
       } else {
         if (!dayId) throw new Error('Identificatore della giornata mancante.')
-        await updateTripDay(tripId, dayId, draft)
+        await dayApplication.updateTripDay(tripId, dayId, draft)
         navigate(`/trips/${tripId}`, { replace: true })
       }
     } catch (cause) {
