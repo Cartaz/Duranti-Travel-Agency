@@ -20,14 +20,16 @@ const forbiddenBridgeFiles = new Set([
   'src/features/templates/day-template-service.ts',
   'src/features/templates/personal-day-template-service.ts',
   'src/features/expenses/expense-service.ts',
+  'src/features/expenses/expense-summary-service.ts',
+  'src/features/travelers/traveler-service.ts',
 ])
 const forbiddenBridgeImportTokens = [
-  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service', '/templates/day-template-service', '/templates/personal-day-template-service', '/expenses/expense-service',
-  '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service', '../media/day-media-service', '../templates/day-template-service', '../templates/personal-day-template-service', '../expenses/expense-service',
-  './block-service', './reservation-service', './day-media-service', './day-template-service', './personal-day-template-service', './expense-service',
+  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service', '/templates/day-template-service', '/templates/personal-day-template-service', '/expenses/expense-service', '/expenses/expense-summary-service', '/travelers/traveler-service',
+  '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service', '../media/day-media-service', '../templates/day-template-service', '../templates/personal-day-template-service', '../expenses/expense-service', '../expenses/expense-summary-service', '../travelers/traveler-service',
+  './block-service', './reservation-service', './day-media-service', './day-template-service', './personal-day-template-service', './expense-service', './expense-summary-service', './traveler-service',
 ]
 const applicationBackedFeatureRoots = [
-  'src/features/trips/', 'src/features/days/', 'src/features/planner/', 'src/features/reservations/', 'src/features/media/', 'src/features/templates/', 'src/features/expenses/',
+  'src/features/trips/', 'src/features/days/', 'src/features/planner/', 'src/features/reservations/', 'src/features/media/', 'src/features/templates/', 'src/features/expenses/', 'src/features/travelers/',
 ]
 const plannerPagePaths = new Set(['src/features/planner/DayPlannerPage.tsx', 'src/features/planner/GuidedDayPlannerPage.tsx'])
 
