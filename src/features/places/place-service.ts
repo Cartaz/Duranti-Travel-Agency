@@ -1,7 +1,7 @@
 import type { Block, Place } from '../../domain/entities'
+import { assertTripDayContext } from '../../application/shared/trip-day-context'
 import { placeBlockRepository } from '../../data/repositories/place-block-repository'
-import { blockRepository, placeRepository } from '../../data/repositories/repositories'
-import { assertPlannerDayContext } from '../planner/block-service'
+import { blockRepository, dayRepository, placeRepository, tripRepository } from '../../data/repositories/repositories'
 import { buildGoogleMapsSearchUrl } from './maps-url'
 
 export interface PlaceDraft {
@@ -90,6 +90,16 @@ async function getPlaceBlock(tripId: string, dayId: string, blockId: string): Pr
   return block
 }
 
+async function assertPlaceContext(tripId: string, dayId: string, editable: boolean): Promise<void> {
+  await assertTripDayContext(
+    { trips: tripRepository, days: dayRepository },
+    tripId,
+    dayId,
+    editable,
+    'Ripristina il viaggio prima di modificare i luoghi del planner.',
+  )
+}
+
 export function placeToDraft(place: Place): PlaceDraft {
   return {
     name: place.name,
@@ -104,7 +114,7 @@ export function placeToDraft(place: Place): PlaceDraft {
 }
 
 export async function getPlannerPlace(tripId: string, dayId: string, blockId: string): Promise<Place | undefined> {
-  await assertPlannerDayContext(tripId, dayId, false)
+  await assertPlaceContext(tripId, dayId, false)
   const block = await getPlaceBlock(tripId, dayId, blockId)
   const placeId = placeIdFromBlock(block)
   if (!placeId) return undefined
@@ -117,7 +127,7 @@ export async function savePlannerPlace(
   blockId: string,
   input: PlaceDraft,
 ): Promise<Place> {
-  await assertPlannerDayContext(tripId, dayId, true)
+  await assertPlaceContext(tripId, dayId, true)
   const block = await getPlaceBlock(tripId, dayId, blockId)
   const currentPlaceId = placeIdFromBlock(block)
   const currentPlace = currentPlaceId ? await placeRepository.get(currentPlaceId) : undefined
