@@ -1,4 +1,4 @@
-# Duranti Storage Lab
+# DTAgency Storage Lab
 
 The first implementation milestone is deliberately a storage-only proof of concept. It must be tested on the target device: iPhone 16, Safari/Web App on iOS.
 
@@ -9,7 +9,7 @@ The first implementation milestone is deliberately a storage-only proof of conce
 - `navigator.storage.persist()` / `navigator.storage.persisted()`.
 - Storage usage/quota reporting.
 - Offline/online state.
-- Encrypted `.duranti-test` export/import using PBKDF2-SHA-256 and AES-256-GCM.
+- Encrypted `.dtagency-test` export/import using PBKDF2-SHA-256 and AES-256-GCM.
 
 ## Manual protocol
 
@@ -18,11 +18,11 @@ The first implementation milestone is deliberately a storage-only proof of conce
 3. Close the Web App completely and reopen it. The record must remain.
 4. Press **Request persistent storage** and record whether `Persistent grant` becomes `YES`.
 5. Press **Add 100 MB to OPFS** and verify that the page remains responsive and the usage estimate changes.
-6. Export the encrypted test vault and save it somewhere outside Safari, preferably in **Files → On My iPhone → Duranti**.
+6. Export the encrypted test vault and save it somewhere outside Safari, preferably in **Files → On My iPhone → DTAgency**.
 7. Verify that the exported file cannot be read as plaintext JSON containing the test payload without the password.
 8. Use iOS **Settings → Apps → Safari → Clear History and Website Data**. This is destructive for the test origin; only proceed after verifying the vault exists outside Safari.
 9. Reopen the Web App. The internal test data may be gone. That is expected and is the reason the external Vault exists.
-10. Import the `.duranti-test` file and verify that the test record is restored.
+10. Import the `.dtagency-test` file and verify that the test record is restored.
 11. Repeat the test with real image/video selection only after the basic flow passes.
 
 ## Acceptance criteria
