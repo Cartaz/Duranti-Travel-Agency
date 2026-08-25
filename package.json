@@ -1,11 +1,12 @@
 {
-  "name": "duranti-travel-agency",
+  "name": "dtagency",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "check:policy": "node scripts/check-repo-policy.mjs",
+    "build": "npm run check:policy && tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
