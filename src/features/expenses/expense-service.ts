@@ -1,8 +1,7 @@
 import type { Block, Expense, ExpenseFxConversion, Traveler } from '../../domain/entities'
+import { assertTripDayContext } from '../../application/shared/trip-day-context'
 import { expenseBlockRepository } from '../../data/repositories/expense-block-repository'
-import { blockRepository, expenseRepository, tripRepository } from '../../data/repositories/repositories'
-import { getTripDay } from '../days/day-service'
-import { assertPlannerDayContext } from '../planner/block-service'
+import { blockRepository, dayRepository, expenseRepository, tripRepository } from '../../data/repositories/repositories'
 import { getTraveler, listTripParticipants } from '../travelers/traveler-service'
 import {
   convertMinorByRate,
@@ -107,7 +106,6 @@ async function validatePayer(
 ): Promise<string | undefined> {
   const travelerId = cleanOptional(requestedTravelerId)
   if (!travelerId) return undefined
-
   if (travelerId === currentTravelerId) return travelerId
 
   const participants = await listTripParticipants(tripId)
@@ -115,6 +113,16 @@ async function validatePayer(
     throw new Error('“Pagato da” deve riferirsi a un viaggiatore attualmente associato al viaggio.')
   }
   return travelerId
+}
+
+async function assertExpenseDayContext(tripId: string, dayId: string, editable: boolean) {
+  return assertTripDayContext(
+    { trips: tripRepository, days: dayRepository },
+    tripId,
+    dayId,
+    editable,
+    'Ripristina il viaggio prima di modificare le spese.',
+  )
 }
 
 export function expenseToDraft(expense: Expense): ExpenseDraft {
@@ -154,7 +162,7 @@ export async function getPlannerExpense(
   dayId: string,
   blockId: string,
 ): Promise<Expense | undefined> {
-  await assertPlannerDayContext(tripId, dayId, false)
+  await assertExpenseDayContext(tripId, dayId, false)
   const block = await getExpenseBlock(tripId, dayId, blockId)
   const expenseId = expenseIdFromBlock(block)
   if (!expenseId) return undefined
@@ -171,14 +179,8 @@ export async function savePlannerExpense(
   blockId: string,
   input: ExpenseDraft,
 ): Promise<Expense> {
-  await assertPlannerDayContext(tripId, dayId, true)
-  const [block, day, trip] = await Promise.all([
-    getExpenseBlock(tripId, dayId, blockId),
-    getTripDay(tripId, dayId),
-    tripRepository.get(tripId),
-  ])
-  if (!day) throw new Error('La giornata non esiste più.')
-  if (!trip) throw new Error('Il viaggio non esiste più.')
+  const { trip, day } = await assertExpenseDayContext(tripId, dayId, true)
+  const block = await getExpenseBlock(tripId, dayId, blockId)
 
   const currency = normalizeCurrencyCode(input.currency)
   const amountMinor = majorAmountToMinor(input.amount, currency)
@@ -215,21 +217,8 @@ export async function savePlannerExpense(
   }
 
   const expense: Expense = current
-    ? {
-        ...current,
-        ...common,
-        tripId,
-        dayId,
-        updatedAt: now,
-      }
-    : {
-        id: crypto.randomUUID(),
-        ...common,
-        tripId,
-        dayId,
-        createdAt: now,
-        updatedAt: now,
-      }
+    ? { ...current, ...common, tripId, dayId, updatedAt: now }
+    : { id: crypto.randomUUID(), ...common, tripId, dayId, createdAt: now, updatedAt: now }
 
   await expenseBlockRepository.saveExpenseForBlock(blockId, tripId, dayId, expense)
   return expense
@@ -240,6 +229,6 @@ export async function deletePlannerExpenseBlock(
   dayId: string,
   blockId: string,
 ): Promise<void> {
-  await assertPlannerDayContext(tripId, dayId, true)
+  await assertExpenseDayContext(tripId, dayId, true)
   await expenseBlockRepository.softDeleteExpenseBlock(blockId, tripId, dayId)
 }
