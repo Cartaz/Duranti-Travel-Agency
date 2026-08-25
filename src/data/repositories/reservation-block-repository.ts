@@ -1,4 +1,5 @@
 import type { Block, Itinerary, Media, Reservation } from '../../domain/entities'
+import { itineraryStatusForReservation, itineraryTypeForReservation } from '../../domain/reservation-itinerary-mapping'
 import { db } from '../db/dtagency-db'
 
 function readReservationId(block: Block): string | undefined {
@@ -14,27 +15,6 @@ function expectedReservationType(block: Block): Reservation['type'] | undefined 
   if (block.type === 'restaurant') return 'restaurant'
   if (block.type === 'activity') return 'activity'
   return undefined
-}
-
-function itineraryTypeForReservation(type: Reservation['type']): Itinerary['type'] {
-  switch (type) {
-    case 'transport': return 'transport'
-    case 'restaurant': return 'meal'
-    case 'activity': return 'activity'
-    case 'accommodation': return 'reservation'
-    default: return 'reservation'
-  }
-}
-
-function itineraryStatusForReservation(status: Reservation['status']): Itinerary['status'] {
-  switch (status) {
-    case 'booked': return 'booked'
-    case 'completed': return 'done'
-    case 'cancelled': return 'cancelled'
-    case 'planned':
-    default:
-      return 'planned'
-  }
 }
 
 function assertReservationContext(
