@@ -6,7 +6,7 @@ import {
   placeRepository,
   tripRepository,
 } from '../data/repositories/repositories'
-import { listDayItineraryItems } from '../features/itinerary/itinerary-service'
+import { itineraryApplication } from './itinerary'
 
 export const dayMediaApplication = createDayMediaApplication({
   media: mediaRepository,
@@ -15,6 +15,6 @@ export const dayMediaApplication = createDayMediaApplication({
   trips: tripRepository,
   days: dayRepository,
   itinerary: {
-    listDayItems: listDayItineraryItems,
+    listDayItems: itineraryApplication.listDayItineraryItems,
   },
 })
