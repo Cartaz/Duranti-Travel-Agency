@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Trip } from '../../domain/entities'
+import { useApplicationServices } from '../../ui/application-context'
 import TripDaysPanel from '../days/TripDaysPanel'
 import TripExpenseSummary from '../expenses/TripExpenseSummary'
 import TripItineraryOverview from '../itinerary/TripItineraryOverview'
 import TripTravelersPanel from '../travelers/TripTravelersPanel'
-import { archiveTrip, getTrip } from './trip-service'
 import './trips.css'
 import './trip-lifecycle.css'
 import './trip-detail-simple.css'
@@ -25,6 +25,7 @@ function formatDate(value: string | undefined): string {
 }
 
 export default function TripDetailPage() {
+  const { trips: tripApplication } = useApplicationServices()
   const { tripId } = useParams<{ tripId: string }>()
   const navigate = useNavigate()
   const [trip, setTrip] = useState<Trip>()
@@ -40,7 +41,7 @@ export default function TripDetailPage() {
     }
 
     let cancelled = false
-    void getTrip(tripId)
+    void tripApplication.getTrip(tripId)
       .then((item) => {
         if (cancelled) return
         if (!item || item.status === 'archived') {
@@ -59,7 +60,7 @@ export default function TripDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [tripId])
+  }, [tripApplication, tripId])
 
   const handleArchive = async (): Promise<void> => {
     if (!trip || archiving) return
@@ -69,7 +70,7 @@ export default function TripDetailPage() {
     setArchiving(true)
     setError('')
     try {
-      await archiveTrip(trip.id)
+      await tripApplication.archiveTrip(trip.id)
       navigate('/archive', { replace: true })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile archiviare il viaggio.')
