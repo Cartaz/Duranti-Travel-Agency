@@ -1,6 +1,8 @@
 import type { Block, Itinerary, Reservation } from './entities'
 
-export function reservationTypeForBlockType(type: Block['type']): Reservation['type'] | undefined {
+export type PlannerReservationType = Extract<Reservation['type'], 'transport' | 'accommodation' | 'restaurant' | 'activity'>
+
+export function reservationTypeForBlockType(type: Block['type']): PlannerReservationType | undefined {
   switch (type) {
     case 'transport': return 'transport'
     case 'accommodation': return 'accommodation'
