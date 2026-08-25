@@ -1,10 +1,11 @@
 import type { Traveler, TripTraveler } from '../../domain/entities'
+import { requireTrip } from '../../application/shared/trip-day-context'
 import {
   travelerRepository,
+  tripRepository,
   tripTravelerRepository,
 } from '../../data/repositories/repositories'
 import type { TripTravelerRole } from '../../data/repositories/trip-traveler-repository'
-import { getTrip } from '../trips/trip-service'
 
 export type TravelerRole = TripTravelerRole
 
@@ -158,8 +159,7 @@ export async function updateTraveler(travelerId: string, input: TravelerDraft): 
 }
 
 export async function listTripParticipants(tripId: string): Promise<TripParticipant[]> {
-  const trip = await getTrip(tripId)
-  if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
+  await requireTrip({ trips: tripRepository }, tripId)
 
   const memberships = await tripTravelerRepository.listActiveForTrip(tripId)
   const participants: TripParticipant[] = []
