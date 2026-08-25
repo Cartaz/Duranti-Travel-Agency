@@ -1,21 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Media } from '../../domain/entities'
-import InlineConfirm from '../../ui/InlineConfirm'
-import DayMediaLightbox from './DayMediaLightbox'
 import {
   DAY_MEDIA_ACCEPT,
   dayMediaItineraryKey,
-  importDayMedia,
-  listDayMedia,
-  listDayMediaContext,
   MAX_DAY_MEDIA_CAPTION_LENGTH,
-  moveDayMedia,
-  readDayMedia,
-  removeDayMedia,
-  updateDayMediaDetails,
   type DayMediaContextOptions,
   type DayMediaMoveDirection,
-} from './day-media-service'
+} from '../../application/media/day-media-application'
+import InlineConfirm from '../../ui/InlineConfirm'
+import { useApplicationServices } from '../../ui/application-context'
+import DayMediaLightbox from './DayMediaLightbox'
 import './day-media.css'
 
 function formatBytes(value: number): string {
@@ -35,6 +29,7 @@ export default function DayMediaGallery({
   dayId: string
   readOnly: boolean
 }) {
+  const { media: mediaApplication } = useApplicationServices()
   const [items, setItems] = useState<Media[]>([])
   const [context, setContext] = useState<DayMediaContextOptions>(EMPTY_CONTEXT)
   const [loading, setLoading] = useState(true)
@@ -47,8 +42,8 @@ export default function DayMediaGallery({
     if (!preserveError) setError('')
     try {
       const [loadedItems, loadedContext] = await Promise.all([
-        listDayMedia(tripId, dayId),
-        listDayMediaContext(tripId, dayId),
+        mediaApplication.listDayMedia(tripId, dayId),
+        mediaApplication.listDayMediaContext(tripId, dayId),
       ])
       setItems(loadedItems)
       setContext(loadedContext)
@@ -57,7 +52,7 @@ export default function DayMediaGallery({
     } finally {
       setLoading(false)
     }
-  }, [dayId, tripId])
+  }, [dayId, mediaApplication, tripId])
 
   useEffect(() => {
     void refresh()
@@ -69,7 +64,7 @@ export default function DayMediaGallery({
     setError('')
     try {
       for (const file of Array.from(files)) {
-        await importDayMedia(tripId, dayId, file)
+        await mediaApplication.importDayMedia(tripId, dayId, file)
       }
       await refresh()
     } catch (cause) {
@@ -83,7 +78,7 @@ export default function DayMediaGallery({
   const move = async (mediaId: string, direction: DayMediaMoveDirection): Promise<void> => {
     setError('')
     try {
-      await moveDayMedia(tripId, dayId, mediaId, direction)
+      await mediaApplication.moveDayMedia(tripId, dayId, mediaId, direction)
       await refresh()
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Impossibile riordinare i ricordi della giornata.'
@@ -184,6 +179,7 @@ function DayMediaCard({
   onMove: (direction: DayMediaMoveDirection) => Promise<void>
   onChanged: () => Promise<void>
 }) {
+  const { media: mediaApplication } = useApplicationServices()
   const [objectUrl, setObjectUrl] = useState('')
   const [previewError, setPreviewError] = useState('')
   const [caption, setCaption] = useState(media.caption ?? '')
@@ -202,7 +198,7 @@ function DayMediaCard({
   useEffect(() => {
     let cancelled = false
     let url = ''
-    void readDayMedia(media, tripId, dayId)
+    void mediaApplication.readDayMedia(media, tripId, dayId)
       .then((file) => {
         if (cancelled) return
         url = URL.createObjectURL(file)
@@ -216,14 +212,14 @@ function DayMediaCard({
       cancelled = true
       if (url) URL.revokeObjectURL(url)
     }
-  }, [dayId, media, tripId])
+  }, [dayId, media, mediaApplication, tripId])
 
   const saveDetails = async (): Promise<void> => {
     if (readOnly || saving || !detailsChanged) return
     setSaving(true)
     setPreviewError('')
     try {
-      await updateDayMediaDetails(tripId, dayId, media.id, {
+      await mediaApplication.updateDayMediaDetails(tripId, dayId, media.id, {
         caption,
         placeId: placeId || undefined,
         itineraryKey: itineraryKey || undefined,
@@ -254,7 +250,7 @@ function DayMediaCard({
     setSaving(true)
     setPreviewError('')
     try {
-      await removeDayMedia(tripId, dayId, media.id)
+      await mediaApplication.removeDayMedia(tripId, dayId, media.id)
       setConfirmRemove(false)
       await onChanged()
     } catch (cause) {
