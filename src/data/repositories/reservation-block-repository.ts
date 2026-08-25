@@ -1,5 +1,5 @@
 import type { Block, Itinerary, Media, Reservation } from '../../domain/entities'
-import { db } from '../db/duranti-db'
+import { db } from '../db/dtagency-db'
 
 function readReservationId(block: Block): string | undefined {
   const value = block.content.reservationId
