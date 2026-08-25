@@ -1,0 +1,108 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { createPlannerApplication } from '../../src/application/planner/planner-application.ts'
+import type { Block, Day, Trip } from '../../src/domain/entities.ts'
+
+const timestamp = '2026-08-25T12:00:00.000Z'
+
+function createFixture() {
+  const trip: Trip = {
+    id: 'trip-1',
+    title: 'Strategic planner trip',
+    status: 'planned',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+  const day: Day = {
+    id: 'day-1',
+    tripId: trip.id,
+    sequence: 1,
+    date: '2026-09-01',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+  const blocks: Block[] = [
+    {
+      id: 'block-later',
+      tripId: trip.id,
+      dayId: day.id,
+      type: 'text',
+      position: 3,
+      content: { text: 'Later' },
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: 'block-earlier',
+      tripId: trip.id,
+      dayId: day.id,
+      type: 'heading',
+      position: 1,
+      content: { text: 'Earlier' },
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: 'block-foreign',
+      tripId: 'trip-2',
+      dayId: day.id,
+      type: 'text',
+      position: 99,
+      content: { text: 'Corrupt cross-trip row' },
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+  ]
+  return { trip, day, blocks }
+}
+
+test('planner lists blocks through the semantic day query and keeps trip isolation', async () => {
+  const { trip, day, blocks } = createFixture()
+  const queriedDayIds: string[] = []
+
+  const application = createPlannerApplication({
+    blocks: {
+      listByDay: async (dayId) => {
+        queriedDayIds.push(dayId)
+        return blocks
+      },
+      get: async () => undefined,
+      put: async () => undefined,
+      softDelete: async () => 'not-found',
+      moveWithinDay: async () => 'boundary',
+    },
+    trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
+    days: { getTripDay: async (tripId, dayId) => tripId === trip.id && dayId === day.id ? day : undefined },
+    now: () => timestamp,
+    newId: () => 'new-block',
+  })
+
+  const listed = await application.listDayPlannerBlocks(trip.id, day.id)
+
+  assert.deepEqual(queriedDayIds, [day.id])
+  assert.deepEqual(listed.map((block) => block.id), ['block-earlier', 'block-later'])
+})
+
+test('planner assigns a new position from day-scoped siblings only', async () => {
+  const { trip, day, blocks } = createFixture()
+  let saved: Block | undefined
+
+  const application = createPlannerApplication({
+    blocks: {
+      listByDay: async (dayId) => dayId === day.id ? blocks : [],
+      get: async () => undefined,
+      put: async (block) => { saved = block; return block.id },
+      softDelete: async () => 'not-found',
+      moveWithinDay: async () => 'boundary',
+    },
+    trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
+    days: { getTripDay: async (tripId, dayId) => tripId === trip.id && dayId === day.id ? day : undefined },
+    now: () => '2026-08-25T13:00:00.000Z',
+    newId: () => 'block-new',
+  })
+
+  const created = await application.createPlannerBlock(trip.id, day.id, 'divider')
+
+  assert.equal(created.position, 4)
+  assert.equal(saved?.id, created.id)
+})

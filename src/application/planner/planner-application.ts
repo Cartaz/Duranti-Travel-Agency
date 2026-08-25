@@ -98,9 +98,9 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
 
   async function listDayPlannerBlocks(tripId: string, dayId: string): Promise<Block[]> {
     await assertPlannerDayContext(tripId, dayId, false)
-    const blocks = await deps.blocks.list()
+    const blocks = await deps.blocks.listByDay(dayId)
     return blocks
-      .filter((block) => block.tripId === tripId && block.dayId === dayId && plannerBlockTypes.has(block.type))
+      .filter((block) => block.tripId === tripId && plannerBlockTypes.has(block.type))
       .sort((left, right) => (
         left.position - right.position ||
         left.createdAt.localeCompare(right.createdAt) ||
@@ -122,7 +122,7 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
 
   async function createPlannerBlock(tripId: string, dayId: string, type: PlannerBlockType): Promise<Block> {
     await assertPlannerDayContext(tripId, dayId, true)
-    const siblings = (await deps.blocks.list()).filter((block) => block.tripId === tripId && block.dayId === dayId)
+    const siblings = (await deps.blocks.listByDay(dayId)).filter((block) => block.tripId === tripId)
     const position = siblings.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
     const now = deps.now()
     const content = ['place', 'transport', 'accommodation', 'restaurant', 'activity', 'expense'].includes(type)
