@@ -10,6 +10,16 @@ export class BlockRepository extends Repository<Block> {
     super(db.blocks)
   }
 
+  async listByDay(dayId: string): Promise<Block[]> {
+    return (await db.blocks.where('dayId').equals(dayId).toArray())
+      .filter((block) => !block.deletedAt)
+  }
+
+  async listByTrip(tripId: string): Promise<Block[]> {
+    return (await db.blocks.where('tripId').equals(tripId).toArray())
+      .filter((block) => !block.deletedAt)
+  }
+
   async moveWithinDay(
     blockId: string,
     tripId: string,
