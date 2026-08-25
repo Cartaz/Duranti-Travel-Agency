@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Block, Expense, Traveler } from '../../domain/entities'
 import InlineConfirm from '../../ui/InlineConfirm'
-import { movePlannerBlock } from '../planner/block-service'
+import { useApplicationServices } from '../../ui/application-context'
 import {
   deletePlannerExpenseBlock,
   emptyExpenseDraft,
@@ -47,6 +47,7 @@ export default function ExpenseBlockEditor({
   canMoveDown: boolean
   onChanged: () => Promise<void>
 }) {
+  const { planner } = useApplicationServices()
   const fallbackCurrency = tripCurrency ?? 'EUR'
   const normalizedTripCurrency = tripCurrency?.trim().toUpperCase()
   const [expense, setExpense] = useState<Expense>()
@@ -145,7 +146,7 @@ export default function ExpenseBlockEditor({
     setSaving(true)
     setError('')
     try {
-      await movePlannerBlock(tripId, dayId, block.id, direction)
+      await planner.movePlannerBlock(tripId, dayId, block.id, direction)
       await onChanged()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile spostare la spesa.')
@@ -195,11 +196,7 @@ export default function ExpenseBlockEditor({
         <span className="expense-loading" role="status">Carico la spesa…</span>
       ) : (
         <>
-          {expense && (
-            <strong className="expense-total">
-              {formatMinorCurrency(expense.amountMinor, expense.currency)}
-            </strong>
-          )}
+          {expense && <strong className="expense-total">{formatMinorCurrency(expense.amountMinor, expense.currency)}</strong>}
 
           <div className="expense-grid">
             <label>
@@ -308,7 +305,7 @@ export default function ExpenseBlockEditor({
                     )}
 
                     <small className="expense-hint">
-                      Il tasso è inserito da te: Duranti non scarica, aggiorna o applica automaticamente tassi di cambio.
+                      Il tasso è inserito da te: DTAgency non scarica, aggiorna o applica automaticamente tassi di cambio.
                     </small>
                   </div>
                 )}
