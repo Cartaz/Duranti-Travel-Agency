@@ -1,6 +1,6 @@
 import { VAULT_FORMAT_VERSION } from '../lib/versions'
 
-const VAULT_MAGIC = new TextEncoder().encode('DURVLT01')
+const VAULT_MAGIC = new TextEncoder().encode('DTAVLT01')
 const AES_GCM_IV_BYTES = 12
 const AES_GCM_TAG_BITS = 128
 const MIN_VAULT_PASSPHRASE_LENGTH = 12
@@ -17,7 +17,7 @@ export const VAULT_FRAME_FILE_CHUNK = 2 as const
 export const VAULT_FRAME_END = 255 as const
 
 export interface VaultHeaderV1 {
-  magic: 'DURVLT01'
+  magic: 'DTAVLT01'
   version: 1
   archiveId: string
   createdAt: string
@@ -52,7 +52,7 @@ export interface VaultFileManifestEntry {
 }
 
 export interface VaultManifestV1 {
-  format: 'duranti-vault'
+  format: 'dtagency-vault'
   version: 1
   archiveId: string
   createdAt: string
@@ -227,7 +227,7 @@ export async function decryptVaultPayload(
 }
 
 export function manifestAdditionalData(archiveId: string): string {
-  return `duranti|vault|v1|${archiveId}|manifest`
+  return `dtagency|vault|v1|${archiveId}|manifest`
 }
 
 export function fileChunkAdditionalData(
@@ -236,5 +236,5 @@ export function fileChunkAdditionalData(
   chunkIndex: number,
   plaintextBytes: number,
 ): string {
-  return `duranti|vault|v1|${archiveId}|file|${file.index}|${file.path}|chunk|${chunkIndex}|${plaintextBytes}`
+  return `dtagency|vault|v1|${archiveId}|file|${file.index}|${file.path}|chunk|${chunkIndex}|${plaintextBytes}`
 }
