@@ -7,8 +7,8 @@ export interface TripExpenseSummary { expenseCount: number; currencies: ExpenseC
 export interface ExpenseSummaryApplication { getTripExpenseSummary(tripId: string): Promise<TripExpenseSummary> }
 export interface ExpenseSummaryDependencies {
   trips: { get(id: string): Promise<Trip | undefined> }
-  days: { list(): Promise<Day[]> }
-  expenses: { list(): Promise<Expense[]> }
+  days: { listByTrip(tripId: string): Promise<Day[]> }
+  expenses: { listByTrip(tripId: string): Promise<Expense[]> }
   travelers: { get(id: string): Promise<Traveler | undefined> }
 }
 
@@ -59,9 +59,12 @@ function summarizeBudgetExpenses(expenses: Expense[], currency: string) {
 
 export function createExpenseSummaryApplication(deps: ExpenseSummaryDependencies): ExpenseSummaryApplication {
   async function getTripExpenseSummary(tripId: string): Promise<TripExpenseSummary> {
-    const [trip, expenses] = await Promise.all([deps.trips.get(tripId), deps.expenses.list().then((items) => items.filter((expense) => expense.tripId === tripId))])
+    const [trip, expenses, tripDays] = await Promise.all([
+      deps.trips.get(tripId),
+      deps.expenses.listByTrip(tripId),
+      deps.days.listByTrip(tripId),
+    ])
     if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
-    const tripDays = (await deps.days.list()).filter((day) => day.tripId === tripId)
     const payerIds = Array.from(new Set(expenses.map((expense) => expense.paidByTravelerId).filter((id): id is string => Boolean(id))))
     const dayById = new Map(tripDays.map((day) => [day.id, day]))
     const payerNames = new Map<string, string>()
