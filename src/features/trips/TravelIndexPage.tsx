@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Trip, TripStatus } from '../../domain/entities'
-import { listBookTrips } from './trip-service'
+import { useApplicationServices } from '../../ui/application-context'
 import './trips.css'
 import './trip-lifecycle.css'
 
@@ -46,13 +46,14 @@ function formatTripDates(trip: Trip): string {
 }
 
 export default function TravelIndexPage() {
+  const { trips: tripApplication } = useApplicationServices()
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    void listBookTrips()
+    void tripApplication.listBookTrips()
       .then((items) => {
         if (!cancelled) setTrips(items)
       })
@@ -66,7 +67,7 @@ export default function TravelIndexPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [tripApplication])
 
   const groups = useMemo(() => {
     return new Map(chapters.map((chapter) => [
@@ -79,7 +80,7 @@ export default function TravelIndexPage() {
     <section className="travel-index" aria-labelledby="travel-index-title">
       <div className="book-intro">
         <div className="book-intro-copy">
-          <p className="eyebrow">DURANTI TRAVEL AGENCY</p>
+          <p className="eyebrow">DTAgency</p>
           <h1 id="travel-index-title">Il nostro libro dei viaggi</h1>
           <p className="book-tagline">viaggia con noi, viaggio, con i topi</p>
           <p className="book-intro-note">
