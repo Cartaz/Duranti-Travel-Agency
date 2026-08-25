@@ -1,4 +1,4 @@
-import { DB_NAME, DB_VERSION, db } from '../data/db/duranti-db'
+import { DB_NAME, DB_VERSION, db } from '../data/db/dtagency-db'
 import {
   MAX_VAULT_MANIFEST_BYTES,
   VAULT_CHUNK_BYTES,
@@ -24,7 +24,7 @@ import {
   type VaultTableSnapshot,
 } from './format'
 
-const ROOT_DIRECTORY = 'duranti'
+const ROOT_DIRECTORY = 'dtagency'
 const MEDIA_DIRECTORY = 'media'
 const PRIVATE_DIRECTORY = 'private'
 const PRIVATE_DOCUMENT_DIRECTORY = 'traveler-documents'
@@ -209,8 +209,8 @@ function buildVaultFileName(createdAt: string): string {
 
 async function getVaultStagingDirectory(): Promise<FileSystemDirectoryHandle> {
   const root = await getRootDirectory()
-  const duranti = await root.getDirectoryHandle(ROOT_DIRECTORY, { create: true })
-  return duranti.getDirectoryHandle(VAULT_STAGING_DIRECTORY, { create: true })
+  const dtagency = await root.getDirectoryHandle(ROOT_DIRECTORY, { create: true })
+  return dtagency.getDirectoryHandle(VAULT_STAGING_DIRECTORY, { create: true })
 }
 
 async function writeBytes(
@@ -256,7 +256,7 @@ export async function prepareVaultExport(
 
   const salt = crypto.getRandomValues(new Uint8Array(KDF_SALT_BYTES))
   const header: VaultHeaderV1 = {
-    magic: 'DURVLT01',
+    magic: 'DTAVLT01',
     version: VAULT_FORMAT_VERSION,
     archiveId,
     createdAt,
@@ -276,7 +276,7 @@ export async function prepareVaultExport(
   }
 
   const manifest: VaultManifestV1 = {
-    format: 'duranti-vault',
+    format: 'dtagency-vault',
     version: VAULT_FORMAT_VERSION,
     archiveId,
     createdAt,
