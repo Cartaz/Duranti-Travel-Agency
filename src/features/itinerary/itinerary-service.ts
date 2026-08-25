@@ -1,14 +1,14 @@
 import type { Block, Itinerary, Place, Reservation } from '../../domain/entities'
+import { assertTripDayContext, requireTripDay } from '../../application/shared/trip-day-context'
 import { reservationBlockRepository } from '../../data/repositories/reservation-block-repository'
 import {
   blockRepository,
+  dayRepository,
   itineraryRepository,
   placeRepository,
   reservationRepository,
+  tripRepository,
 } from '../../data/repositories/repositories'
-import { getTripDay } from '../days/day-service'
-import { assertPlannerDayContext } from '../planner/block-service'
-import { getTrip } from '../trips/trip-service'
 
 export type ItinerarySource = 'manual' | 'reservation'
 export type ItinerarySyncState = 'manual' | 'synced' | 'needs-sync' | 'orphaned'
@@ -50,6 +50,7 @@ const itineraryTypes = new Set<EditableItineraryType>([
 ])
 const itineraryStatuses = new Set<EditableItineraryStatus>(['idea', 'planned', 'booked', 'done', 'cancelled'])
 const reservationBlockTypes = new Set<Block['type']>(['transport', 'accommodation', 'restaurant', 'activity'])
+const contextDependencies = { trips: tripRepository, days: dayRepository }
 
 function cleanOptional(value: string | undefined): string | undefined {
   const cleaned = value?.trim()
@@ -174,8 +175,7 @@ function itineraryMatchesReservation(itinerary: Itinerary, reservation: Reservat
 }
 
 async function normalizeManualDraft(tripId: string, dayId: string, input: ItineraryDraft): Promise<ItineraryDraft> {
-  const [trip, day] = await Promise.all([getTrip(tripId), getTripDay(tripId, dayId)])
-  if (!trip || !day) throw new Error('Viaggio o giornata non disponibili.')
+  const { trip, day } = await requireTripDay(contextDependencies, tripId, dayId)
 
   const title = input.title.trim()
   if (!title) throw new Error('Il titolo della tappa è obbligatorio.')
@@ -210,6 +210,16 @@ async function normalizeManualDraft(tripId: string, dayId: string, input: Itiner
   }
 }
 
+async function assertItineraryContext(tripId: string, dayId: string, editable: boolean): Promise<void> {
+  await assertTripDayContext(
+    contextDependencies,
+    tripId,
+    dayId,
+    editable,
+    'Ripristina il viaggio prima di modificare l’itinerario.',
+  )
+}
+
 export function itineraryToDraft(itinerary: Itinerary): ItineraryDraft {
   return {
     title: itinerary.title,
@@ -229,7 +239,7 @@ export async function listItineraryPlaces(): Promise<Place[]> {
 }
 
 export async function listDayItineraryItems(tripId: string, dayId: string): Promise<DayItineraryItem[]> {
-  await assertPlannerDayContext(tripId, dayId, false)
+  await assertItineraryContext(tripId, dayId, false)
 
   const [itineraries, places, reservations, blocks] = await Promise.all([
     itineraryRepository.list().then((items) => items.filter((item) => item.tripId === tripId && item.dayId === dayId)),
@@ -312,7 +322,7 @@ export async function saveManualItineraryItem(
   itineraryId: string | undefined,
   input: ItineraryDraft,
 ): Promise<Itinerary> {
-  await assertPlannerDayContext(tripId, dayId, true)
+  await assertItineraryContext(tripId, dayId, true)
   const draft = await normalizeManualDraft(tripId, dayId, input)
   const current = itineraryId ? await itineraryRepository.get(itineraryId) : undefined
   if (itineraryId && !current) throw new Error('La tappa non esiste più.')
@@ -331,30 +341,15 @@ export async function saveManualItineraryItem(
   }
 
   const itinerary: Itinerary = current
-    ? {
-        ...current,
-        ...draft,
-        tripId,
-        dayId,
-        position,
-        updatedAt: now,
-      }
-    : {
-        id: crypto.randomUUID(),
-        ...draft,
-        tripId,
-        dayId,
-        position,
-        createdAt: now,
-        updatedAt: now,
-      }
+    ? { ...current, ...draft, tripId, dayId, position, updatedAt: now }
+    : { id: crypto.randomUUID(), ...draft, tripId, dayId, position, createdAt: now, updatedAt: now }
 
   await itineraryRepository.put(itinerary)
   return itinerary
 }
 
 export async function deleteManualItineraryItem(tripId: string, dayId: string, itineraryId: string): Promise<void> {
-  await assertPlannerDayContext(tripId, dayId, true)
+  await assertItineraryContext(tripId, dayId, true)
   const itinerary = await itineraryRepository.get(itineraryId)
   if (!itinerary) return
   if (itinerary.tripId !== tripId || itinerary.dayId !== dayId) throw new Error('La tappa non appartiene a questa giornata.')
@@ -365,7 +360,7 @@ export async function deleteManualItineraryItem(tripId: string, dayId: string, i
 }
 
 export async function reconcileDayReservationItineraries(tripId: string, dayId: string): Promise<number> {
-  await assertPlannerDayContext(tripId, dayId, true)
+  await assertItineraryContext(tripId, dayId, true)
   const [blocks, reservations] = await Promise.all([
     blockRepository.list().then((items) => items.filter((item) => item.tripId === tripId && item.dayId === dayId)),
     reservationRepository.list().then((items) => items.filter((item) => item.tripId === tripId && item.dayId === dayId)),
