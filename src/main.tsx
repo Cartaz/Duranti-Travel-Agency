@@ -7,6 +7,7 @@ import { dayMediaApplication } from './composition/media'
 import { plannerApplication } from './composition/planner'
 import { reservationApplication } from './composition/reservations'
 import { dayTemplateApplication } from './composition/templates'
+import { travelerApplication } from './composition/travelers'
 import { tripApplication } from './composition/trips'
 import { bootstrapApplication } from './data/bootstrap'
 import { ApplicationProvider } from './ui/application-context'
@@ -30,6 +31,7 @@ async function startApplication(): Promise<void> {
           media: dayMediaApplication,
           templates: dayTemplateApplication,
           expenses: expenseApplication,
+          travelers: travelerApplication,
         }}>
           <App />
         </ApplicationProvider>
