@@ -9,8 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Duranti Travel Agency',
-        short_name: 'Duranti',
+        name: 'DTAgency',
+        short_name: 'DTAgency',
         description: 'Private offline-first travel planner and journal.',
         theme_color: '#17130f',
         background_color: '#17130f',
