@@ -134,7 +134,7 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
     for (const reservation of reservations) if (reservation.placeId) ids.add(reservation.placeId)
     return deps.places.getMany([...ids])
   }
-  async function normalizeManualDraft(tripId: string, dayId: string, input: ItineraryDraft): Promise<ItineraryDraft> {
+  async function normalizeManualDraft(tripId: string, dayId: string, input: ItineraryDraft, currentPlaceId?: string): Promise<ItineraryDraft> {
     const { trip, day } = await requireTripDay(contextDependencies, tripId, dayId)
     const title = input.title.trim()
     if (!title) throw new Error('Il titolo della tappa è obbligatorio.')
@@ -147,7 +147,7 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
     if (startsAt && endsAt && endsAt < startsAt) throw new Error('La fine non può precedere l’inizio.')
     if (endsAt && trip.endDate && endsAt.slice(0, 10) > trip.endDate) throw new Error('La fine della tappa non può superare la data di ritorno del viaggio.')
     const placeId = cleanOptional(input.placeId)
-    if (placeId && !(await deps.places.get(placeId))) throw new Error('Il luogo associato non esiste più.')
+    if (placeId && placeId !== currentPlaceId && !(await deps.places.get(placeId))) throw new Error('Il luogo associato non esiste più.')
     return { title, type: input.type, status: input.status, startsAt, endsAt, timezone: validateTimezone(input.timezone), placeId, bookingReference: validateOptionalText(input.bookingReference, 'Riferimento', 200), notes: validateOptionalText(input.notes, 'Note', 4000) }
   }
   function itineraryToDraft(itinerary: Itinerary): ItineraryDraft {
@@ -169,11 +169,12 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
     return buildDayItems(day, itineraries, places, reservations, blocks)
   }
   async function saveManualItineraryItem(tripId: string, dayId: string, itineraryId: string | undefined, input: ItineraryDraft): Promise<Itinerary> {
-    await assertContext(tripId, dayId, true); const draft = await normalizeManualDraft(tripId, dayId, input)
+    await assertContext(tripId, dayId, true)
     const current = itineraryId ? await deps.itineraries.get(itineraryId) : undefined
     if (itineraryId && !current) throw new Error('La tappa non esiste più.')
     if (current && (current.reservationId || current.blockId)) throw new Error('Le tappe derivate da prenotazioni si modificano dal relativo blocco del planner.')
     if (current && (current.tripId !== tripId || current.dayId !== dayId)) throw new Error('La tappa non appartiene a questa giornata.')
+    const draft = await normalizeManualDraft(tripId, dayId, input, current?.placeId)
     const now = deps.now(); let position = current?.position
     if (!current) {
       const siblings = (await deps.itineraries.listByDay(dayId)).filter((item) => item.tripId === tripId && item.dayId === dayId)
