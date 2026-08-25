@@ -1,18 +1,16 @@
 import { decryptBytes, encryptBytes } from '../../security/local-encryption'
 
-const ROOT_DIRECTORY = 'duranti'
+const ROOT_DIRECTORY = 'dtagency'
 const PRIVATE_DIRECTORY = 'private'
 const DOCUMENT_DIRECTORY = 'traveler-documents'
 const FILE_EXTENSION = '.enc'
-const FILE_MAGIC = new TextEncoder().encode('DURDOC01')
+const FILE_MAGIC = new TextEncoder().encode('DTADOC01')
 const AES_GCM_IV_BYTES = 12
 const AES_GCM_TAG_BYTES = 16
 const ENCRYPTION_PURPOSE = 'traveler-document-attachment'
 const ENVELOPE_OVERHEAD_BYTES = FILE_MAGIC.length + AES_GCM_IV_BYTES + AES_GCM_TAG_BYTES
 const SAFE_SEGMENT = /^[A-Za-z0-9_-]+$/
 
-// Web Crypto encrypt/decrypt takes the complete BufferSource at once. Keep v1
-// deliberately bounded until a reviewed chunked encrypted format is introduced.
 export const MAX_PRIVATE_DOCUMENT_BYTES = 20 * 1024 * 1024
 
 export interface PrivateDocumentRootEntry {
@@ -63,8 +61,8 @@ async function getRootDirectory(): Promise<FileSystemDirectoryHandle> {
 
 async function getPrivateDocumentsDirectory(create: boolean): Promise<FileSystemDirectoryHandle> {
   const root = await getRootDirectory()
-  const duranti = await root.getDirectoryHandle(ROOT_DIRECTORY, { create })
-  const privateDirectory = await duranti.getDirectoryHandle(PRIVATE_DIRECTORY, { create })
+  const dtagency = await root.getDirectoryHandle(ROOT_DIRECTORY, { create })
+  const privateDirectory = await dtagency.getDirectoryHandle(PRIVATE_DIRECTORY, { create })
   return privateDirectory.getDirectoryHandle(DOCUMENT_DIRECTORY, { create })
 }
 
@@ -81,7 +79,7 @@ async function requireDocumentDirectory(documentId: string): Promise<FileSystemD
   assertSafeSegment(documentId, 'Document ID')
   const documentsDirectory = await getExistingPrivateDocumentsDirectory()
   if (!documentsDirectory) {
-    throw new DOMException('Duranti private document directory was not found.', 'NotFoundError')
+    throw new DOMException('DTAgency private document directory was not found.', 'NotFoundError')
   }
   return documentsDirectory.getDirectoryHandle(documentId)
 }
@@ -299,7 +297,7 @@ export async function deleteEncryptedDocumentDirectory(documentId: string): Prom
   assertSafeSegment(documentId, 'Document ID')
   const documentsDirectory = await getExistingPrivateDocumentsDirectory()
   if (!documentsDirectory) {
-    throw new DOMException('Duranti private document directory was not found.', 'NotFoundError')
+    throw new DOMException('DTAgency private document directory was not found.', 'NotFoundError')
   }
   await documentsDirectory.removeEntry(documentId, { recursive: true })
 }
