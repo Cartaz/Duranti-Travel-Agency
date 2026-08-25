@@ -3,7 +3,7 @@ import type { Day, Trip } from '../../domain/entities'
 export interface DayRepositoryPort {
   list(): Promise<Day[]>
   get(id: string): Promise<Day | undefined>
-  put(value: Day): Promise<void>
+  put(value: Day): Promise<unknown>
 }
 
 export interface TripReaderPort {
