@@ -4,6 +4,7 @@ import type { DayApplication } from '../application/days/day-application'
 import type { ExpenseApplication } from '../application/expenses/expense-application'
 import type { ExpenseSummaryApplication } from '../application/expenses/expense-summary'
 import type { DayMediaApplication } from '../application/media/day-media-application'
+import type { PlaceApplication } from '../application/places/place-application'
 import type { PlannerApplication } from '../application/planner/planner-application'
 import type { ReservationApplication } from '../application/reservations/reservation-application'
 import type { DayTemplateApplication } from '../application/templates/day-template-application'
@@ -19,6 +20,7 @@ export interface ApplicationServices {
   templates: DayTemplateApplication
   expenses: ExpenseApplication & ExpenseSummaryApplication
   travelers: TravelerApplication
+  places: PlaceApplication
 }
 
 const ApplicationContext = createContext<ApplicationServices | null>(null)
