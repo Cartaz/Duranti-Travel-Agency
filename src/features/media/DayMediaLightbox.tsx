@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Media } from '../../domain/entities'
-import { readDayMedia } from './day-media-service'
+import { useApplicationServices } from '../../ui/application-context'
 
 export default function DayMediaLightbox({
   items,
@@ -15,6 +15,7 @@ export default function DayMediaLightbox({
   dayId: string
   onClose: () => void
 }) {
+  const { media: mediaApplication } = useApplicationServices()
   const [index, setIndex] = useState(() => Math.min(Math.max(initialIndex, 0), Math.max(items.length - 1, 0)))
   const [objectUrl, setObjectUrl] = useState('')
   const [error, setError] = useState('')
@@ -38,12 +39,8 @@ export default function DayMediaLightbox({
         return
       }
       if (items.length <= 1) return
-      if (event.key === 'ArrowLeft') {
-        setIndex((current) => (current <= 0 ? items.length - 1 : current - 1))
-      }
-      if (event.key === 'ArrowRight') {
-        setIndex((current) => (current >= items.length - 1 ? 0 : current + 1))
-      }
+      if (event.key === 'ArrowLeft') setIndex((current) => (current <= 0 ? items.length - 1 : current - 1))
+      if (event.key === 'ArrowRight') setIndex((current) => (current >= items.length - 1 ? 0 : current + 1))
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -55,7 +52,7 @@ export default function DayMediaLightbox({
     let url = ''
     setObjectUrl('')
     setError('')
-    void readDayMedia(media, tripId, dayId)
+    void mediaApplication.readDayMedia(media, tripId, dayId)
       .then((file) => {
         if (cancelled) return
         url = URL.createObjectURL(file)
@@ -69,7 +66,7 @@ export default function DayMediaLightbox({
       cancelled = true
       if (url) URL.revokeObjectURL(url)
     }
-  }, [dayId, media, tripId])
+  }, [dayId, media, mediaApplication, tripId])
 
   if (!media) return null
 
