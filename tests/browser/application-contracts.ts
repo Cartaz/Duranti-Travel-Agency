@@ -1,6 +1,7 @@
-import type { Day, Expense, Trip } from '../../src/domain/entities'
+import type { Block, Day, Expense, Place, Trip } from '../../src/domain/entities'
 import { createDayApplication } from '../../src/application/days/day-application'
 import { createExpenseSummaryApplication } from '../../src/application/expenses/expense-summary'
+import { createDayMediaApplication } from '../../src/application/media/day-media-application'
 import { createTripApplication } from '../../src/application/trips/trip-application'
 
 export interface ApplicationContractResult {
@@ -169,6 +170,66 @@ export async function runApplicationContractTests(): Promise<ApplicationContract
     assert(summary.budget?.directExpenseCount === 1, 'Direct expense count is incorrect.')
     assert(summary.budget?.convertedExpenseCount === 1, 'Converted expense count is incorrect.')
     assert(summary.budget?.excludedExpenseCount === 1, 'Unconverted foreign expense was not excluded.')
+  }))
+
+  results.push(await contract('Day media context scopes blocks and place lookups to referenced day data', async () => {
+    const timestamp = '2026-08-25T12:00:00.000Z'
+    const trip: Trip = {
+      id: 'trip-1', title: 'Media trip', status: 'planned', createdAt: timestamp, updatedAt: timestamp,
+    }
+    const day: Day = {
+      id: 'day-1', tripId: trip.id, sequence: 1, date: '2026-09-01', createdAt: timestamp, updatedAt: timestamp,
+    }
+    const blocks: Block[] = [
+      {
+        id: 'place-block', tripId: trip.id, dayId: day.id, type: 'place', position: 1,
+        content: { placeId: 'place-b' }, createdAt: timestamp, updatedAt: timestamp,
+      },
+      {
+        id: 'foreign-place-block', tripId: 'trip-2', dayId: day.id, type: 'place', position: 2,
+        content: { placeId: 'place-foreign' }, createdAt: timestamp, updatedAt: timestamp,
+      },
+      {
+        id: 'text-block', tripId: trip.id, dayId: day.id, type: 'text', position: 3,
+        content: { placeId: 'place-ignored' }, createdAt: timestamp, updatedAt: timestamp,
+      },
+    ]
+    const places = new Map<string, Place>([
+      ['place-a', { id: 'place-a', name: 'Albergo', createdAt: timestamp, updatedAt: timestamp }],
+      ['place-b', { id: 'place-b', name: 'Zoologico', createdAt: timestamp, updatedAt: timestamp }],
+    ])
+    const queriedDays: string[] = []
+    const queriedPlaceIds: string[][] = []
+
+    const application = createDayMediaApplication({
+      blocks: {
+        listByDay: async (dayId) => { queriedDays.push(dayId); return blocks },
+      },
+      places: {
+        getMany: async (ids) => {
+          queriedPlaceIds.push([...ids])
+          return ids.map((id) => places.get(id)).filter((item): item is Place => Boolean(item))
+        },
+        get: async (id) => places.get(id),
+      },
+      trips: { get: async (id) => id === trip.id ? trip : undefined },
+      days: { get: async (id) => id === day.id ? day : undefined },
+      itinerary: {
+        listDayItems: async () => [{
+          itinerary: { id: 'itinerary-1', title: 'Cena', placeId: 'place-a' },
+          place: { name: 'Albergo' },
+        }],
+      },
+      media: undefined as never,
+    })
+
+    const context = await application.listDayMediaContext(trip.id, day.id)
+    assert(queriedDays.length === 1 && queriedDays[0] === day.id, 'Media context did not use the day-scoped block query.')
+    assert(JSON.stringify(queriedPlaceIds) === JSON.stringify([['place-b', 'place-a']]), 'Media context requested unrelated places.')
+    assert(JSON.stringify(context.places) === JSON.stringify([
+      { id: 'place-a', name: 'Albergo' },
+      { id: 'place-b', name: 'Zoologico' },
+    ]), 'Media place options are incomplete or incorrectly ordered.')
   }))
 
   return results
