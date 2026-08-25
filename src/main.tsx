@@ -1,7 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { tripApplication } from './composition/trips'
 import { bootstrapApplication } from './data/bootstrap'
+import { ApplicationProvider } from './ui/application-context'
 import './styles.css'
 import './ui/guided-ux.css'
 
@@ -15,7 +17,9 @@ async function startApplication(): Promise<void> {
     await bootstrapApplication()
     root.render(
       <React.StrictMode>
-        <App />
+        <ApplicationProvider services={{ trips: tripApplication }}>
+          <App />
+        </ApplicationProvider>
       </React.StrictMode>,
     )
   } catch (error) {
