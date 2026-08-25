@@ -106,3 +106,71 @@ test('planner assigns a new position from day-scoped siblings only', async () =>
   assert.equal(created.position, 4)
   assert.equal(saved?.id, created.id)
 })
+
+test('planner generic delete refuses blocks whose linked data needs a transactional delete', async () => {
+  const { trip, day } = createFixture()
+  const expenseBlock: Block = {
+    id: 'expense-block',
+    tripId: trip.id,
+    dayId: day.id,
+    type: 'expense',
+    position: 1,
+    content: { expenseId: 'expense-1' },
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+  let softDeleteCalls = 0
+
+  const application = createPlannerApplication({
+    blocks: {
+      listByDay: async () => [expenseBlock],
+      get: async (blockId) => blockId === expenseBlock.id ? expenseBlock : undefined,
+      put: async () => undefined,
+      softDelete: async () => { softDeleteCalls += 1; return 'tombstoned' },
+      moveWithinDay: async () => 'boundary',
+    },
+    trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
+    days: { getTripDay: async (tripId, dayId) => tripId === trip.id && dayId === day.id ? day : undefined },
+    now: () => timestamp,
+    newId: () => 'new-block',
+  })
+
+  await assert.rejects(
+    application.deletePlannerBlock(trip.id, day.id, expenseBlock.id),
+    /editor dedicato/,
+  )
+  assert.equal(softDeleteCalls, 0)
+})
+
+test('planner generic delete still tombstones standalone blocks', async () => {
+  const { trip, day } = createFixture()
+  const textBlock: Block = {
+    id: 'text-block',
+    tripId: trip.id,
+    dayId: day.id,
+    type: 'text',
+    position: 1,
+    content: { text: 'Standalone' },
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+  const deletedIds: string[] = []
+
+  const application = createPlannerApplication({
+    blocks: {
+      listByDay: async () => [textBlock],
+      get: async (blockId) => blockId === textBlock.id ? textBlock : undefined,
+      put: async () => undefined,
+      softDelete: async (blockId) => { deletedIds.push(blockId); return 'tombstoned' },
+      moveWithinDay: async () => 'boundary',
+    },
+    trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
+    days: { getTripDay: async (tripId, dayId) => tripId === trip.id && dayId === day.id ? day : undefined },
+    now: () => timestamp,
+    newId: () => 'new-block',
+  })
+
+  await application.deletePlannerBlock(trip.id, day.id, textBlock.id)
+
+  assert.deepEqual(deletedIds, [textBlock.id])
+})
