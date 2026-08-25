@@ -19,14 +19,15 @@ const forbiddenBridgeFiles = new Set([
   'src/features/media/day-media-service.ts',
   'src/features/templates/day-template-service.ts',
   'src/features/templates/personal-day-template-service.ts',
+  'src/features/expenses/expense-service.ts',
 ])
 const forbiddenBridgeImportTokens = [
-  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service', '/templates/day-template-service', '/templates/personal-day-template-service',
-  '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service', '../media/day-media-service', '../templates/day-template-service', '../templates/personal-day-template-service',
-  './block-service', './reservation-service', './day-media-service', './day-template-service', './personal-day-template-service',
+  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service', '/templates/day-template-service', '/templates/personal-day-template-service', '/expenses/expense-service',
+  '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service', '../media/day-media-service', '../templates/day-template-service', '../templates/personal-day-template-service', '../expenses/expense-service',
+  './block-service', './reservation-service', './day-media-service', './day-template-service', './personal-day-template-service', './expense-service',
 ]
 const applicationBackedFeatureRoots = [
-  'src/features/trips/', 'src/features/days/', 'src/features/planner/', 'src/features/reservations/', 'src/features/media/', 'src/features/templates/',
+  'src/features/trips/', 'src/features/days/', 'src/features/planner/', 'src/features/reservations/', 'src/features/media/', 'src/features/templates/', 'src/features/expenses/',
 ]
 const plannerPagePaths = new Set(['src/features/planner/DayPlannerPage.tsx', 'src/features/planner/GuidedDayPlannerPage.tsx'])
 
