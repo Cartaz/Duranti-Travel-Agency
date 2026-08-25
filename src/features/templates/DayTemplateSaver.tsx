@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { getTripDay } from '../days/day-service'
+import { useApplicationServices } from '../../ui/application-context'
 import {
   createPersonalDayTemplate,
   MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH,
@@ -14,6 +14,7 @@ export default function DayTemplateSaver({
   tripId: string
   dayId: string
 }) {
+  const { days } = useApplicationServices()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
@@ -23,7 +24,7 @@ export default function DayTemplateSaver({
 
   useEffect(() => {
     let cancelled = false
-    void getTripDay(tripId, dayId)
+    void days.getTripDay(tripId, dayId)
       .then((day) => {
         if (cancelled || !day) return
         setName(day.title?.trim() || `Giorno ${day.sequence}`)
@@ -35,7 +36,7 @@ export default function DayTemplateSaver({
     return () => {
       cancelled = true
     }
-  }, [dayId, tripId])
+  }, [dayId, days, tripId])
 
   useEffect(() => {
     if (!status) return
