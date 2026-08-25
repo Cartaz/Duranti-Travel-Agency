@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Trip } from '../../domain/entities'
-import { listArchivedTrips, restoreArchivedTrip } from './trip-service'
+import { useApplicationServices } from '../../ui/application-context'
 import './trips.css'
 import './trip-lifecycle.css'
 
@@ -24,6 +24,7 @@ function formatArchivedAt(value: string): string {
 }
 
 export default function ArchivedTripsPage() {
+  const { trips: tripApplication } = useApplicationServices()
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -31,7 +32,7 @@ export default function ArchivedTripsPage() {
 
   useEffect(() => {
     let cancelled = false
-    void listArchivedTrips()
+    void tripApplication.listArchivedTrips()
       .then((items) => {
         if (!cancelled) setTrips(items)
       })
@@ -45,7 +46,7 @@ export default function ArchivedTripsPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [tripApplication])
 
   const handleRestore = async (trip: Trip): Promise<void> => {
     if (restoringId) return
@@ -53,7 +54,7 @@ export default function ArchivedTripsPage() {
     setError('')
 
     try {
-      await restoreArchivedTrip(trip.id)
+      await tripApplication.restoreArchivedTrip(trip.id)
       setTrips((current) => current.filter((item) => item.id !== trip.id))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile ripristinare il viaggio.')
