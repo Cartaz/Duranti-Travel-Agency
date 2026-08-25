@@ -1,0 +1,21 @@
+{
+  "name": "dtagency",
+  "schemaVersion": 1,
+  "tables": [
+    { "name": "appMeta", "rows": [] },
+    { "name": "auditLog", "rows": [] },
+    { "name": "blocks", "rows": [] },
+    { "name": "days", "rows": [] },
+    { "name": "expenses", "rows": [] },
+    { "name": "itineraries", "rows": [] },
+    { "name": "links", "rows": [] },
+    { "name": "media", "rows": [] },
+    { "name": "places", "rows": [] },
+    { "name": "reservations", "rows": [] },
+    { "name": "templates", "rows": [] },
+    { "name": "travelerDocuments", "rows": [] },
+    { "name": "travelers", "rows": [] },
+    { "name": "trips", "rows": [] },
+    { "name": "tripTravelers", "rows": [] }
+  ]
+}
