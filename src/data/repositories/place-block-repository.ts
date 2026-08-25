@@ -1,5 +1,5 @@
 import type { Block, Place } from '../../domain/entities'
-import { db } from '../db/duranti-db'
+import { db } from '../db/dtagency-db'
 
 function readPlaceId(block: Block): string | undefined {
   const value = block.content.placeId
