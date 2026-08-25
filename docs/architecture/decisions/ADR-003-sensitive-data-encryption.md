@@ -4,7 +4,7 @@ Status: accepted
 
 ## Context
 
-Duranti stores traveler identity data and scans of passports and identity documents. The product is an iPhone Home Screen PWA with no cloud backend and no native Apple Developer integration. Standard web APIs do not expose an iOS Keychain/Secure Enclave equivalent that Duranti can use as its sole application key store.
+DTAgency stores traveler identity data and scans of passports and identity documents. The product is an iPhone Home Screen PWA with no cloud backend and no native Apple Developer integration. Standard web APIs do not expose an iOS Keychain/Secure Enclave equivalent that DTAgency can use as its sole application key store.
 
 Sensitive records therefore need application-level encryption at rest while remaining fully local/offline.
 
@@ -24,7 +24,7 @@ PBKDF2-HMAC-SHA256 starts at 600,000 iterations. The iteration count is persiste
 
 Traveler document records keep only relationship/query metadata (`id`, `travelerId`, document `type`, timestamps and tombstone) in plaintext. Document number, issuing country, issue/expiry dates, holder name, notes and private attachment metadata are stored inside the encrypted payload.
 
-Binary attachment format v1 uses the same unlocked DEK with a distinct additional-data namespace. Each file contains only a fixed format marker, a fresh 96-bit IV and AES-GCM authenticated ciphertext. The OPFS location is `duranti/private/traveler-documents/<documentId>/<attachmentId>.enc`.
+Binary attachment format v1 uses the same unlocked DEK with a distinct additional-data namespace. Each file contains only the `DTADOC01` format marker, a fresh 96-bit IV and AES-GCM authenticated ciphertext. The OPFS location is `dtagency/private/traveler-documents/<documentId>/<attachmentId>.enc`.
 
 Because Web Crypto `encrypt()` and `decrypt()` accept a complete BufferSource rather than a streaming source, private attachment format v1 is limited to 20 MiB. Supporting larger binaries requires a separately reviewed chunked authenticated-encryption format; this ADR does not define one.
 
@@ -34,11 +34,13 @@ A stable random DEK separates data encryption from the user's passphrase. A late
 
 ## Why not make passkeys/WebAuthn the required key store
 
-WebAuthn can improve future unlock UX, but credentials may be synchronized by the platform and the web platform does not give this PWA a universal Keychain/Secure Enclave contract. Duranti's core encrypted storage must remain usable offline and independent of a cloud-synchronized credential provider. WebAuthn may later be an optional convenience layer, not the only recovery path.
+WebAuthn can improve future unlock UX, but credentials may be synchronized by the platform and the web platform does not give this PWA a universal Keychain/Secure Enclave contract. DTAgency's core encrypted storage must remain usable offline and independent of a cloud-synchronized credential provider. WebAuthn may later be an optional convenience layer, not the only recovery path.
 
-## Migration rule
+## Baseline and migration rule
 
-Dexie v3 removes the plaintext `expiryDate` index but does not delete or rewrite legacy document fields. Encrypting those values requires the user's unlocked key, which is unavailable during a database-version transaction. The secure repository must detect legacy plaintext rows and block normal use until an explicit user-mediated secure migration is implemented.
+DTAgency v1 begins with sensitive fields encrypted from the first persisted production record. There is no supported pre-release plaintext migration path because no meaningful user data requires one.
+
+Once meaningful user data exists, any change to the key envelope, AAD namespaces, private-document marker, OPFS path structure or encrypted payload format requires an explicit versioned migration and regression tests before release.
 
 ## Attachment lifecycle
 
@@ -50,7 +52,7 @@ Removing an attachment unlinks it from the encrypted JSON payload before deletin
 
 Private-document integrity scanning is read-only by default. A full relational scan requires the local encryption key to be unlocked because attachment IDs, OPFS paths and plaintext sizes live inside the encrypted JSON payload.
 
-The normal scan enumerates the private OPFS tree and compares it with IndexedDB metadata. It detects missing attachments, orphan directories/files, stale empty directories, path mismatches, encrypted-size mismatches, invalid `DURDOC01` envelopes, unexpected OPFS entries, unreadable metadata and legacy plaintext records.
+The normal scan enumerates the private OPFS tree and compares it with IndexedDB metadata. It detects missing attachments, orphan directories/files, stale empty directories, path mismatches, encrypted-size mismatches, invalid `DTADOC01` envelopes, unexpected OPFS entries and unreadable metadata.
 
 The scanner intentionally does not decrypt every attachment body. It reads file size and the small format header only; full AES-GCM authentication remains part of normal attachment decryption. This avoids repeatedly allocating up to the v1 20 MiB plaintext/ciphertext buffers during routine diagnostics on iPhone.
 
@@ -61,7 +63,7 @@ Cleanup is never automatic. Guarded maintenance functions re-check current Index
 - The passphrase is never persisted.
 - A page reload/app restart locks sensitive data.
 - Weak passphrases remain susceptible to offline guessing; UI must encourage a strong passphrase.
-- PBKDF2 cost must be benchmarked on iPhone 16 before the security UI is frozen.
+- PBKDF2 cost must be benchmarked on the target iPhone before the security UI is frozen.
 - Encryption at rest cannot protect plaintext already displayed in an unlocked compromised page; XSS/CSP hardening remains mandatory.
 - Integrity reconciliation can detect structural corruption and stale/orphan storage without bulk-decrypting attachment bodies.
-- Vault export must eventually include encrypted private OPFS files as well as structured records.
+- Vault export includes encrypted private OPFS files as well as structured records.
