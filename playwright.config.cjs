@@ -16,7 +16,7 @@ module.exports = defineConfig({
   },
   webServer: {
     command: 'npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
-    url: `${baseURL}tests/browser/index.html`,
+    url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,
   },
