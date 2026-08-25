@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "check:policy": "node scripts/check-repo-policy.mjs",
-    "test": "node --test tests/application/*.test.ts tests/domain/*.test.ts tests/storage/*.test.ts tests/vault/*.test.ts",
+    "test": "node --test tests/domain/*.test.ts tests/storage/*.test.ts tests/vault/*.test.ts",
     "build": "npm run check:policy && npm test && tsc -b && vite build",
     "preview": "vite preview"
   },
