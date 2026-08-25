@@ -5,6 +5,7 @@ import { dayRepository } from './day-repository'
 import { expenseRepository } from './expense-repository'
 import { itineraryRepository } from './itinerary-repository'
 import { mediaFileRepository } from './media-repository'
+import { reservationRepository } from './reservation-repository'
 import { tripRepository } from './trip-repository'
 import { tripTravelerRepository } from './trip-traveler-repository'
 import { secureTravelerDocumentRepository } from './traveler-document-repository'
@@ -22,5 +23,5 @@ export const linkRepository = new Repository<DatabaseTables['links']>(db.links)
 export { itineraryRepository }
 export const templateRepository = new Repository<DatabaseTables['templates']>(db.templates)
 export { expenseRepository }
-export const reservationRepository = new Repository<DatabaseTables['reservations']>(db.reservations)
+export { reservationRepository }
 export const auditRepository = new Repository<DatabaseTables['auditLog']>(db.auditLog)
