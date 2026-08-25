@@ -162,7 +162,13 @@ export function createReservationApplication(deps: ReservationApplicationDepende
     await assertTripDayContext(contextDependencies, tripId, dayId, editable, 'Ripristina il viaggio prima di modificare le prenotazioni.')
   }
 
-  async function normalizeDraft(tripId: string, dayId: string, reservationType: PlannerReservationType, input: ReservationDraft): Promise<ReservationDraft> {
+  async function normalizeDraft(
+    tripId: string,
+    dayId: string,
+    reservationType: PlannerReservationType,
+    input: ReservationDraft,
+    currentPlaceId?: string,
+  ): Promise<ReservationDraft> {
     const { trip, day } = await requireTripDay(contextDependencies, tripId, dayId)
     const title = input.title.trim()
     if (!title) throw new Error('Il titolo della prenotazione è obbligatorio.')
@@ -182,7 +188,7 @@ export function createReservationApplication(deps: ReservationApplicationDepende
       throw new Error(`Data di ${labels.end} non valida: ${formatDisplayDate(endsAt.slice(0, 10))} supera il ritorno del viaggio, fissato al ${formatDisplayDate(trip.endDate)}.`)
     }
     const placeId = cleanOptional(input.placeId)
-    if (placeId && !(await deps.places.get(placeId))) throw new Error('Il luogo associato non esiste più.')
+    if (placeId && placeId !== currentPlaceId && !(await deps.places.get(placeId))) throw new Error('Il luogo associato non esiste più.')
     return {
       title,
       provider: validateOptionalText(input.provider, 'Fornitore', 200),
@@ -273,7 +279,7 @@ export function createReservationApplication(deps: ReservationApplicationDepende
     const reservationId = reservationIdFromBlock(block)
     const current = reservationId ? await deps.reservations.get(reservationId) : undefined
     if (current) assertReservationContext(current, tripId, dayId, reservationType)
-    const draft = await normalizeDraft(tripId, dayId, reservationType, input)
+    const draft = await normalizeDraft(tripId, dayId, reservationType, input, current?.placeId)
     const now = deps.now()
     const reservation: Reservation = current
       ? { ...current, ...draft, type: reservationType, tripId, dayId, updatedAt: now }
