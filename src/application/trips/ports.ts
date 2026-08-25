@@ -1,13 +1,14 @@
 import type { Day, Trip } from '../../domain/entities'
 
 export interface TripRepositoryPort {
-  list(): Promise<Trip[]>
+  listBookTrips(): Promise<Trip[]>
+  listArchivedTrips(): Promise<Trip[]>
   get(id: string): Promise<Trip | undefined>
   put(value: Trip): Promise<unknown>
 }
 
 export interface DayRepositoryPort {
-  list(): Promise<Day[]>
+  listByTrip(tripId: string): Promise<Day[]>
 }
 
 export interface TripApplicationDependencies {
