@@ -2,6 +2,7 @@ import { db } from '../db/dtagency-db'
 import { Repository } from './base-repository'
 import { plannerBlockRepository } from './block-repository'
 import { dayRepository } from './day-repository'
+import { expenseRepository } from './expense-repository'
 import { itineraryRepository } from './itinerary-repository'
 import { mediaFileRepository } from './media-repository'
 import { tripRepository } from './trip-repository'
@@ -20,6 +21,6 @@ export const mediaRepository = mediaFileRepository
 export const linkRepository = new Repository<DatabaseTables['links']>(db.links)
 export { itineraryRepository }
 export const templateRepository = new Repository<DatabaseTables['templates']>(db.templates)
-export const expenseRepository = new Repository<DatabaseTables['expenses']>(db.expenses)
+export { expenseRepository }
 export const reservationRepository = new Repository<DatabaseTables['reservations']>(db.reservations)
 export const auditRepository = new Repository<DatabaseTables['auditLog']>(db.auditLog)
