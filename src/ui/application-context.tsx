@@ -7,6 +7,7 @@ import type { DayMediaApplication } from '../application/media/day-media-applica
 import type { PlannerApplication } from '../application/planner/planner-application'
 import type { ReservationApplication } from '../application/reservations/reservation-application'
 import type { DayTemplateApplication } from '../application/templates/day-template-application'
+import type { TravelerApplication } from '../application/travelers/traveler-application'
 import type { TripApplication } from '../application/trips/trip-application'
 
 export interface ApplicationServices {
@@ -17,6 +18,7 @@ export interface ApplicationServices {
   media: DayMediaApplication
   templates: DayTemplateApplication
   expenses: ExpenseApplication & ExpenseSummaryApplication
+  travelers: TravelerApplication
 }
 
 const ApplicationContext = createContext<ApplicationServices | null>(null)
