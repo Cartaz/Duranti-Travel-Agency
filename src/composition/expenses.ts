@@ -20,8 +20,7 @@ const expenseCommands = createExpenseApplication({
     getTraveler: (travelerId) => travelerRepository.get(travelerId),
     async listActiveTripTravelers(tripId) {
       const memberships = await tripTravelerRepository.listActiveForTrip(tripId)
-      const travelers = await Promise.all(memberships.map((membership) => travelerRepository.get(membership.travelerId)))
-      return travelers.filter((traveler): traveler is NonNullable<typeof traveler> => Boolean(traveler))
+      return travelerRepository.getMany(memberships.map((membership) => membership.travelerId))
     },
   },
   now: () => new Date().toISOString(),
