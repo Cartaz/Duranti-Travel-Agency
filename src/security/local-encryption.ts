@@ -1,5 +1,5 @@
 import type { EncryptedPayloadV1 } from '../domain/entities'
-import { db } from '../data/db/duranti-db'
+import { db } from '../data/db/dtagency-db'
 
 const SECURITY_KEY_META = 'security.rootKey.v1'
 const PBKDF2_ITERATIONS = 600_000
@@ -155,11 +155,11 @@ function requireSessionDataKey(): CryptoKey {
 }
 
 function buildJsonAdditionalData(purpose: string, entityId: string): Uint8Array<ArrayBuffer> {
-  return new TextEncoder().encode(`duranti|encrypted-json|v1|${purpose}|${entityId}`)
+  return new TextEncoder().encode(`dtagency|encrypted-json|v1|${purpose}|${entityId}`)
 }
 
 function buildBinaryAdditionalData(purpose: string, entityId: string): Uint8Array<ArrayBuffer> {
-  return new TextEncoder().encode(`duranti|encrypted-file|v1|${purpose}|${entityId}`)
+  return new TextEncoder().encode(`dtagency|encrypted-file|v1|${purpose}|${entityId}`)
 }
 
 export async function isLocalEncryptionConfigured(): Promise<boolean> {
