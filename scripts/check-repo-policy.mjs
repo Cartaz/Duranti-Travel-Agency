@@ -16,6 +16,16 @@ const maximumSchemaVersionBeforeVaultMigration = 1
 const tripReadBridgePath = 'src/features/trips/trip-service.ts'
 const dayBridgePath = 'src/features/days/day-service.ts'
 const plannerBridgePath = 'src/features/planner/block-service.ts'
+const bridgeFiles = new Set([tripReadBridgePath, dayBridgePath, plannerBridgePath])
+const forbiddenBridgeImportTokens = [
+  '/trips/trip-service',
+  '/days/day-service',
+  '/planner/block-service',
+  '../trips/trip-service',
+  '../days/day-service',
+  '../planner/block-service',
+  './block-service',
+]
 const plannerPagePaths = new Set([
   'src/features/planner/DayPlannerPage.tsx',
   'src/features/planner/GuidedDayPlannerPage.tsx',
@@ -41,7 +51,6 @@ function enforceTripReadBridge(path, content) {
   if (!content.includes("export const getTrip = tripApplication.getTrip")) {
     violations.push(`${path}: transitional read bridge must expose only getTrip`)
   }
-
   const forbiddenMutationTokens = [
     'createTrip', 'updateTrip', 'archiveTrip', 'restoreArchivedTrip', 'listBookTrips', 'listArchivedTrips',
   ]
@@ -87,18 +96,17 @@ function enforcePlannerBridge(path, content) {
   return true
 }
 
-function enforcePlannerPageBoundary(path, content) {
-  if (!plannerPagePaths.has(path)) return
-  const forbiddenServiceImports = [
-    "../trips/trip-service",
-    "../days/day-service",
-    "./block-service",
-  ]
-  for (const token of forbiddenServiceImports) {
+function enforceNoBridgeImports(path, content) {
+  if (!path.startsWith('src/') || bridgeFiles.has(path)) return
+  for (const token of forbiddenBridgeImportTokens) {
     if (content.includes(token)) {
-      violations.push(`${path}: planner pages must use ApplicationProvider instead of transitional service bridge ${token}`)
+      violations.push(`${path}: transitional service bridge import is forbidden (${token})`)
     }
   }
+}
+
+function enforcePlannerPageBoundary(path, content) {
+  if (!plannerPagePaths.has(path)) return
   if (!content.includes('useApplicationServices')) {
     violations.push(`${path}: planner pages must resolve application capabilities through useApplicationServices`)
   }
@@ -134,6 +142,8 @@ function enforceDependencyDirection(path, content) {
     }
     enforcePlannerPageBoundary(normalized, content)
   }
+
+  enforceNoBridgeImports(normalized, content)
 }
 
 async function scan(directory) {
