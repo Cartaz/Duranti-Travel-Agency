@@ -14,6 +14,7 @@ const legacyVaultMagic = 'DUR' + 'VLT'
 const legacyDocumentMagic = 'DUR' + 'DOC'
 const maximumSchemaVersionBeforeVaultMigration = 1
 const tripReadBridgePath = 'src/features/trips/trip-service.ts'
+const dayBridgePath = 'src/features/days/day-service.ts'
 
 const violations = []
 
@@ -54,6 +55,20 @@ function enforceTripReadBridge(path, content) {
   return true
 }
 
+function enforceDayBridge(path, content) {
+  if (path !== dayBridgePath) return false
+  const required = ['listTripDays', 'getTripDay', 'createTripDay', 'updateTripDay']
+  for (const token of required) {
+    if (!content.includes(`dayApplication.${token}`)) {
+      violations.push(`${path}: transitional day bridge must delegate ${token} to DayApplication`)
+    }
+  }
+  if (content.includes('/data/') || content.includes('../trips/trip-service')) {
+    violations.push(`${path}: transitional day bridge must never reach data or trip feature services`)
+  }
+  return true
+}
+
 function enforceDependencyDirection(path, content) {
   const normalized = path.replaceAll('\\', '/')
   const importsDataLayer = /from\s+['"][^'"]*\/data(?:\/|['"])/.test(content)
@@ -69,6 +84,15 @@ function enforceDependencyDirection(path, content) {
     }
     if (importsComposition && !enforceTripReadBridge(normalized, content)) {
       violations.push(`${path}: trips feature must depend on application/UI boundaries, never composition directly`)
+    }
+  }
+
+  if (normalized.startsWith('src/features/days/')) {
+    if (importsDataLayer) {
+      violations.push(`${path}: days feature must never import data adapters directly`)
+    }
+    if (importsComposition && !enforceDayBridge(normalized, content)) {
+      violations.push(`${path}: days feature must depend on application/UI boundaries, never composition directly`)
     }
   }
 }
