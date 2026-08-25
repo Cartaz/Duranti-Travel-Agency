@@ -186,7 +186,7 @@ async function captureStableSnapshot(): Promise<{
   const secondCanonical = stableJsonStringify(secondTables)
 
   if (firstCanonical !== secondCanonical) {
-    throw new Error('Duranti data changed while the Vault snapshot was being prepared. Retry the export.')
+    throw new Error('DTAgency data changed while the Vault snapshot was being prepared. Retry the export.')
   }
 
   return { tables: firstTables, files }
@@ -204,7 +204,7 @@ function buildFileManifest(files: VaultSourceFile[]): VaultFileManifestEntry[] {
 
 function buildVaultFileName(createdAt: string): string {
   const timestamp = createdAt.replace(/[:.]/g, '-').replace('Z', '')
-  return `Duranti-Travel-Agency-${timestamp}${VAULT_FILE_EXTENSION}`
+  return `DTAgency-${timestamp}${VAULT_FILE_EXTENSION}`
 }
 
 async function getVaultStagingDirectory(): Promise<FileSystemDirectoryHandle> {
