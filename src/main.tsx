@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import { dayApplication } from './composition/days'
+import { dayMediaApplication } from './composition/media'
 import { plannerApplication } from './composition/planner'
 import { reservationApplication } from './composition/reservations'
 import { tripApplication } from './composition/trips'
@@ -25,6 +26,7 @@ async function startApplication(): Promise<void> {
           days: dayApplication,
           planner: plannerApplication,
           reservations: reservationApplication,
+          media: dayMediaApplication,
         }}>
           <App />
         </ApplicationProvider>
