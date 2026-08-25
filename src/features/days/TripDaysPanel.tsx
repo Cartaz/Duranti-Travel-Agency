@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Day, Trip } from '../../domain/entities'
-import { listTripDays } from './day-service'
+import { useApplicationServices } from '../../ui/application-context'
 import './days.css'
 
 function formatDayDate(value: string): string {
@@ -12,13 +12,14 @@ function formatDayDate(value: string): string {
 }
 
 export default function TripDaysPanel({ trip }: { trip: Trip }) {
+  const { days: dayApplication } = useApplicationServices()
   const [days, setDays] = useState<Day[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    void listTripDays(trip.id)
+    void dayApplication.listTripDays(trip.id)
       .then((items) => {
         if (!cancelled) setDays(items)
       })
@@ -32,7 +33,7 @@ export default function TripDaysPanel({ trip }: { trip: Trip }) {
     return () => {
       cancelled = true
     }
-  }, [trip.id])
+  }, [dayApplication, trip.id])
 
   return (
     <section className="days-panel" aria-labelledby="trip-days-title">
