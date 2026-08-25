@@ -8,7 +8,11 @@ test('DTAgency persistence and Vault browser contracts', async ({ page }) => {
   page.on('pageerror', (error) => consoleErrors.push(`${error.name}: ${error.message}`))
 
   await page.goto('tests/browser/index.html')
-  await page.waitForFunction(() => window.__DTAGENCY_BROWSER_DONE__ === true, null, { timeout: 120_000 })
+  await page.waitForFunction(
+    () => Array.isArray(window.__DTAGENCY_BROWSER_RESULTS__) && window.__DTAGENCY_BROWSER_RESULTS__.length === 5,
+    null,
+    { timeout: 120_000 },
+  )
 
   const results = await page.evaluate(() => window.__DTAGENCY_BROWSER_RESULTS__)
   expect(consoleErrors, `Browser console errors:\n${consoleErrors.join('\n')}`).toEqual([])
