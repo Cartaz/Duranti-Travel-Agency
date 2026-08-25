@@ -1,9 +1,11 @@
 import { createContext, useContext } from 'react'
 import type { PropsWithChildren } from 'react'
 import type { TripApplication } from '../application/trips/trip-application'
+import type { DayApplication } from '../application/days/day-application'
 
 export interface ApplicationServices {
   trips: TripApplication
+  days: DayApplication
 }
 
 const ApplicationContext = createContext<ApplicationServices | null>(null)
