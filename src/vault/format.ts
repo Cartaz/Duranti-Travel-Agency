@@ -6,8 +6,8 @@ const AES_GCM_TAG_BITS = 128
 const MIN_VAULT_PASSPHRASE_LENGTH = 12
 
 export { VAULT_FORMAT_VERSION }
-export const VAULT_MIME_TYPE = 'application/vnd.duranti.vault'
-export const VAULT_FILE_EXTENSION = '.duranti'
+export const VAULT_MIME_TYPE = 'application/vnd.dtagency.vault'
+export const VAULT_FILE_EXTENSION = '.dtagency'
 export const VAULT_CHUNK_BYTES = 4 * 1024 * 1024
 export const VAULT_PBKDF2_ITERATIONS = 600_000
 export const MAX_VAULT_MANIFEST_BYTES = 32 * 1024 * 1024
