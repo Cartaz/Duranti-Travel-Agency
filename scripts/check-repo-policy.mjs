@@ -13,10 +13,11 @@ const legacyVaultExtension = '.' + legacyToken
 const legacyVaultMagic = 'DUR' + 'VLT'
 const legacyDocumentMagic = 'DUR' + 'DOC'
 const maximumSchemaVersionBeforeVaultMigration = 1
-const tripReadBridgePath = 'src/features/trips/trip-service.ts'
-const dayBridgePath = 'src/features/days/day-service.ts'
-const plannerBridgePath = 'src/features/planner/block-service.ts'
-const bridgeFiles = new Set([tripReadBridgePath, dayBridgePath, plannerBridgePath])
+const forbiddenBridgeFiles = new Set([
+  'src/features/trips/trip-service.ts',
+  'src/features/days/day-service.ts',
+  'src/features/planner/block-service.ts',
+])
 const forbiddenBridgeImportTokens = [
   '/trips/trip-service',
   '/days/day-service',
@@ -46,61 +47,11 @@ function hasPersistentLegacyIdentifier(content) {
   return patterns.some((pattern) => content.toLowerCase().includes(pattern.toLowerCase()))
 }
 
-function enforceTripReadBridge(path, content) {
-  if (path !== tripReadBridgePath) return false
-  if (!content.includes("export const getTrip = tripApplication.getTrip")) {
-    violations.push(`${path}: transitional read bridge must expose only getTrip`)
-  }
-  const forbiddenMutationTokens = [
-    'createTrip', 'updateTrip', 'archiveTrip', 'restoreArchivedTrip', 'listBookTrips', 'listArchivedTrips',
-  ]
-  for (const token of forbiddenMutationTokens) {
-    if (content.includes(token)) violations.push(`${path}: transitional read bridge must not expose ${token}`)
-  }
-  return true
-}
-
-function enforceDayBridge(path, content) {
-  if (path !== dayBridgePath) return false
-  const required = ['listTripDays', 'getTripDay', 'createTripDay', 'updateTripDay']
-  for (const token of required) {
-    if (!content.includes(`dayApplication.${token}`)) {
-      violations.push(`${path}: transitional day bridge must delegate ${token} to DayApplication`)
-    }
-  }
-  if (content.includes('/data/') || content.includes('../trips/trip-service')) {
-    violations.push(`${path}: transitional day bridge must never reach data or trip feature services`)
-  }
-  return true
-}
-
-function enforcePlannerBridge(path, content) {
-  if (path !== plannerBridgePath) return false
-  const required = [
-    'assertPlannerDayContext',
-    'listDayPlannerBlocks',
-    'readPlannerBlockDraft',
-    'createPlannerBlock',
-    'updatePlannerBlock',
-    'movePlannerBlock',
-    'deletePlannerBlock',
-  ]
-  for (const token of required) {
-    if (!content.includes(`plannerApplication.${token}`)) {
-      violations.push(`${path}: transitional planner bridge must delegate ${token} to PlannerApplication`)
-    }
-  }
-  if (content.includes('/data/') || content.includes('../trips/trip-service') || content.includes('../days/day-service')) {
-    violations.push(`${path}: transitional planner bridge must never reach data or feature services`)
-  }
-  return true
-}
-
 function enforceNoBridgeImports(path, content) {
-  if (!path.startsWith('src/') || bridgeFiles.has(path)) return
+  if (!path.startsWith('src/')) return
   for (const token of forbiddenBridgeImportTokens) {
     if (content.includes(token)) {
-      violations.push(`${path}: transitional service bridge import is forbidden (${token})`)
+      violations.push(`${path}: removed feature-service bridge import is forbidden (${token})`)
     }
   }
 }
@@ -123,23 +74,17 @@ function enforceDependencyDirection(path, content) {
 
   if (normalized.startsWith('src/features/trips/')) {
     if (importsDataLayer) violations.push(`${path}: trips feature must never import data adapters directly`)
-    if (importsComposition && !enforceTripReadBridge(normalized, content)) {
-      violations.push(`${path}: trips feature must depend on application/UI boundaries, never composition directly`)
-    }
+    if (importsComposition) violations.push(`${path}: trips feature must depend on application/UI boundaries, never composition directly`)
   }
 
   if (normalized.startsWith('src/features/days/')) {
     if (importsDataLayer) violations.push(`${path}: days feature must never import data adapters directly`)
-    if (importsComposition && !enforceDayBridge(normalized, content)) {
-      violations.push(`${path}: days feature must depend on application/UI boundaries, never composition directly`)
-    }
+    if (importsComposition) violations.push(`${path}: days feature must depend on application/UI boundaries, never composition directly`)
   }
 
   if (normalized.startsWith('src/features/planner/')) {
     if (importsDataLayer) violations.push(`${path}: planner feature must never import data adapters directly`)
-    if (importsComposition && !enforcePlannerBridge(normalized, content)) {
-      violations.push(`${path}: planner feature must depend on application/UI boundaries, never composition directly`)
-    }
+    if (importsComposition) violations.push(`${path}: planner feature must depend on application/UI boundaries, never composition directly`)
     enforcePlannerPageBoundary(normalized, content)
   }
 
@@ -160,8 +105,11 @@ async function scan(directory) {
     if (!entry.isFile() || !textExtensions.has(extname(entry.name))) continue
 
     const content = await readFile(absolute, 'utf8')
-    const path = relative(root, absolute)
+    const path = relative(root, absolute).replaceAll('\\', '/')
 
+    if (forbiddenBridgeFiles.has(path)) {
+      violations.push(`${path}: removed transitional feature-service bridge must not be recreated`)
+    }
     if (hasPersistentLegacyIdentifier(content)) violations.push(`${path}: persistent predecessor identifier is forbidden`)
     if (content.includes(legacyVaultMagic)) violations.push(`${path}: predecessor Vault magic is forbidden`)
     if (content.includes(legacyDocumentMagic)) violations.push(`${path}: predecessor private-document magic is forbidden`)
