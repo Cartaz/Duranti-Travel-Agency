@@ -155,7 +155,7 @@ export function createDayTemplateApplication(deps: DayTemplateApplicationDepende
   }
 
   async function ensureBuiltInDayTemplates(): Promise<void> {
-    const existing = new Map((await deps.templates.list({ includeDeleted: true })).map((template) => [template.id, template]))
+    const existing = new Map((await deps.templates.listByCategory(DAY_TEMPLATE_CATEGORY, { includeDeleted: true })).map((template) => [template.id, template]))
     const now = deps.now()
     for (const definition of BUILT_IN_DAY_TEMPLATES) {
       const current = existing.get(definition.id)
@@ -171,7 +171,7 @@ export function createDayTemplateApplication(deps: DayTemplateApplicationDepende
 
   async function listDayTemplates(): Promise<Template[]> {
     await ensureBuiltInDayTemplates()
-    const templates = (await deps.templates.list()).filter((template) => template.category === DAY_TEMPLATE_CATEGORY).map(validateTemplate)
+    const templates = (await deps.templates.listByCategory(DAY_TEMPLATE_CATEGORY)).map(validateTemplate)
     const builtInOrder = new Map(BUILT_IN_DAY_TEMPLATES.map((template, index) => [template.id, index]))
     return templates.sort((left, right) => {
       const leftOrder = builtInOrder.get(left.id)
@@ -190,9 +190,9 @@ export function createDayTemplateApplication(deps: DayTemplateApplicationDepende
     const description = cleanOptional(input.description)
     if (description && description.length > MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH) throw new Error(`La descrizione può contenere al massimo ${MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH} caratteri.`)
     await ensureBuiltInDayTemplates()
-    const duplicate = (await deps.templates.list()).find((template) => template.category === DAY_TEMPLATE_CATEGORY && template.name.trim().localeCompare(name, 'it', { sensitivity: 'accent' }) === 0)
+    const duplicate = (await deps.templates.listByCategory(DAY_TEMPLATE_CATEGORY)).find((template) => template.name.trim().localeCompare(name, 'it', { sensitivity: 'accent' }) === 0)
     if (duplicate) throw new Error('Esiste già un modello di giornata con questo nome.')
-    const blocks = (await deps.blocks.list())
+    const blocks = (await deps.blocks.listByDay(dayId))
       .filter((block) => block.tripId === tripId && block.dayId === dayId && SUPPORTED_DAY_TEMPLATE_BLOCK_TYPES.has(block.type))
       .sort((left, right) => left.position - right.position || left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))
     if (blocks.length === 0) throw new Error('Questa giornata non contiene ancora una struttura da salvare come modello.')
