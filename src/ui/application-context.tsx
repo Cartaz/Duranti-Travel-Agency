@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react'
 import type { PropsWithChildren } from 'react'
 import type { DayApplication } from '../application/days/day-application'
 import type { ExpenseApplication } from '../application/expenses/expense-application'
+import type { ExpenseSummaryApplication } from '../application/expenses/expense-summary'
 import type { DayMediaApplication } from '../application/media/day-media-application'
 import type { PlannerApplication } from '../application/planner/planner-application'
 import type { ReservationApplication } from '../application/reservations/reservation-application'
@@ -15,7 +16,7 @@ export interface ApplicationServices {
   reservations: ReservationApplication
   media: DayMediaApplication
   templates: DayTemplateApplication
-  expenses: ExpenseApplication
+  expenses: ExpenseApplication & ExpenseSummaryApplication
 }
 
 const ApplicationContext = createContext<ApplicationServices | null>(null)
