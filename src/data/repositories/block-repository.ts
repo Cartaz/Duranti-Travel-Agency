@@ -1,5 +1,5 @@
 import type { Block } from '../../domain/entities'
-import { db } from '../db/duranti-db'
+import { db } from '../db/dtagency-db'
 import { Repository } from './base-repository'
 
 export type BlockMoveDirection = 'up' | 'down'
