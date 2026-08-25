@@ -7,7 +7,7 @@ export type SoftDeleteResult = 'not-found' | 'already-deleted' | 'tombstoned'
 export interface PlannerBlockRepositoryPort {
   list(): Promise<Block[]>
   get(id: string): Promise<Block | undefined>
-  put(value: Block): Promise<void>
+  put(value: Block): Promise<unknown>
   softDelete(id: string): Promise<SoftDeleteResult>
   moveWithinDay(blockId: string, tripId: string, dayId: string, direction: BlockMoveDirection): Promise<BlockMoveResult>
 }
