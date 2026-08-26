@@ -8,9 +8,13 @@ export interface PlaceDraft {
   city?: string
   countryCode?: string
   category?: string
+  phone?: string
+  openingHours?: string
   notes?: string
   latitude?: number
   longitude?: number
+  provider?: string
+  providerPlaceId?: string
 }
 
 export const EMPTY_PLACE_DRAFT: PlaceDraft = { name: '' }
@@ -56,9 +60,13 @@ function normalizeDraft(input: PlaceDraft): PlaceDraft {
     city: validateOptionalText(input.city, 'Città', 120),
     countryCode,
     category: validateOptionalText(input.category, 'Categoria', 80),
+    phone: validateOptionalText(input.phone, 'Telefono', 80),
+    openingHours: validateOptionalText(input.openingHours, 'Orari', 1000),
     notes: validateOptionalText(input.notes, 'Note', 2000),
     latitude: hasLatitude ? input.latitude : undefined,
     longitude: hasLongitude ? input.longitude : undefined,
+    provider: validateOptionalText(input.provider, 'Provider', 80),
+    providerPlaceId: validateOptionalText(input.providerPlaceId, 'Identificatore provider', 200),
   }
 }
 function placeIdFromBlock(block: Block): string | undefined {
@@ -78,7 +86,7 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
     return block
   }
   function placeToDraft(place: Place): PlaceDraft {
-    return { name: place.name, formattedAddress: place.formattedAddress, city: place.city, countryCode: place.countryCode, category: place.category, notes: place.notes, latitude: place.latitude, longitude: place.longitude }
+    return { name: place.name, formattedAddress: place.formattedAddress, city: place.city, countryCode: place.countryCode, category: place.category, phone: place.phone, openingHours: place.openingHours, notes: place.notes, latitude: place.latitude, longitude: place.longitude, provider: place.provider, providerPlaceId: place.providerPlaceId }
   }
   async function getPlannerPlace(tripId: string, dayId: string, blockId: string): Promise<Place | undefined> {
     await assertContext(tripId, dayId, false)
@@ -89,12 +97,12 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
   }
   async function savePlannerPlace(tripId: string, dayId: string, blockId: string, input: PlaceDraft): Promise<Place> {
     await assertContext(tripId, dayId, true)
-    const block = await getPlaceBlock(tripId, dayId, blockId)
+    const block = await getPlaceBlock(tripId, dayId, block.id)
     const currentPlaceId = placeIdFromBlock(block)
     const currentPlace = currentPlaceId ? await deps.places.get(currentPlaceId) : undefined
     const draft = normalizeDraft(input)
     const now = deps.now()
-    const placeBase = { ...draft, provider: 'manual', mapsUrl: buildGoogleMapsSearchUrl(draft) }
+    const placeBase = { ...draft, provider: draft.provider ?? 'manual', mapsUrl: buildGoogleMapsSearchUrl(draft) }
     const place: Place = currentPlace
       ? { ...currentPlace, ...placeBase, updatedAt: now }
       : { id: deps.newId(), ...placeBase, createdAt: now, updatedAt: now }
