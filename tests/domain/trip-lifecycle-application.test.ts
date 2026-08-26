@@ -1,30 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTripApplication } from '../../src/application/trips/trip-application.ts'
+import { applyTripStatus } from '../../src/application/trips/trip-lifecycle.ts'
 import type { Trip } from '../../src/domain/entities.ts'
-
-function createHarness(initial: Trip) {
-  let current = initial
-  let nowValue = '2026-08-26T15:10:00.000Z'
-
-  const application = createTripApplication({
-    trips: {
-      async listBookTrips() { return current.status === 'archived' ? [] : [current] },
-      async listArchivedTrips() { return current.status === 'archived' ? [current] : [] },
-      async get(id) { return id === current.id ? current : undefined },
-      async put(value) { current = value },
-    },
-    days: { async listByTrip() { return [] } },
-    now() { return nowValue },
-    newId() { return 'unused' },
-  })
-
-  return {
-    application,
-    current: () => current,
-    setNow(value: string) { nowValue = value },
-  }
-}
 
 const baseTrip: Trip = {
   id: 'trip-1',
@@ -34,38 +11,31 @@ const baseTrip: Trip = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 }
 
-test('trip lifecycle status changes update only lifecycle state and timestamp', async () => {
-  const harness = createHarness(baseTrip)
-
-  const ongoing = await harness.application.setTripStatus('trip-1', 'ongoing')
+test('trip lifecycle status changes update only lifecycle state and timestamp', () => {
+  const ongoing = applyTripStatus(baseTrip, 'ongoing', '2026-08-26T15:10:00.000Z')
   assert.equal(ongoing.status, 'ongoing')
   assert.equal(ongoing.title, 'Tokyo')
   assert.equal(ongoing.updatedAt, '2026-08-26T15:10:00.000Z')
 
-  harness.setNow('2026-08-26T15:11:00.000Z')
-  const completed = await harness.application.setTripStatus('trip-1', 'completed')
+  const completed = applyTripStatus(ongoing, 'completed', '2026-08-26T15:11:00.000Z')
   assert.equal(completed.status, 'completed')
   assert.equal(completed.updatedAt, '2026-08-26T15:11:00.000Z')
 })
 
-test('trip lifecycle status change rejects archived trips', async () => {
-  const harness = createHarness({ ...baseTrip, status: 'archived', archivedFromStatus: 'ongoing' })
+test('trip lifecycle status change rejects archived trips', () => {
+  const archived: Trip = { ...baseTrip, status: 'archived', archivedFromStatus: 'ongoing' }
 
-  await assert.rejects(
-    harness.application.setTripStatus('trip-1', 'completed'),
+  assert.throws(
+    () => applyTripStatus(archived, 'completed', '2026-08-26T15:10:00.000Z'),
     /Ripristina il viaggio dall’archivio prima di cambiarne lo stato/,
   )
-  assert.equal(harness.current().status, 'archived')
+  assert.equal(archived.status, 'archived')
 })
 
-test('trip lifecycle status update is idempotent without touching updatedAt', async () => {
-  const harness = createHarness({ ...baseTrip, status: 'ongoing' })
-  const before = harness.current()
-  harness.setNow('2026-08-26T16:00:00.000Z')
+test('trip lifecycle status update is idempotent without touching updatedAt', () => {
+  const ongoing: Trip = { ...baseTrip, status: 'ongoing' }
+  const result = applyTripStatus(ongoing, 'ongoing', '2026-08-26T16:00:00.000Z')
 
-  const result = await harness.application.setTripStatus('trip-1', 'ongoing')
-
-  assert.strictEqual(result, before)
-  assert.strictEqual(harness.current(), before)
+  assert.strictEqual(result, ongoing)
   assert.equal(result.updatedAt, '2026-01-01T00:00:00.000Z')
 })

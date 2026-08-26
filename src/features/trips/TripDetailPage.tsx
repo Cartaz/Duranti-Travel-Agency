@@ -124,6 +124,7 @@ export default function TripDetailPage() {
           {trip.subtitle && <p className="trip-detail-subtitle">{trip.subtitle}</p>}
         </div>
         <div className="trip-page-actions">
+          <Link className="trip-secondary-action" to={`/trips/${trip.id}/book`}>Apri libro</Link>
           <Link className="trip-secondary-action" to={`/trips/${trip.id}/edit`}>Modifica</Link>
           <button className="trip-archive-action" type="button" onClick={() => setConfirmArchive(true)} disabled={archiving || statusBusy}>
             {archiving ? 'Archivio…' : 'Archivia'}

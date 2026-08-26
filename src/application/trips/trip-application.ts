@@ -1,9 +1,11 @@
-import type { Trip, TripStatus } from '../../domain/entities'
+import type { Trip } from '../../domain/entities'
 import { isDayDateWithinTripRange } from '../../domain/trip-calendar'
 import { normalizeCurrencyCode } from '../../lib/currency'
+import { applyTripStatus, validateEditableTripStatus } from './trip-lifecycle'
+import type { EditableTripStatus } from './trip-lifecycle'
 import type { TripApplicationDependencies } from './ports'
 
-export type EditableTripStatus = Exclude<TripStatus, 'archived'>
+export type { EditableTripStatus } from './trip-lifecycle'
 
 export interface TripDraft {
   title: string
@@ -27,8 +29,6 @@ export interface TripApplication {
   restoreArchivedTrip(tripId: string): Promise<Trip>
 }
 
-const editableStatuses = new Set<TripStatus>(['planned', 'ongoing', 'completed'])
-
 function cleanOptional(value: string | undefined): string | undefined {
   const cleaned = value?.trim()
   return cleaned ? cleaned : undefined
@@ -44,16 +44,11 @@ function formatDisplayDate(value: string): string {
   }).format(new Date(year, month - 1, day))
 }
 
-function validateEditableStatus(status: EditableTripStatus): EditableTripStatus {
-  if (!editableStatuses.has(status)) throw new Error('Lo stato del viaggio non è valido.')
-  return status
-}
-
 function validateDraft(input: TripDraft): TripDraft {
   const title = input.title.trim()
   if (!title) throw new Error('Il titolo del viaggio è obbligatorio.')
   if (title.length > 120) throw new Error('Il titolo del viaggio è troppo lungo.')
-  const status = validateEditableStatus(input.status)
+  const status = validateEditableTripStatus(input.status)
 
   const startDate = cleanOptional(input.startDate)
   const endDate = cleanOptional(input.endDate)
@@ -175,19 +170,10 @@ export function createTripApplication(dependencies: TripApplicationDependencies)
     async setTripStatus(tripId: string, status: EditableTripStatus): Promise<Trip> {
       const existing = await trips.get(tripId)
       if (!existing) throw new Error('Il viaggio non esiste o è stato eliminato.')
-      if (existing.status === 'archived') {
-        throw new Error('Ripristina il viaggio dall’archivio prima di cambiarne lo stato.')
-      }
 
-      const nextStatus = validateEditableStatus(status)
-      if (existing.status === nextStatus) return existing
+      const updated = applyTripStatus(existing, status, now())
+      if (updated === existing) return existing
 
-      const updated: Trip = {
-        ...existing,
-        status: nextStatus,
-        archivedFromStatus: undefined,
-        updatedAt: now(),
-      }
       await trips.put(updated)
       return updated
     },
