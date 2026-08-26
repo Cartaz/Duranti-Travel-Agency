@@ -9,6 +9,7 @@ import { placeApplication } from './composition/places'
 import { plannerApplication } from './composition/planner'
 import { reservationApplication } from './composition/reservations'
 import { dayTemplateApplication } from './composition/templates'
+import { travelerDocumentApplication } from './composition/traveler-documents'
 import { travelerApplication } from './composition/travelers'
 import { tripApplication } from './composition/trips'
 import { bootstrapApplication } from './data/bootstrap'
@@ -34,6 +35,7 @@ async function startApplication(): Promise<void> {
           templates: dayTemplateApplication,
           expenses: expenseApplication,
           travelers: travelerApplication,
+          travelerDocuments: travelerDocumentApplication,
           places: placeApplication,
           itinerary: itineraryApplication,
         }}>
