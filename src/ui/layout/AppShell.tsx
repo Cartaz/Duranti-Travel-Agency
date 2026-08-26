@@ -131,6 +131,10 @@ export default function AppShell() {
           <span className="nav-glyph book-glyph" aria-hidden="true" />
           <span>Viaggi</span>
         </NavLink>
+        <NavLink to="/backup" className={navClassName}>
+          <span className="nav-glyph" aria-hidden="true">↥</span>
+          <span>Backup</span>
+        </NavLink>
       </nav>
     </div>
   )
