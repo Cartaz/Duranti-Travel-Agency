@@ -5,6 +5,7 @@ import { dayApplication } from './composition/days'
 import { expenseApplication } from './composition/expenses'
 import { itineraryApplication } from './composition/itinerary'
 import { dayMediaApplication } from './composition/media'
+import { placeImportApplication } from './composition/place-import'
 import { placeApplication } from './composition/places'
 import { plannerApplication } from './composition/planner'
 import { reservationApplication } from './composition/reservations'
@@ -38,6 +39,7 @@ async function startApplication(): Promise<void> {
           travelers: travelerApplication,
           travelerDocuments: travelerDocumentApplication,
           places: placeApplication,
+          placeImport: placeImportApplication,
           itinerary: itineraryApplication,
           travelBook: travelBookApplication,
         }}>
