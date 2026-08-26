@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Trip } from '../../domain/entities'
+import InlineConfirm from '../../ui/InlineConfirm'
 import { useApplicationServices } from '../../ui/application-context'
 import TripDaysPanel from '../days/TripDaysPanel'
 import TripExpenseSummary from '../expenses/TripExpenseSummary'
@@ -32,6 +33,7 @@ export default function TripDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [archiving, setArchiving] = useState(false)
+  const [confirmArchive, setConfirmArchive] = useState(false)
 
   useEffect(() => {
     if (!tripId) {
@@ -64,8 +66,6 @@ export default function TripDetailPage() {
 
   const handleArchive = async (): Promise<void> => {
     if (!trip || archiving) return
-    const confirmed = window.confirm(`Archiviare “${trip.title}”? Potrai ripristinarlo in seguito.`)
-    if (!confirmed) return
 
     setArchiving(true)
     setError('')
@@ -75,6 +75,7 @@ export default function TripDetailPage() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile archiviare il viaggio.')
       setArchiving(false)
+      setConfirmArchive(false)
     }
   }
 
@@ -99,11 +100,22 @@ export default function TripDetailPage() {
         </div>
         <div className="trip-page-actions">
           <Link className="trip-secondary-action" to={`/trips/${trip.id}/edit`}>Modifica</Link>
-          <button className="trip-archive-action" type="button" onClick={() => void handleArchive()} disabled={archiving}>
+          <button className="trip-archive-action" type="button" onClick={() => setConfirmArchive(true)} disabled={archiving}>
             {archiving ? 'Archivio…' : 'Archivia'}
           </button>
         </div>
       </div>
+
+      {confirmArchive && (
+        <InlineConfirm
+          title={`Archiviare “${trip.title}”?`}
+          message="Il viaggio verrà spostato nell’archivio e resterà ripristinabile. I suoi dati non vengono eliminati."
+          confirmLabel="Archivia viaggio"
+          busy={archiving}
+          onConfirm={() => void handleArchive()}
+          onCancel={() => setConfirmArchive(false)}
+        />
+      )}
 
       {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
 
