@@ -97,7 +97,7 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
   }
   async function savePlannerPlace(tripId: string, dayId: string, blockId: string, input: PlaceDraft): Promise<Place> {
     await assertContext(tripId, dayId, true)
-    const block = await getPlaceBlock(tripId, dayId, block.id)
+    const block = await getPlaceBlock(tripId, dayId, blockId)
     const currentPlaceId = placeIdFromBlock(block)
     const currentPlace = currentPlaceId ? await deps.places.get(currentPlaceId) : undefined
     const draft = normalizeDraft(input)
