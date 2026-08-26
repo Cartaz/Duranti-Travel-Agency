@@ -128,6 +128,8 @@ export interface Place extends EntityBase {
   countryCode?: string
   city?: string
   category?: string
+  phone?: string
+  openingHours?: string
   notes?: string
 }
 

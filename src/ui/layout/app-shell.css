@@ -44,8 +44,14 @@
 }
 
 .app-bottom-nav-simple {
-  width: min(210px, calc(100% - 32px));
-  grid-template-columns: 1fr;
+  width: min(330px, calc(100% - 32px));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-bottom-nav-simple .app-nav-link {
+  min-width: 0;
+  grid-template-columns: 18px auto;
+  gap: 6px;
 }
 
 /* Never truncate actionable feedback. This also fixes legacy toast messages. */
@@ -75,5 +81,10 @@
 
   .app-validation-notice button {
     align-self: flex-end;
+  }
+
+  .app-bottom-nav-simple .app-nav-link {
+    gap: 4px;
+    font-size: 11px;
   }
 }

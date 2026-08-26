@@ -8,15 +8,21 @@ export interface PlaceDraft {
   city?: string
   countryCode?: string
   category?: string
+  phone?: string
+  openingHours?: string
   notes?: string
   latitude?: number
   longitude?: number
+  provider?: string
+  providerPlaceId?: string
 }
 
 export const EMPTY_PLACE_DRAFT: PlaceDraft = { name: '' }
 
 export interface PlaceApplication {
   placeToDraft(place: Place): PlaceDraft
+  listCatalogPlaces(): Promise<Place[]>
+  saveCatalogPlace(input: PlaceDraft): Promise<Place>
   getPlannerPlace(tripId: string, dayId: string, blockId: string): Promise<Place | undefined>
   savePlannerPlace(tripId: string, dayId: string, blockId: string, input: PlaceDraft): Promise<Place>
 }
@@ -56,10 +62,18 @@ function normalizeDraft(input: PlaceDraft): PlaceDraft {
     city: validateOptionalText(input.city, 'Città', 120),
     countryCode,
     category: validateOptionalText(input.category, 'Categoria', 80),
+    phone: validateOptionalText(input.phone, 'Telefono', 80),
+    openingHours: validateOptionalText(input.openingHours, 'Orari', 1000),
     notes: validateOptionalText(input.notes, 'Note', 2000),
     latitude: hasLatitude ? input.latitude : undefined,
     longitude: hasLongitude ? input.longitude : undefined,
+    provider: validateOptionalText(input.provider, 'Provider', 80),
+    providerPlaceId: validateOptionalText(input.providerPlaceId, 'Identificatore provider', 200),
   }
+}
+function placeBaseFromDraft(input: PlaceDraft): Omit<Place, 'id' | 'createdAt' | 'updatedAt'> {
+  const draft = normalizeDraft(input)
+  return { ...draft, provider: draft.provider ?? 'manual', mapsUrl: buildGoogleMapsSearchUrl(draft) }
 }
 function placeIdFromBlock(block: Block): string | undefined {
   const value = block.content.placeId
@@ -78,7 +92,16 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
     return block
   }
   function placeToDraft(place: Place): PlaceDraft {
-    return { name: place.name, formattedAddress: place.formattedAddress, city: place.city, countryCode: place.countryCode, category: place.category, notes: place.notes, latitude: place.latitude, longitude: place.longitude }
+    return { name: place.name, formattedAddress: place.formattedAddress, city: place.city, countryCode: place.countryCode, category: place.category, phone: place.phone, openingHours: place.openingHours, notes: place.notes, latitude: place.latitude, longitude: place.longitude, provider: place.provider, providerPlaceId: place.providerPlaceId }
+  }
+  async function listCatalogPlaces(): Promise<Place[]> {
+    return (await deps.places.list()).sort((left, right) => left.name.localeCompare(right.name, 'it'))
+  }
+  async function saveCatalogPlace(input: PlaceDraft): Promise<Place> {
+    const timestamp = deps.now()
+    const place: Place = { id: deps.newId(), ...placeBaseFromDraft(input), createdAt: timestamp, updatedAt: timestamp }
+    await deps.places.put(place)
+    return place
   }
   async function getPlannerPlace(tripId: string, dayId: string, blockId: string): Promise<Place | undefined> {
     await assertContext(tripId, dayId, false)
@@ -92,14 +115,13 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
     const block = await getPlaceBlock(tripId, dayId, blockId)
     const currentPlaceId = placeIdFromBlock(block)
     const currentPlace = currentPlaceId ? await deps.places.get(currentPlaceId) : undefined
-    const draft = normalizeDraft(input)
     const now = deps.now()
-    const placeBase = { ...draft, provider: 'manual', mapsUrl: buildGoogleMapsSearchUrl(draft) }
+    const base = placeBaseFromDraft(input)
     const place: Place = currentPlace
-      ? { ...currentPlace, ...placeBase, updatedAt: now }
-      : { id: deps.newId(), ...placeBase, createdAt: now, updatedAt: now }
+      ? { ...currentPlace, ...base, updatedAt: now }
+      : { id: deps.newId(), ...base, createdAt: now, updatedAt: now }
     await deps.blockTransactions.savePlaceForBlock(blockId, tripId, dayId, place)
     return place
   }
-  return { placeToDraft, getPlannerPlace, savePlannerPlace }
+  return { placeToDraft, listCatalogPlaces, saveCatalogPlace, getPlannerPlace, savePlannerPlace }
 }

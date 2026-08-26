@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import DayFormPage from './features/days/DayFormPage'
+import PlaceCatalogPage from './features/places/PlaceCatalogPage'
 import GuidedDayPlannerPage from './features/planner/GuidedDayPlannerPage'
 import StorageLabPage from './features/storage-lab/StorageLabPage'
 import TravelBookPage from './features/travel-book/TravelBookPage'
@@ -20,6 +21,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<TravelIndexPage />} />
           <Route path="archive" element={<ArchivedTripsPage />} />
+          <Route path="places" element={<PlaceCatalogPage />} />
           <Route path="travelers" element={<TravelersPage />} />
           <Route path="travelers/new" element={<TravelerFormPage mode="create" />} />
           <Route path="travelers/:travelerId/edit" element={<TravelerFormPage mode="edit" />} />
