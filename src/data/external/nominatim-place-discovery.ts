@@ -40,7 +40,7 @@ function categoryFrom(result: NominatimResult): string | undefined {
 }
 
 function providerPlaceId(result: NominatimResult): string {
-  if (result.osm_type && Number.isFinite(result.osm_id)) return `${result.osm_type}:${result.osm_id}`
+  if (result.osm_type?.trim() && Number.isFinite(result.osm_id)) return `${result.osm_type}:${result.osm_id}`
   return `nominatim:${result.place_id}`
 }
 
@@ -84,7 +84,7 @@ function writeCache(query: string, candidates: PlaceImportCandidate[]): void {
   try {
     localStorage.setItem(cacheKey(query), JSON.stringify({ storedAt: Date.now(), candidates }))
   } catch {
-    // External discovery cache is opportunistic; failure must not affect DTAgency user data.
+    // This cache contains only reproducible third-party lookup data, never DTAgency user data.
   }
 }
 
