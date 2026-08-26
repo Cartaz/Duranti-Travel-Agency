@@ -9,6 +9,7 @@ import type { PlaceApplication } from '../application/places/place-application'
 import type { PlannerApplication } from '../application/planner/planner-application'
 import type { ReservationApplication } from '../application/reservations/reservation-application'
 import type { DayTemplateApplication } from '../application/templates/day-template-application'
+import type { TravelerDocumentApplication } from '../application/travelers/traveler-document-application'
 import type { TravelerApplication } from '../application/travelers/traveler-application'
 import type { TripApplication } from '../application/trips/trip-application'
 
@@ -21,6 +22,7 @@ export interface ApplicationServices {
   templates: DayTemplateApplication
   expenses: ExpenseApplication & ExpenseSummaryApplication
   travelers: TravelerApplication
+  travelerDocuments: TravelerDocumentApplication
   places: PlaceApplication
   itinerary: ItineraryApplication
 }
