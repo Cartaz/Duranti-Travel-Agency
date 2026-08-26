@@ -8,6 +8,7 @@ import TripDetailPage from './features/trips/TripDetailPage'
 import TripFormPage from './features/trips/TripFormPage'
 import TravelerFormPage from './features/travelers/TravelerFormPage'
 import TravelersPage from './features/travelers/TravelersPage'
+import VaultBackupPage from './features/vault/VaultBackupPage'
 import AppShell from './ui/layout/AppShell'
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
           <Route path="travelers" element={<TravelersPage />} />
           <Route path="travelers/new" element={<TravelerFormPage mode="create" />} />
           <Route path="travelers/:travelerId/edit" element={<TravelerFormPage mode="edit" />} />
+          <Route path="backup" element={<VaultBackupPage />} />
           <Route path="trips/new" element={<TripFormPage mode="create" />} />
           <Route path="trips/:tripId" element={<TripDetailPage />} />
           <Route path="trips/:tripId/edit" element={<TripFormPage mode="edit" />} />
