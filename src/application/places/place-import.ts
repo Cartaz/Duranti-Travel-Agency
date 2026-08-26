@@ -24,7 +24,7 @@ function decodedPathPart(value: string): string {
 function isGoogleMapsHost(hostname: string): boolean {
   const normalized = hostname.toLowerCase()
   if (normalized === 'maps.app.goo.gl') return true
-  return /(^|\.)google\.[a-z]{2,}(?:\.[a-z]{2,})?$/.test(normalized)
+  return /(^|\.)google\.(?:com|[a-z]{2}|co\.[a-z]{2}|com\.[a-z]{2})$/.test(normalized)
 }
 
 export function googleMapsSearchQuery(sourceUrl: string): string {
