@@ -1,0 +1,157 @@
+.vault-page {
+  display: grid;
+  gap: 1rem;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 1rem 0 3rem;
+}
+
+.vault-heading,
+.vault-card {
+  background: var(--surface, #fffdf8);
+  border: 1px solid rgba(64, 49, 37, 0.14);
+  border-radius: 20px;
+  box-shadow: 0 14px 40px rgba(54, 38, 23, 0.06);
+}
+
+.vault-heading {
+  padding: 1.25rem;
+}
+
+.vault-heading h1,
+.vault-card h2 {
+  margin: 0.2rem 0 0.55rem;
+}
+
+.vault-heading p,
+.vault-card p {
+  line-height: 1.55;
+}
+
+.vault-back-link {
+  display: inline-flex;
+  margin-top: 0.4rem;
+  font-weight: 700;
+}
+
+.vault-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.vault-restore-card {
+  border-color: rgba(112, 74, 49, 0.22);
+}
+
+.vault-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.vault-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+}
+
+.vault-form input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(64, 49, 37, 0.2);
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  padding: 0.8rem 0.9rem;
+  font: inherit;
+}
+
+.vault-form input:focus-visible,
+.vault-actions button:focus-visible,
+.vault-primary:focus-visible {
+  outline: 3px solid rgba(95, 84, 60, 0.24);
+  outline-offset: 2px;
+}
+
+.vault-primary,
+.vault-actions button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.72rem 1rem;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.vault-primary,
+.vault-actions button:not(.vault-subtle):not(.vault-danger) {
+  background: #2f493c;
+  color: #fff;
+}
+
+.vault-primary:disabled,
+.vault-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.vault-feedback,
+.vault-progress,
+.vault-result {
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+}
+
+.vault-feedback,
+.vault-progress {
+  margin: 0;
+  background: rgba(47, 73, 60, 0.08);
+}
+
+.vault-feedback-error {
+  background: rgba(151, 52, 43, 0.1);
+  color: #7b281f;
+}
+
+.vault-result {
+  display: grid;
+  gap: 0.35rem;
+  background: rgba(93, 83, 61, 0.07);
+}
+
+.vault-result > span {
+  color: rgba(48, 39, 32, 0.72);
+}
+
+.vault-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.6rem;
+}
+
+.vault-actions .vault-subtle {
+  background: transparent;
+  color: inherit;
+  border: 1px solid rgba(64, 49, 37, 0.18);
+}
+
+.vault-actions .vault-danger {
+  background: #8d3029;
+  color: #fff;
+}
+
+.vault-staged {
+  border: 1px solid rgba(141, 48, 41, 0.16);
+}
+
+@media (min-width: 720px) {
+  .vault-form {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  .vault-primary {
+    min-height: 46px;
+  }
+}
