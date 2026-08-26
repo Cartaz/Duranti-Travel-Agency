@@ -19,6 +19,12 @@ test('Vault UI preserves the prepare-then-save iPhone flow', async () => {
   assert.match(page, /downloadVaultFile/)
 })
 
+test('Vault UI discards replaced export and import staging', async () => {
+  const page = await readFile(pageUrl, 'utf8')
+  assert.match(page, /if \(prepared\) await discardPreparedVault\(prepared\)/)
+  assert.match(page, /if \(staged\) await discardStagedVaultImport\(staged\)/)
+})
+
 test('Vault restore stages before explicit replace confirmation', async () => {
   const page = await readFile(pageUrl, 'utf8')
   const stageIndex = page.indexOf('stageVaultImport(')
