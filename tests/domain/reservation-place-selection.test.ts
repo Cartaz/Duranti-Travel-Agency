@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { Place } from '../../src/domain/entities.ts'
+import type { ReservationDraft } from '../../src/application/reservations/reservation-application.ts'
 import { selectSavedPlaceForReservation } from '../../src/application/reservations/reservation-place-selection.ts'
-import { EMPTY_RESERVATION_DRAFT } from '../../src/application/reservations/reservation-application.ts'
+
+const emptyDraft: ReservationDraft = { title: '', status: 'planned' }
 
 const place: Place = {
   id: 'place-1',
@@ -15,7 +17,7 @@ const place: Place = {
 }
 
 test('restaurant selection links the canonical place and initializes an empty title', () => {
-  const next = selectSavedPlaceForReservation(EMPTY_RESERVATION_DRAFT, place, 'restaurant')
+  const next = selectSavedPlaceForReservation(emptyDraft, place, 'restaurant')
 
   assert.equal(next.placeId, place.id)
   assert.equal(next.title, place.name)
@@ -26,7 +28,7 @@ test('restaurant selection links the canonical place and initializes an empty ti
 
 test('restaurant selection preserves a title already authored by the user', () => {
   const next = selectSavedPlaceForReservation(
-    { ...EMPTY_RESERVATION_DRAFT, title: 'Cena di anniversario' },
+    { ...emptyDraft, title: 'Cena di anniversario' },
     place,
     'restaurant',
   )
@@ -36,7 +38,7 @@ test('restaurant selection preserves a title already authored by the user', () =
 })
 
 test('non-restaurant reservations link the place without inventing a title', () => {
-  const next = selectSavedPlaceForReservation(EMPTY_RESERVATION_DRAFT, place, 'activity')
+  const next = selectSavedPlaceForReservation(emptyDraft, place, 'activity')
 
   assert.equal(next.placeId, place.id)
   assert.equal(next.title, '')
