@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import type { EditableTripStatus } from '../../application/trips/trip-application'
 import type { Trip } from '../../domain/entities'
 import InlineConfirm from '../../ui/InlineConfirm'
 import { useApplicationServices } from '../../ui/application-context'
@@ -25,6 +26,13 @@ function formatDate(value: string | undefined): string {
     .format(new Date(year, month - 1, day))
 }
 
+function lifecycleAction(status: EditableTripStatus): { target: EditableTripStatus; label: string } | undefined {
+  if (status === 'planned') return { target: 'ongoing', label: 'Inizia viaggio' }
+  if (status === 'ongoing') return { target: 'completed', label: 'Segna concluso' }
+  if (status === 'completed') return { target: 'ongoing', label: 'Riapri viaggio' }
+  return undefined
+}
+
 export default function TripDetailPage() {
   const { trips: tripApplication } = useApplicationServices()
   const { tripId } = useParams<{ tripId: string }>()
@@ -33,6 +41,7 @@ export default function TripDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [archiving, setArchiving] = useState(false)
+  const [statusBusy, setStatusBusy] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(false)
 
   useEffect(() => {
@@ -79,6 +88,20 @@ export default function TripDetailPage() {
     }
   }
 
+  const handleStatusChange = async (status: EditableTripStatus): Promise<void> => {
+    if (!trip || statusBusy) return
+    setStatusBusy(true)
+    setError('')
+    try {
+      const updated = await tripApplication.setTripStatus(trip.id, status)
+      setTrip(updated)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile aggiornare lo stato del viaggio.')
+    } finally {
+      setStatusBusy(false)
+    }
+  }
+
   if (loading) return <p className="trip-feedback" role="status">Apro il viaggio…</p>
 
   if (!trip || trip.status === 'archived') {
@@ -90,6 +113,8 @@ export default function TripDetailPage() {
     )
   }
 
+  const nextLifecycleAction = lifecycleAction(trip.status)
+
   return (
     <article className="trip-detail-page" aria-labelledby="trip-detail-title">
       <div className="trip-page-heading">
@@ -100,7 +125,7 @@ export default function TripDetailPage() {
         </div>
         <div className="trip-page-actions">
           <Link className="trip-secondary-action" to={`/trips/${trip.id}/edit`}>Modifica</Link>
-          <button className="trip-archive-action" type="button" onClick={() => setConfirmArchive(true)} disabled={archiving}>
+          <button className="trip-archive-action" type="button" onClick={() => setConfirmArchive(true)} disabled={archiving || statusBusy}>
             {archiving ? 'Archivio…' : 'Archivia'}
           </button>
         </div>
@@ -123,6 +148,16 @@ export default function TripDetailPage() {
         <section className="trip-detail-panel">
           <p className="eyebrow">Stato</p>
           <strong>{statusLabel[trip.status]}</strong>
+          {nextLifecycleAction && (
+            <button
+              className="trip-secondary-action trip-status-action"
+              type="button"
+              disabled={statusBusy || archiving}
+              onClick={() => void handleStatusChange(nextLifecycleAction.target)}
+            >
+              {statusBusy ? 'Aggiorno…' : nextLifecycleAction.label}
+            </button>
+          )}
         </section>
         <section className="trip-detail-panel">
           <p className="eyebrow">Partenza</p>
