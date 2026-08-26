@@ -9,6 +9,13 @@ test('Google Maps full place URLs become a provider-neutral search query', () =>
   )
 })
 
+test('Google Maps country domains are accepted', () => {
+  assert.equal(
+    googleMapsSearchQuery('https://www.google.it/maps/place/Da+Enzo+al+29/'),
+    'Da Enzo al 29',
+  )
+})
+
 test('Google Maps query URLs use the explicit query parameter', () => {
   assert.equal(
     googleMapsSearchQuery('https://www.google.com/maps/search/?api=1&query=Roscioli%2C+Roma'),
@@ -23,11 +30,17 @@ test('short Google Maps links fail visibly instead of depending on a fragile red
   )
 })
 
-test('non-Google URLs are rejected before external discovery', () => {
-  assert.throws(
-    () => googleMapsSearchQuery('https://example.com/maps/place/Test'),
-    /link completo di Google Maps/,
-  )
+test('non-Google and Google-lookalike URLs are rejected before external discovery', () => {
+  for (const url of [
+    'https://example.com/maps/place/Test',
+    'https://notgoogle.com/maps/place/Test',
+    'https://google.example.com/maps/place/Test',
+  ]) {
+    assert.throws(
+      () => googleMapsSearchQuery(url),
+      /link completo di Google Maps/,
+    )
+  }
 })
 
 test('place import delegates only the parsed query to the discovery port', async () => {
