@@ -5,6 +5,7 @@ import {
   RESERVATION_ATTACHMENT_ACCEPT,
   type ReservationDraft,
 } from '../../application/reservations/reservation-application'
+import { selectSavedPlaceForReservation } from '../../application/reservations/reservation-place-selection'
 import InlineConfirm from '../../ui/InlineConfirm'
 import { useApplicationServices } from '../../ui/application-context'
 import './reservations.css'
@@ -89,6 +90,10 @@ function formatDayDate(value: string): string {
   }).format(new Date(year, month - 1, day))
 }
 
+function placeDetail(value: string | undefined, fallback = 'Non disponibile'): string {
+  return value?.trim() || fallback
+}
+
 export default function ReservationBlockEditor({
   block,
   tripId,
@@ -167,6 +172,21 @@ export default function ReservationBlockEditor({
   const startTime = draft.startsAt?.slice(11, 16) ?? ''
   const endTime = draft.endsAt?.slice(11, 16) ?? ''
   const sameDayEnd = endDateInput === dayDate
+  const selectedPlace = draft.placeId ? places.find((place) => place.id === draft.placeId) : undefined
+
+  const updateSavedPlace = (placeId: string): void => {
+    setError('')
+    if (!placeId) {
+      patch({ placeId: undefined })
+      return
+    }
+    const selected = places.find((place) => place.id === placeId)
+    if (!selected) {
+      setError('Il luogo selezionato non è più disponibile nel catalogo.')
+      return
+    }
+    setDraft((current) => selectSavedPlaceForReservation(current, selected, blockType))
+  }
 
   const updateStartTime = (value: string): void => {
     setError('')
@@ -350,13 +370,31 @@ export default function ReservationBlockEditor({
               </select>
             </label>
             <label>
-              <span>Luogo salvato</span>
-              <select disabled={readOnly} value={draft.placeId ?? ''} onChange={(event) => patch({ placeId: event.target.value })}>
+              <span>{blockType === 'restaurant' ? 'Ristorante dal catalogo' : 'Luogo salvato'}</span>
+              <select disabled={readOnly} value={draft.placeId ?? ''} onChange={(event) => updateSavedPlace(event.target.value)}>
                 <option value="">Nessun luogo</option>
                 {places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
               </select>
             </label>
           </div>
+
+          {blockType === 'restaurant' && selectedPlace && (
+            <aside className="reservation-place-preview" aria-label="Dati del ristorante salvato">
+              <div className="reservation-place-preview-heading">
+                <div>
+                  <span>Dal catalogo Luoghi</span>
+                  <strong>{selectedPlace.name}</strong>
+                </div>
+                {selectedPlace.mapsUrl && <a href={selectedPlace.mapsUrl} target="_blank" rel="noreferrer">Apri in Maps ↗</a>}
+              </div>
+              <p>{placeDetail(selectedPlace.formattedAddress)}</p>
+              <dl>
+                <div><dt>Telefono</dt><dd>{placeDetail(selectedPlace.phone)}</dd></div>
+                <div><dt>Orari</dt><dd>{placeDetail(selectedPlace.openingHours)}</dd></div>
+              </dl>
+              <small>Questi dati restano nel luogo canonico: la prenotazione conserva solo il collegamento, così non vengono create copie divergenti.</small>
+            </aside>
+          )}
 
           <details className="reservation-optional">
             <summary>
@@ -419,7 +457,7 @@ export default function ReservationBlockEditor({
             </section>
           </details>
 
-          {places.length === 0 && <small className="reservation-hint">Puoi prima creare un blocco Luogo per collegarlo a questa prenotazione.</small>}
+          {places.length === 0 && <small className="reservation-hint">Salva prima un ristorante o un luogo nella sezione Luoghi per poterlo riutilizzare qui.</small>}
           {error && <small className="planner-block-error" role="alert">{error}</small>}
           {removeTarget === 'reservation' && (
             <InlineConfirm
