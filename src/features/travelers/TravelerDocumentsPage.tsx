@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Traveler, TravelerDocument, TravelerDocumentSecret } from '../../domain/entities'
 import type { TravelerDocumentMetadata, TravelerDocumentView } from '../../application/travelers/document-ports'
@@ -58,6 +58,8 @@ export default function TravelerDocumentsPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [deleteId, setDeleteId] = useState<string>()
+  const [editingId, setEditingId] = useState<string>()
+  const [removeAttachmentId, setRemoveAttachmentId] = useState<string>()
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!travelerId) return
@@ -139,6 +141,62 @@ export default function TravelerDocumentsPage() {
     }
   }
 
+  const updateDocument = async (event: FormEvent<HTMLFormElement>, documentId: string): Promise<void> => {
+    event.preventDefault()
+    setError('')
+    setNotice('')
+    setBusy(true)
+    try {
+      await travelerDocuments.updateSecret(documentId, buildSecret(event.currentTarget))
+      setEditingId(undefined)
+      await refresh()
+      setNotice('Dettagli del documento aggiornati e cifrati.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile aggiornare il documento cifrato.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const replaceAttachment = async (event: ChangeEvent<HTMLInputElement>, documentId: string): Promise<void> => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setError('')
+    setNotice('')
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setError('L’allegato supera il limite cifrato di 20 MiB.')
+      return
+    }
+    setBusy(true)
+    try {
+      await travelerDocuments.replaceAttachment(documentId, file)
+      await refresh()
+      setNotice('Allegato sostituito e cifrato sul dispositivo.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile sostituire l’allegato cifrato.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const confirmRemoveAttachment = async (): Promise<void> => {
+    if (!removeAttachmentId) return
+    setError('')
+    setNotice('')
+    setBusy(true)
+    try {
+      await travelerDocuments.removeAttachment(removeAttachmentId)
+      setRemoveAttachmentId(undefined)
+      await refresh()
+      setNotice('Allegato rimosso dal documento.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile rimuovere l’allegato.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const downloadAttachment = async (document: TravelerDocumentView): Promise<void> => {
     setError('')
     try {
@@ -162,6 +220,9 @@ export default function TravelerDocumentsPage() {
     travelerDocuments.lock()
     setUnlocked(false)
     setDocuments([])
+    setEditingId(undefined)
+    setDeleteId(undefined)
+    setRemoveAttachmentId(undefined)
     setNotice('Archivio documenti bloccato. La chiave è stata rimossa dalla sessione.')
   }
 
@@ -172,6 +233,7 @@ export default function TravelerDocumentsPage() {
     try {
       await travelerDocuments.delete(deleteId)
       setDeleteId(undefined)
+      setEditingId(undefined)
       await refresh()
       setNotice('Documento rimosso dalla vista attiva.')
     } catch (cause) {
@@ -228,21 +290,44 @@ export default function TravelerDocumentsPage() {
       <div className="traveler-document-list">
         {documents.length === 0 && <div className="travelers-empty"><strong>Nessun documento cifrato.</strong><span>Aggiungi passaporto, carta d’identità, patente o visto.</span></div>}
         {documents.map((document) => <article className="traveler-document-card" key={document.id}>
-          <div className="traveler-document-card-copy">
-            <div><span className="traveler-document-type">{typeLabels[document.type]}</span><strong>{document.secret.holderName || traveler?.displayName || 'Documento personale'}</strong></div>
-            <dl>
-              <div><dt>Numero</dt><dd>{document.secret.documentNumber || '—'}</dd></div>
-              <div><dt>Emesso da</dt><dd>{document.secret.issuingCountryCode || '—'}</dd></div>
-              <div><dt>Emissione</dt><dd>{formatDate(document.secret.issueDate)}</dd></div>
-              <div><dt>Scadenza</dt><dd>{formatDate(document.secret.expiryDate)}</dd></div>
-            </dl>
-            {document.secret.notes && <p className="traveler-document-notes">{document.secret.notes}</p>}
-            {document.attachment && <span className="traveler-document-file">{document.attachment.originalName || 'Allegato'} · {humanBytes(document.attachment.sizeBytes)}</span>}
-          </div>
+          {editingId === document.id ? (
+            <form className="traveler-document-form traveler-document-edit-form" onSubmit={(event) => void updateDocument(event, document.id)}>
+              <div className="traveler-document-edit-heading traveler-document-wide"><span className="traveler-document-type">{typeLabels[document.type]}</span><strong>Modifica dettagli cifrati</strong></div>
+              <label><span>Intestatario</span><input name="holderName" defaultValue={document.secret.holderName ?? ''} /></label>
+              <label><span>Numero documento</span><input name="documentNumber" autoComplete="off" defaultValue={document.secret.documentNumber ?? ''} /></label>
+              <label><span>Paese emittente</span><input name="issuingCountryCode" maxLength={3} autoCapitalize="characters" defaultValue={document.secret.issuingCountryCode ?? ''} /></label>
+              <label><span>Data emissione</span><input name="issueDate" type="date" defaultValue={document.secret.issueDate ?? ''} /></label>
+              <label><span>Scadenza</span><input name="expiryDate" type="date" defaultValue={document.secret.expiryDate ?? ''} /></label>
+              <label className="traveler-document-wide"><span>Note private</span><textarea name="notes" rows={3} defaultValue={document.secret.notes ?? ''} /></label>
+              <div className="traveler-document-edit-actions traveler-document-wide">
+                <button className="trip-primary-action" type="submit" disabled={busy}>{busy ? 'Cifro e salvo…' : 'Salva modifiche'}</button>
+                <button className="trip-secondary-action" type="button" disabled={busy} onClick={() => setEditingId(undefined)}>Annulla</button>
+              </div>
+            </form>
+          ) : (
+            <div className="traveler-document-card-copy">
+              <div><span className="traveler-document-type">{typeLabels[document.type]}</span><strong>{document.secret.holderName || traveler?.displayName || 'Documento personale'}</strong></div>
+              <dl>
+                <div><dt>Numero</dt><dd>{document.secret.documentNumber || '—'}</dd></div>
+                <div><dt>Emesso da</dt><dd>{document.secret.issuingCountryCode || '—'}</dd></div>
+                <div><dt>Emissione</dt><dd>{formatDate(document.secret.issueDate)}</dd></div>
+                <div><dt>Scadenza</dt><dd>{formatDate(document.secret.expiryDate)}</dd></div>
+              </dl>
+              {document.secret.notes && <p className="traveler-document-notes">{document.secret.notes}</p>}
+              {document.attachment && <span className="traveler-document-file">{document.attachment.originalName || 'Allegato'} · {humanBytes(document.attachment.sizeBytes)}</span>}
+            </div>
+          )}
           <div className="traveler-document-card-actions">
-            {document.attachment && <button type="button" className="trip-secondary-action" onClick={() => void downloadAttachment(document)}>Apri allegato</button>}
-            <button type="button" className="traveler-document-delete" onClick={() => setDeleteId(document.id)}>Rimuovi</button>
+            {editingId !== document.id && <button type="button" className="trip-secondary-action" disabled={busy} onClick={() => setEditingId(document.id)}>Modifica</button>}
+            {document.attachment && <button type="button" className="trip-secondary-action" disabled={busy} onClick={() => void downloadAttachment(document)}>Apri allegato</button>}
+            <label className="trip-secondary-action traveler-document-file-action">
+              <span>{document.attachment ? 'Sostituisci allegato' : 'Aggiungi allegato'}</span>
+              <input type="file" accept="image/*,.pdf,application/pdf" disabled={busy} onChange={(event) => void replaceAttachment(event, document.id)} />
+            </label>
+            {document.attachment && <button type="button" className="trip-secondary-action" disabled={busy} onClick={() => setRemoveAttachmentId(document.id)}>Rimuovi allegato</button>}
+            <button type="button" className="traveler-document-delete" disabled={busy} onClick={() => setDeleteId(document.id)}>Rimuovi documento</button>
           </div>
+          {removeAttachmentId === document.id && <InlineConfirm title="Rimuovere l’allegato?" message="Il file cifrato verrà rimosso dal documento. I dettagli del documento resteranno disponibili." confirmLabel="Rimuovi allegato" busy={busy} onConfirm={() => void confirmRemoveAttachment()} onCancel={() => setRemoveAttachmentId(undefined)} />}
           {deleteId === document.id && <InlineConfirm title="Rimuovere questo documento?" message="Il documento non sarà più mostrato nella cassaforte attiva. I dati restano gestiti dal lifecycle cifrato e dal backup DTAgency." confirmLabel="Rimuovi documento" busy={busy} onConfirm={() => void confirmDelete()} onCancel={() => setDeleteId(undefined)} />}
         </article>)}
       </div>
