@@ -92,9 +92,10 @@ export default function VaultBackupPage() {
     }
 
     setExportBusy(true)
-    setPrepared(undefined)
-    setPreparedFile(undefined)
     try {
+      if (prepared) await discardPreparedVault(prepared)
+      setPrepared(undefined)
+      setPreparedFile(undefined)
       const result = await prepareVaultExport(exportPassword, { onProgress: setExportProgress })
       const file = await loadPreparedVaultFile(result)
       setPrepared(result)
@@ -137,7 +138,6 @@ export default function VaultBackupPage() {
 
   const handleFile = (event: ChangeEvent<HTMLInputElement>): void => {
     clearFeedback()
-    setStaged(undefined)
     const file = event.target.files?.[0]
     if (!file) {
       setImportFile(undefined)
@@ -167,6 +167,8 @@ export default function VaultBackupPage() {
     setImportBusy(true)
     try {
       if (staged) await discardStagedVaultImport(staged)
+      setStaged(undefined)
+      setConfirmRestore(false)
       const result = await stageVaultImport(importFile, importPassword, { onProgress: setImportProgress })
       setStaged(result)
       setImportPassword('')
