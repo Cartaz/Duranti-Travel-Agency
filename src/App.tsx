@@ -6,6 +6,7 @@ import ArchivedTripsPage from './features/trips/ArchivedTripsPage'
 import TravelIndexPage from './features/trips/TravelIndexPage'
 import TripDetailPage from './features/trips/TripDetailPage'
 import TripFormPage from './features/trips/TripFormPage'
+import TravelerDocumentsPage from './features/travelers/TravelerDocumentsPage'
 import TravelerFormPage from './features/travelers/TravelerFormPage'
 import TravelersPage from './features/travelers/TravelersPage'
 import VaultBackupPage from './features/vault/VaultBackupPage'
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="travelers" element={<TravelersPage />} />
           <Route path="travelers/new" element={<TravelerFormPage mode="create" />} />
           <Route path="travelers/:travelerId/edit" element={<TravelerFormPage mode="edit" />} />
+          <Route path="travelers/:travelerId/documents" element={<TravelerDocumentsPage />} />
           <Route path="backup" element={<VaultBackupPage />} />
           <Route path="trips/new" element={<TripFormPage mode="create" />} />
           <Route path="trips/:tripId" element={<TripDetailPage />} />
