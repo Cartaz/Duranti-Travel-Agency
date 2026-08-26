@@ -28,13 +28,13 @@ export default function TravelersPage() {
 
   return <section className="travelers-page" aria-labelledby="travelers-title">
     <header className="travelers-heading"><div><p className="eyebrow">Rubrica locale</p><h1 id="travelers-title">Viaggiatori</h1><p>Crea una volta i profili e riutilizzali in tutti i capitoli del libro.</p></div><div className="travelers-heading-actions"><Link className="trip-secondary-action" to="/">Torna al libro</Link><Link className="trip-primary-action" to="/travelers/new">Nuovo profilo</Link></div></header>
-    <aside className="traveler-privacy-note"><strong>Solo archivio locale.</strong><span>I dati del profilo restano sul dispositivo. Passaporti e scansioni useranno sempre il percorso cifrato dedicato, non questa schermata.</span></aside>
+    <aside className="traveler-privacy-note"><strong>Profili locali, documenti cifrati.</strong><span>I dati anagrafici restano sul dispositivo; passaporti, numeri e scansioni passano dalla cassaforte cifrata dedicata.</span></aside>
     {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
     {loading && <p className="trip-feedback" role="status">Apro la rubrica locale…</p>}
     {!loading && travelers.length === 0 && <div className="travelers-empty"><strong>Nessun viaggiatore salvato.</strong><span>Crea il primo profilo per poterlo associare ai viaggi.</span></div>}
     <div className="traveler-card-list">{travelers.map((traveler) => {
       const birthDate = formatDate(traveler.birthDate)
-      return <article className="traveler-card" key={traveler.id}><div className="traveler-avatar" aria-hidden="true">{(traveler.firstName[0] ?? '').toUpperCase()}{(traveler.lastName[0] ?? '').toUpperCase()}</div><div className="traveler-card-copy"><strong>{traveler.displayName}</strong><span>{traveler.firstName} {traveler.lastName}</span><div className="traveler-meta">{traveler.nationality && <span>{traveler.nationality}</span>}{birthDate && <span>Nato/a il {birthDate}</span>}{traveler.email && <span>{traveler.email}</span>}</div></div><Link className="trip-secondary-action" to={`/travelers/${traveler.id}/edit`}>Modifica</Link></article>
+      return <article className="traveler-card" key={traveler.id}><div className="traveler-avatar" aria-hidden="true">{(traveler.firstName[0] ?? '').toUpperCase()}{(traveler.lastName[0] ?? '').toUpperCase()}</div><div className="traveler-card-copy"><strong>{traveler.displayName}</strong><span>{traveler.firstName} {traveler.lastName}</span><div className="traveler-meta">{traveler.nationality && <span>{traveler.nationality}</span>}{birthDate && <span>Nato/a il {birthDate}</span>}{traveler.email && <span>{traveler.email}</span>}</div></div><div className="travelers-heading-actions"><Link className="trip-secondary-action" to={`/travelers/${traveler.id}/documents`}>Documenti</Link><Link className="trip-secondary-action" to={`/travelers/${traveler.id}/edit`}>Modifica</Link></div></article>
     })}</div>
   </section>
 }
