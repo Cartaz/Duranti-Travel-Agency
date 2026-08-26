@@ -1,7 +1,19 @@
-import type { PlaceDiscoveryPort, PlaceImportCandidate } from '../../application/places/place-import'
-
 type NominatimAddress = Record<string, string | undefined>
 type NominatimExtraTags = Record<string, string | undefined>
+
+export interface NominatimPlaceCandidate {
+  name: string
+  formattedAddress?: string
+  city?: string
+  countryCode?: string
+  category?: string
+  phone?: string
+  openingHours?: string
+  latitude?: number
+  longitude?: number
+  provider: 'openstreetmap'
+  providerPlaceId: string
+}
 
 interface NominatimResult {
   place_id: number
@@ -44,7 +56,7 @@ function providerPlaceId(result: NominatimResult): string {
   return `nominatim:${result.place_id}`
 }
 
-function candidateFromResult(result: NominatimResult): PlaceImportCandidate {
+function candidateFromResult(result: NominatimResult): NominatimPlaceCandidate {
   const extra = result.extratags
   return {
     name: first(result.name, result.namedetails?.name, result.display_name.split(',')[0]) ?? result.display_name,
@@ -65,11 +77,11 @@ function cacheKey(query: string): string {
   return `${CACHE_PREFIX}${query.trim().toLocaleLowerCase('it-IT')}`
 }
 
-function readCache(query: string): PlaceImportCandidate[] | undefined {
+function readCache(query: string): NominatimPlaceCandidate[] | undefined {
   try {
     const raw = localStorage.getItem(cacheKey(query))
     if (!raw) return undefined
-    const parsed = JSON.parse(raw) as { storedAt: number; candidates: PlaceImportCandidate[] }
+    const parsed = JSON.parse(raw) as { storedAt: number; candidates: NominatimPlaceCandidate[] }
     if (!Number.isFinite(parsed.storedAt) || Date.now() - parsed.storedAt > CACHE_TTL_MS) {
       localStorage.removeItem(cacheKey(query))
       return undefined
@@ -80,7 +92,7 @@ function readCache(query: string): PlaceImportCandidate[] | undefined {
   }
 }
 
-function writeCache(query: string, candidates: PlaceImportCandidate[]): void {
+function writeCache(query: string, candidates: NominatimPlaceCandidate[]): void {
   try {
     localStorage.setItem(cacheKey(query), JSON.stringify({ storedAt: Date.now(), candidates }))
   } catch {
@@ -94,9 +106,9 @@ async function respectRateLimit(): Promise<void> {
   lastRequestStartedAt = Date.now()
 }
 
-export function createNominatimPlaceDiscovery(endpoint = 'https://nominatim.openstreetmap.org'): PlaceDiscoveryPort {
+export function createNominatimPlaceDiscovery(endpoint = 'https://nominatim.openstreetmap.org') {
   return {
-    async search(query: string): Promise<PlaceImportCandidate[]> {
+    async search(query: string): Promise<NominatimPlaceCandidate[]> {
       const cached = readCache(query)
       if (cached) return cached
 
