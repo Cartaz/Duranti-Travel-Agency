@@ -7,7 +7,11 @@ export interface TravelerDocumentSecurityState {
 }
 
 export class TravelerDocumentApplication {
-  constructor(private readonly dependencies: TravelerDocumentApplicationDependencies) {}
+  private readonly dependencies: TravelerDocumentApplicationDependencies
+
+  constructor(dependencies: TravelerDocumentApplicationDependencies) {
+    this.dependencies = dependencies
+  }
 
   async getSecurityState(): Promise<TravelerDocumentSecurityState> {
     return {
