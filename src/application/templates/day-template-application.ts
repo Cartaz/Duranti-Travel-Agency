@@ -243,15 +243,14 @@ export function createDayTemplateApplication(deps: DayTemplateApplicationDepende
     validateTemplate(template)
 
     const trip = await requireTrip({ trips: deps.trips }, tripId)
-    const existingDays = await deps.days.listByTrip(tripId)
     const now = deps.now()
-    const preparedDay = prepareTripDay(trip, existingDays, draft, now, deps.newId)
-    const day: Day = { ...preparedDay, templateId: template.id }
+    const preparedDay = prepareTripDay(trip, draft, now, deps.newId)
+    const dayWithoutSequence: Omit<Day, 'sequence'> = { ...preparedDay, templateId: template.id }
     const orderedBlocks = [...template.definition.blocks].sort((left, right) => left.position - right.position)
     const blocks: Block[] = orderedBlocks.map((definition, index) => ({
       id: deps.newId(),
       tripId,
-      dayId: day.id,
+      dayId: dayWithoutSequence.id,
       type: definition.type,
       position: index + 1,
       content: reusableBlockContent(definition.type, cloneContent(definition.content), true, deps.newId),
@@ -259,8 +258,7 @@ export function createDayTemplateApplication(deps: DayTemplateApplicationDepende
       updatedAt: now,
     }))
 
-    await deps.transactions.createDayWithBlocks(day, blocks)
-    return day
+    return deps.transactions.createDayWithBlocks(dayWithoutSequence, blocks)
   }
 
   return {
