@@ -10,6 +10,12 @@ function compareManualUntimed(left: Itinerary, right: Itinerary): number {
     || left.id.localeCompare(right.id)
 }
 
+function compareManualForRepair(left: Itinerary, right: Itinerary): number {
+  return (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER)
+    || left.createdAt.localeCompare(right.createdAt)
+    || left.id.localeCompare(right.id)
+}
+
 export class ItineraryRepository extends Repository<Itinerary> {
   constructor() {
     super(db.itineraries)
@@ -41,9 +47,37 @@ export class ItineraryRepository extends Repository<Itinerary> {
       }
       if (await db.itineraries.get(value.id)) throw new Error('Esiste già una tappa con questo identificatore.')
 
-      const siblings = (await db.itineraries.where('dayId').equals(value.dayId).toArray())
+      const dayItems = (await db.itineraries.where('dayId').equals(value.dayId).toArray())
         .filter((item) => !item.deletedAt && item.tripId === value.tripId)
-      const position = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
+      const manualSiblings = dayItems
+        .filter((item) => !item.reservationId && !item.blockId)
+        .sort(compareManualForRepair)
+      const hasDuplicateManualPosition = manualSiblings.some((item, index) => (
+        index > 0
+        && item.position !== undefined
+        && item.position === manualSiblings[index - 1].position
+      ))
+
+      if (hasDuplicateManualPosition) {
+        const repairedAt = new Date().toISOString()
+        const fixedPositions = dayItems
+          .filter((item) => item.reservationId || item.blockId)
+          .map((item) => item.position ?? 0)
+        const basePosition = fixedPositions.reduce((maximum, position) => Math.max(maximum, position), 0)
+        const repairs = manualSiblings
+          .map((item, index) => {
+            const position = basePosition + index + 1
+            return item.position === position ? undefined : { ...item, position, updatedAt: repairedAt }
+          })
+          .filter((item): item is Itinerary => item !== undefined)
+        if (repairs.length > 0) await db.itineraries.bulkPut(repairs)
+      }
+
+      const position = hasDuplicateManualPosition
+        ? dayItems
+          .filter((item) => item.reservationId || item.blockId)
+          .reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + manualSiblings.length + 1
+        : dayItems.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
       const itinerary: Itinerary = { ...value, position }
       await db.itineraries.add(itinerary)
       return itinerary
