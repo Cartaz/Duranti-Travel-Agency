@@ -8,6 +8,7 @@ export interface PlannerBlockRepositoryPort {
   listByDay(dayId: string): Promise<Block[]>
   get(id: string): Promise<Block | undefined>
   put(value: Block): Promise<unknown>
+  appendToDay(value: Omit<Block, 'position'>): Promise<Block>
   softDelete(id: string): Promise<SoftDeleteResult>
   moveWithinDay(blockId: string, tripId: string, dayId: string, direction: BlockMoveDirection): Promise<BlockMoveResult>
 }
