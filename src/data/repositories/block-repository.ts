@@ -1,9 +1,15 @@
-import type { Block } from '../../domain/entities'
+import type { Block, Itinerary } from '../../domain/entities'
 import { db } from '../db/dtagency-db'
 import { Repository } from './base-repository'
 
 export type BlockMoveDirection = 'up' | 'down'
 export type BlockMoveResult = 'moved' | 'boundary' | 'not-found' | 'invalid-context'
+
+function compareBlocksForRepair(left: Block, right: Block): number {
+  return left.position - right.position
+    || left.createdAt.localeCompare(right.createdAt)
+    || left.id.localeCompare(right.id)
+}
 
 export class BlockRepository extends Repository<Block> {
   constructor() {
@@ -21,7 +27,7 @@ export class BlockRepository extends Repository<Block> {
   }
 
   async appendToDay(value: Omit<Block, 'position'>): Promise<Block> {
-    return db.transaction('rw', db.trips, db.days, db.blocks, async () => {
+    return db.transaction('rw', db.trips, db.days, db.blocks, db.itineraries, async () => {
       const trip = await db.trips.get(value.tripId)
       if (!trip || trip.deletedAt) throw new Error('Il viaggio non esiste o è stato eliminato.')
       if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di modificare il planner.')
@@ -35,7 +41,32 @@ export class BlockRepository extends Repository<Block> {
 
       const siblings = (await db.blocks.where('dayId').equals(value.dayId).toArray())
         .filter((block) => !block.deletedAt && block.tripId === value.tripId)
-      const position = siblings.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
+        .sort(compareBlocksForRepair)
+      const hasDuplicatePosition = siblings.some((block, index) => index > 0 && block.position === siblings[index - 1].position)
+
+      if (hasDuplicatePosition) {
+        const repairedAt = new Date().toISOString()
+        const repairs = siblings
+          .map((block, index) => block.position === index + 1 ? undefined : { ...block, position: index + 1, updatedAt: repairedAt })
+          .filter((block): block is Block => block !== undefined)
+
+        if (repairs.length > 0) {
+          await db.blocks.bulkPut(repairs)
+          const repairedPositionByBlockId = new Map(repairs.map((block) => [block.id, block.position]))
+          const linkedItineraries = (await db.itineraries.where('dayId').equals(value.dayId).toArray())
+            .filter((item) => !item.deletedAt && item.tripId === value.tripId && item.blockId && repairedPositionByBlockId.has(item.blockId))
+          const itineraryRepairs: Itinerary[] = linkedItineraries.map((item) => ({
+            ...item,
+            position: repairedPositionByBlockId.get(item.blockId as string),
+            updatedAt: repairedAt,
+          }))
+          if (itineraryRepairs.length > 0) await db.itineraries.bulkPut(itineraryRepairs)
+        }
+      }
+
+      const position = hasDuplicatePosition
+        ? siblings.length + 1
+        : siblings.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
       const block: Block = { ...value, position }
       await db.blocks.add(block)
       return block
