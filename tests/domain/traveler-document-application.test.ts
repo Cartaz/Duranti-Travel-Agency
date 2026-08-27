@@ -61,7 +61,9 @@ test('traveler document creation rejects a missing or deleted parent before pers
   const parents = new Map([
     ['traveler-deleted', {
       id: 'traveler-deleted',
-      name: 'Deleted traveler',
+      firstName: 'Deleted',
+      lastName: 'Traveler',
+      displayName: 'Deleted Traveler',
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-02T00:00:00Z',
       deletedAt: '2026-01-03T00:00:00Z',
