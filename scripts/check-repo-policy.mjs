@@ -29,7 +29,7 @@ const forbiddenBridgeFiles = new Set([
   'src/features/itinerary/trip-itinerary-service.ts',
 ])
 const forbiddenBridgeImportTokens = [
-  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service', '/templates/day-template-service', '/expenses/expense-service', '/expenses/expense-summary-service', '/travelers/traveler-service', '/places/place-service', '/itinerary/itinerary-service', '/itinerary/itinerary-order-service', '/itinerary/itinerary-orphan-service', '/itinerary/trip-itinerary-service',
+  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service', '/templates/day-template-service', '/templates/personal-day-template-service', '/expenses/expense-service', '/expenses/expense-summary-service', '/travelers/traveler-service', '/places/place-service', '/itinerary/itinerary-service', '/itinerary/itinerary-order-service', '/itinerary/itinerary-orphan-service', '/itinerary/trip-itinerary-service',
   '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service', '../media/day-media-service', '../templates/day-template-service', '../templates/personal-day-template-service', '../expenses/expense-service', '../expenses/expense-summary-service', '../travelers/traveler-service', '../places/place-service', '../itinerary/itinerary-service', '../itinerary/itinerary-order-service', '../itinerary/itinerary-orphan-service', '../itinerary/trip-itinerary-service',
   './block-service', './reservation-service', './day-media-service', './day-template-service', './personal-day-template-service', './expense-service', './expense-summary-service', './traveler-service', './place-service', './itinerary-service', './itinerary-order-service', './itinerary-orphan-service', './trip-itinerary-service',
 ]
@@ -41,6 +41,9 @@ const featureDirectoryNames = new Set([
 ])
 const plannerPagePaths = new Set(['src/features/planner/DayPlannerPage.tsx', 'src/features/planner/GuidedDayPlannerPage.tsx'])
 const presentationCompositionImports = new Map([
+  ['src/features/days/DayFormPage.tsx', new Set([
+    '../templates/DayTemplateManager',
+  ])],
   ['src/features/planner/DayPlannerPage.tsx', new Set([
     '../expenses/ExpenseBlockEditor',
     '../itinerary/DayItinerarySummary',
