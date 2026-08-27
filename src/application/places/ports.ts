@@ -1,5 +1,16 @@
 import type { Block, Day, Place, Trip } from '../../domain/entities'
-import type { SafeDeletePlaceResult } from '../../data/repositories/place-repository'
+
+export interface PlaceReferenceCounts {
+  blocks: number
+  reservations: number
+  itineraries: number
+  media: number
+}
+
+export type SafeDeletePlaceResult =
+  | { status: 'not-found' }
+  | { status: 'in-use'; references: PlaceReferenceCounts }
+  | { status: 'deleted' }
 
 export interface PlaceTripPort { get(id: string): Promise<Trip | undefined> }
 export interface PlaceDayPort { get(id: string): Promise<Day | undefined> }
