@@ -81,7 +81,7 @@ export async function runApplicationContractTests(): Promise<ApplicationContract
     assert(stored.endDate === '2026-09-10', 'Rejected trip update mutated persisted state.')
   }))
 
-  results.push(await contract('Day use case assigns the next sequence using only days from its trip', async () => {
+  results.push(await contract('Day use case delegates sequence allocation to its transactional append port', async () => {
     const timestamp = '2026-08-25T12:00:00.000Z'
     const trip: Trip = {
       id: 'trip-1',
@@ -105,9 +105,14 @@ export async function runApplicationContractTests(): Promise<ApplicationContract
     const application = createDayApplication({
       trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
       days: {
-        listByTrip: async (tripId) => tripId === trip.id ? [...tripDays] : [],
+        listByTrip: async () => { throw new Error('create must not pre-read trip days') },
         get: async () => undefined,
-        put: async (value) => { saved = value; return value.id },
+        put: async () => { throw new Error('create must use appendToTrip') },
+        appendToTrip: async (value) => {
+          const sequence = tripDays.reduce((maximum, day) => Math.max(maximum, day.sequence), 0) + 1
+          saved = { ...value, sequence }
+          return saved
+        },
       },
       now: () => '2026-08-25T13:00:00.000Z',
       newId: () => 'day-new',
@@ -115,7 +120,7 @@ export async function runApplicationContractTests(): Promise<ApplicationContract
 
     const created = await application.createTripDay(trip.id, { date: '2026-09-04', title: 'Fourth day' })
     assert(created.sequence === 4, `Expected sequence 4, got ${created.sequence}.`)
-    assert(saved?.id === created.id, 'Created day was not persisted through the port.')
+    assert(saved?.id === created.id, 'Created day was not persisted through the append port.')
   }))
 
   results.push(await contract('Expense summary includes explicit FX conversions in trip budget', async () => {
