@@ -169,13 +169,13 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
     if (current && (current.reservationId || current.blockId)) throw new Error('Le tappe derivate da prenotazioni si modificano dal relativo blocco del planner.')
     if (current && (current.tripId !== tripId || current.dayId !== dayId)) throw new Error('La tappa non appartiene a questa giornata.')
     const draft = await normalizeManualDraft(tripId, dayId, input, current?.placeId)
-    const now = deps.now(); let position = current?.position
-    if (!current) {
-      const siblings = (await deps.itineraries.listByDay(dayId)).filter((item) => item.tripId === tripId && item.dayId === dayId)
-      position = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
+    const now = deps.now()
+    if (current) {
+      const itinerary: Itinerary = { ...current, ...draft, tripId, dayId, position: current.position, updatedAt: now }
+      await deps.itineraries.put(itinerary)
+      return itinerary
     }
-    const itinerary: Itinerary = current ? { ...current, ...draft, tripId, dayId, position, updatedAt: now } : { id: deps.newId(), ...draft, tripId, dayId, position, createdAt: now, updatedAt: now }
-    await deps.itineraries.put(itinerary); return itinerary
+    return deps.itineraries.appendManualToDay({ id: deps.newId(), ...draft, tripId, dayId, createdAt: now, updatedAt: now })
   }
   async function deleteManualItineraryItem(tripId: string, dayId: string, itineraryId: string): Promise<void> {
     await assertContext(tripId, dayId, true); const itinerary = await deps.itineraries.get(itineraryId); if (!itinerary) return
