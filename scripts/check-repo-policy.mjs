@@ -29,14 +29,29 @@ const forbiddenBridgeFiles = new Set([
   'src/features/itinerary/trip-itinerary-service.ts',
 ])
 const forbiddenBridgeImportTokens = [
-  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service', '/templates/day-template-service', '/templates/personal-day-template-service', '/expenses/expense-service', '/expenses/expense-summary-service', '/travelers/traveler-service', '/places/place-service', '/itinerary/itinerary-service', '/itinerary/itinerary-order-service', '/itinerary/itinerary-orphan-service', '/itinerary/trip-itinerary-service',
+  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service', '/templates/day-template-service', '/expenses/expense-service', '/expenses/expense-summary-service', '/travelers/traveler-service', '/places/place-service', '/itinerary/itinerary-service', '/itinerary/itinerary-order-service', '/itinerary/itinerary-orphan-service', '/itinerary/trip-itinerary-service',
   '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service', '../media/day-media-service', '../templates/day-template-service', '../templates/personal-day-template-service', '../expenses/expense-service', '../expenses/expense-summary-service', '../travelers/traveler-service', '../places/place-service', '../itinerary/itinerary-service', '../itinerary/itinerary-order-service', '../itinerary/itinerary-orphan-service', '../itinerary/trip-itinerary-service',
   './block-service', './reservation-service', './day-media-service', './day-template-service', './personal-day-template-service', './expense-service', './expense-summary-service', './traveler-service', './place-service', './itinerary-service', './itinerary-order-service', './itinerary-orphan-service', './trip-itinerary-service',
 ]
 const applicationBackedFeatureRoots = [
   'src/features/trips/', 'src/features/days/', 'src/features/planner/', 'src/features/reservations/', 'src/features/media/', 'src/features/templates/', 'src/features/expenses/', 'src/features/travelers/', 'src/features/places/', 'src/features/itinerary/',
 ]
+const featureDirectoryNames = new Set([
+  'days', 'expenses', 'itinerary', 'media', 'places', 'planner', 'reservations', 'storage-lab', 'templates', 'travel-book', 'travelers', 'trips', 'vault',
+])
 const plannerPagePaths = new Set(['src/features/planner/DayPlannerPage.tsx', 'src/features/planner/GuidedDayPlannerPage.tsx'])
+const presentationCompositionImports = new Map([
+  ['src/features/planner/DayPlannerPage.tsx', new Set([
+    '../expenses/ExpenseBlockEditor',
+    '../itinerary/DayItinerarySummary',
+    '../places/maps-url',
+    '../reservations/ReservationBlockEditor',
+  ])],
+  ['src/features/planner/GuidedDayPlannerPage.tsx', new Set([
+    '../media/DayMediaGallery',
+    '../templates/DayTemplateSaver',
+  ])],
+])
 
 const violations = []
 
@@ -52,6 +67,22 @@ function enforceNoBridgeImports(path, content) {
   if (!path.startsWith('src/')) return
   for (const token of forbiddenBridgeImportTokens) {
     if (content.includes(token)) violations.push(`${path}: removed feature-service bridge import is forbidden (${token})`)
+  }
+}
+
+function enforcePresentationFeatureImports(path, content) {
+  if (!path.startsWith('src/features/')) return
+  const currentFeature = path.split('/')[2]
+  const allowed = presentationCompositionImports.get(path) ?? new Set()
+  const importPattern = /from\s+['"](\.\.\/([^/'"]+)\/[^'"]+)['"]/g
+  let match
+  while ((match = importPattern.exec(content)) !== null) {
+    const importPath = match[1]
+    const targetFeature = match[2]
+    if (!featureDirectoryNames.has(targetFeature) || targetFeature === currentFeature) continue
+    if (!allowed.has(importPath)) {
+      violations.push(`${path}: cross-feature presentation import is forbidden (${importPath}); compose through an explicit presentation root or shared UI boundary`)
+    }
   }
 }
 
@@ -74,6 +105,7 @@ function enforceDependencyDirection(path, content) {
     violations.push(`${path}: planner pages must resolve application capabilities through useApplicationServices`)
   }
 
+  enforcePresentationFeatureImports(normalized, content)
   enforceNoBridgeImports(normalized, content)
 }
 
