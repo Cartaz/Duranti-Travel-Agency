@@ -2,6 +2,7 @@ import { runApplicationContractTests } from './application-contracts'
 import { runDayTemplateTransactionContract } from './day-template-transaction-contract'
 import { runItineraryQueryContract } from './itinerary-query-contract'
 import { runMediaHistoricalPlaceContract } from './media-historical-place-contract'
+import { runOrderingConcurrencyContract } from './ordering-concurrency-contract'
 import { runTravelerDocumentQueryContract } from './traveler-document-query-contract'
 
 const results = [
@@ -10,6 +11,7 @@ const results = [
   await runMediaHistoricalPlaceContract(),
   await runDayTemplateTransactionContract(),
   await runTravelerDocumentQueryContract(),
+  await runOrderingConcurrencyContract(),
 ]
 ;(window as Window & { __DTAGENCY_APPLICATION_RESULTS__?: unknown }).__DTAGENCY_APPLICATION_RESULTS__ = results
 
