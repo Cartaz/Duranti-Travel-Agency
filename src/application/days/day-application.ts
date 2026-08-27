@@ -9,6 +9,8 @@ export interface DayDraft {
   journalText?: string
 }
 
+export type PreparedTripDay = Omit<Day, 'sequence'>
+
 function cleanOptional(value: string | undefined): string | undefined {
   const cleaned = value?.trim()
   return cleaned ? cleaned : undefined
@@ -53,19 +55,16 @@ function validateDraft(input: DayDraft): DayDraft {
 
 export function prepareTripDay(
   trip: Trip,
-  existingDays: Day[],
   input: DayDraft,
   now: string,
   newId: () => string,
-): Day {
+): PreparedTripDay {
   if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di modificare le sue giornate.')
   const draft = validateDraft(input)
   assertDayDateWithinTripRange(trip, draft.date)
-  const nextSequence = existingDays.reduce((maximum, day) => Math.max(maximum, day.sequence), 0) + 1
   return {
     id: newId(),
     tripId: trip.id,
-    sequence: nextSequence,
     createdAt: now,
     updatedAt: now,
     ...draft,
@@ -99,10 +98,8 @@ export function createDayApplication(deps: DayApplicationDependencies): DayAppli
 
   async function createTripDay(tripId: string, input: DayDraft): Promise<Day> {
     const trip = await getEditableTrip(tripId)
-    const days = await listTripDays(tripId)
-    const entity = prepareTripDay(trip, days, input, deps.now(), deps.newId)
-    await deps.days.put(entity)
-    return entity
+    const prepared = prepareTripDay(trip, input, deps.now(), deps.newId)
+    return deps.days.appendToTrip(prepared)
   }
 
   async function updateTripDay(tripId: string, dayId: string, input: DayDraft): Promise<Day> {
