@@ -24,11 +24,14 @@ The initial discovery adapter uses the public Nominatim search endpoint only for
 
 The adapter:
 
-- caps itself to at most one network request per second;
+- serializes network calls through one module-level queue and starts at most one in-process request per second;
+- rechecks the seven-day local cache after entering the queue, so concurrent identical searches can reuse the first completed lookup;
 - caches successful query results locally for seven days;
 - sends a browser referrer policy suitable for application identification;
 - exposes OpenStreetMap attribution in the UI;
 - performs no autocomplete, background refresh, bulk download or systematic POI harvesting.
+
+The queue coordinates callers in the current JavaScript context only. Separate tabs have independent module state and are **not** claimed to share a rate-limit lease. This is acceptable for the current explicit, low-volume personal-use flow; if multi-tab discovery becomes common, add a cross-tab lease or move to a provider whose quota model supports the intended traffic.
 
 The public Nominatim instance is an adapter, not an architectural dependency. If DTAgency grows beyond moderate personal use, the adapter must be switched to another compliant provider or a self-hosted service before increasing traffic.
 
