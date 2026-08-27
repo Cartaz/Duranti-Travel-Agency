@@ -1,3 +1,5 @@
+import { writeAndVerifyOpfsFile } from './verified-write'
+
 const ROOT_DIRECTORY = 'dtagency'
 const MEDIA_DIRECTORY = 'media'
 
@@ -60,17 +62,10 @@ export async function writeMediaFile(mediaId: string, source: Blob): Promise<str
   const mediaDirectory = await getMediaDirectory()
   const itemDirectory = await mediaDirectory.getDirectoryHandle(mediaId, { create: true })
   const fileHandle = await itemDirectory.getFileHandle('original', { create: true })
-  const writable = await fileHandle.createWritable()
 
   try {
-    await writable.write(source)
-    await writable.close()
+    await writeAndVerifyOpfsFile(fileHandle, source, source.size)
   } catch (error) {
-    try {
-      await writable.abort()
-    } catch {
-      // Preserve the original write failure.
-    }
     try {
       await mediaDirectory.removeEntry(mediaId, { recursive: true })
     } catch {
