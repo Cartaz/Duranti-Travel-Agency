@@ -1,3 +1,68 @@
+.app-readiness-stack {
+  width: min(980px, calc(100% - 32px));
+  margin: 14px auto 0;
+  display: grid;
+  gap: 10px;
+}
+
+.app-readiness-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 13px 14px;
+  border: 1px solid rgba(104, 86, 68, .28);
+  border-radius: 14px;
+  background: rgba(255, 252, 246, .82);
+  box-shadow: 0 8px 24px rgba(53, 42, 31, .06);
+}
+
+.app-readiness-notice.warning {
+  border-color: rgba(157, 112, 42, .38);
+  background: rgba(255, 248, 226, .9);
+}
+
+.app-readiness-notice.info {
+  border-color: rgba(73, 105, 125, .28);
+  background: rgba(239, 247, 250, .9);
+}
+
+.app-readiness-notice > div:first-child {
+  min-width: 0;
+}
+
+.app-readiness-notice strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.app-readiness-notice p {
+  margin: 0;
+  line-height: 1.45;
+  font-size: 12px;
+}
+
+.app-readiness-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-readiness-actions a,
+.app-readiness-actions button {
+  min-height: 34px;
+  padding: 7px 9px;
+  font-size: 12px;
+}
+
+.app-readiness-actions a {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 .app-validation-notice {
   position: fixed;
   z-index: 100;
@@ -73,6 +138,15 @@
 }
 
 @media (max-width: 520px) {
+  .app-readiness-notice {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .app-readiness-actions {
+    align-self: flex-end;
+  }
+
   .app-validation-notice {
     align-items: stretch;
     flex-direction: column;
