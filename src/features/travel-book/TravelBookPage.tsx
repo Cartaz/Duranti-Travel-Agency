@@ -87,7 +87,7 @@ export default function TravelBookPage() {
             </div>
           </section>
           <nav className="travel-book-chapter-strip" aria-label="Indice dei capitoli">
-            {book.chapters.map((item, index) => <button type="button" key={item.key} className={index === chapterIndex ? 'is-active' : ''} aria-current={index === chapterIndex ? 'page' : undefined} onClick={() => setChapterIndex(index)}><span>{index + 1}</span>{item.title ?? `Giorno ${item.sequence}`}</button>)}
+            {book.chapters.map((item, index) => <button type="button" key={item.dayId} className={index === chapterIndex ? 'is-active' : ''} aria-current={index === chapterIndex ? 'page' : undefined} onClick={() => setChapterIndex(index)}><span>{index + 1}</span>{item.title ?? `Giorno ${item.sequence}`}</button>)}
           </nav>
         </>
       ) : null}
