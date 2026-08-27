@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
+import type { AppReadinessNotice } from '../readiness'
 import './app-shell.css'
 
 function navClassName({ isActive }: { isActive: boolean }): string {
@@ -71,9 +72,15 @@ function readableValidationMessage(control: ValidatableControl): string {
   return control.validationMessage || `Controlla “${label}”.`
 }
 
-export default function AppShell() {
+export interface AppShellProps {
+  readinessNotices?: AppReadinessNotice[]
+}
+
+export default function AppShell({ readinessNotices = [] }: AppShellProps) {
   const [validationNotice, setValidationNotice] = useState('')
+  const [dismissedReadinessIds, setDismissedReadinessIds] = useState<Set<string>>(() => new Set())
   const validationLockRef = useRef(false)
+  const visibleReadinessNotices = readinessNotices.filter((notice) => !dismissedReadinessIds.has(notice.id))
 
   const handleInvalid = (event: FormEvent<HTMLElement>): void => {
     event.preventDefault()
@@ -111,6 +118,29 @@ export default function AppShell() {
         </NavLink>
         <span className="offline-badge">offline-first</span>
       </header>
+
+      {visibleReadinessNotices.length > 0 && (
+        <section className="app-readiness-stack" aria-label="Stato archivio locale">
+          {visibleReadinessNotices.map((notice) => (
+            <div key={notice.id} className={`app-readiness-notice ${notice.kind}`} role="status">
+              <div>
+                <strong>{notice.title}</strong>
+                <p>{notice.message}</p>
+              </div>
+              <div className="app-readiness-actions">
+                {notice.backupAction && <Link to="/backup">Apri backup</Link>}
+                <button
+                  type="button"
+                  onClick={() => setDismissedReadinessIds((current) => new Set([...current, notice.id]))}
+                  aria-label={`Nascondi avviso: ${notice.title}`}
+                >
+                  Chiudi
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       <main className="app-content">
         <Outlet />
