@@ -2,6 +2,13 @@ import type { Day } from '../../domain/entities'
 import { db } from '../db/dtagency-db'
 import { Repository } from './base-repository'
 
+function compareDaysForRepair(left: Day, right: Day): number {
+  return left.sequence - right.sequence
+    || left.date.localeCompare(right.date)
+    || left.createdAt.localeCompare(right.createdAt)
+    || left.id.localeCompare(right.id)
+}
+
 export class DayRepository extends Repository<Day> {
   constructor() {
     super(db.days)
@@ -21,7 +28,18 @@ export class DayRepository extends Repository<Day> {
 
       const siblings = (await db.days.where('tripId').equals(value.tripId).toArray())
         .filter((day) => !day.deletedAt)
-      const sequence = siblings.reduce((maximum, day) => Math.max(maximum, day.sequence), 0) + 1
+        .sort(compareDaysForRepair)
+      const hasDuplicateSequence = siblings.some((day, index) => index > 0 && day.sequence === siblings[index - 1].sequence)
+
+      if (hasDuplicateSequence) {
+        const repairedAt = new Date().toISOString()
+        const repairs = siblings
+          .map((day, index) => day.sequence === index + 1 ? undefined : { ...day, sequence: index + 1, updatedAt: repairedAt })
+          .filter((day): day is Day => day !== undefined)
+        if (repairs.length > 0) await db.days.bulkPut(repairs)
+      }
+
+      const sequence = siblings.length + 1
       const day: Day = { ...value, sequence }
       await db.days.add(day)
       return day
