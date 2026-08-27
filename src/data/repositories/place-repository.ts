@@ -28,11 +28,18 @@ export class PlaceRepository extends Repository<Place> {
       const place = await db.places.get(id)
       if (!place || place.deletedAt) return { status: 'not-found' }
 
+      // Block content.placeId and Media.placeId are intentionally unindexed in schema v1.
+      // Use cursor-backed counts so the rare destructive check does not materialize either
+      // table in memory. Add indexes only as part of a justified schema-v2 migration.
       const [blocks, reservations, itineraries, media] = await Promise.all([
-        db.blocks.toArray().then((items) => items.filter((item) => !item.deletedAt && blockReferencesPlace(item.content, id)).length),
-        db.reservations.where('placeId').equals(id).toArray().then((items) => items.filter((item) => !item.deletedAt).length),
-        db.itineraries.where('placeId').equals(id).toArray().then((items) => items.filter((item) => !item.deletedAt).length),
-        db.media.toArray().then((items) => items.filter((item) => !item.deletedAt && item.placeId === id).length),
+        db.blocks
+          .filter((item) => !item.deletedAt && blockReferencesPlace(item.content, id))
+          .count(),
+        db.reservations.where('placeId').equals(id).filter((item) => !item.deletedAt).count(),
+        db.itineraries.where('placeId').equals(id).filter((item) => !item.deletedAt).count(),
+        db.media
+          .filter((item) => !item.deletedAt && item.placeId === id)
+          .count(),
       ])
       const references = { blocks, reservations, itineraries, media }
       if (Object.values(references).some((count) => count > 0)) return { status: 'in-use', references }
