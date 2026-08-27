@@ -89,9 +89,4 @@ export class Repository<T extends EntityBase> {
     await this.table.delete(id)
     return 'purged'
   }
-
-  async count(options: RepositoryReadOptions = {}): Promise<number> {
-    if (options.includeDeleted) return this.table.count()
-    return (await this.list()).length
-  }
 }
