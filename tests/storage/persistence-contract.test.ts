@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const mediaStore = await readFile(new URL('../../src/data/opfs/opfs-store.ts', import.meta.url), 'utf8')
 const privateStore = await readFile(new URL('../../src/data/opfs/private-document-store.ts', import.meta.url), 'utf8')
+const verifiedWrite = await readFile(new URL('../../src/data/opfs/verified-write.ts', import.meta.url), 'utf8')
 const encryption = await readFile(new URL('../../src/security/local-encryption.ts', import.meta.url), 'utf8')
 
 test('managed OPFS trees live under the DTAgency root', () => {
@@ -11,6 +12,15 @@ test('managed OPFS trees live under the DTAgency root', () => {
   assert.match(privateStore, /const ROOT_DIRECTORY = 'dtagency'/)
   assert.match(mediaStore, /`\$\{ROOT_DIRECTORY\}\/\$\{MEDIA_DIRECTORY\}\/\$\{mediaId\}\/original`/)
   assert.match(privateStore, /const DOCUMENT_DIRECTORY = 'traveler-documents'/)
+})
+
+test('normal OPFS writes verify the final persisted byte size', () => {
+  assert.match(verifiedWrite, /await fileHandle\.getFile\(\)/)
+  assert.match(verifiedWrite, /stored\.size !== expectedBytes/)
+  assert.match(mediaStore, /writeAndVerifyOpfsFile\(fileHandle, source, source\.size\)/)
+  assert.match(privateStore, /writeAndVerifyOpfsFile\(fileHandle, envelope, envelope\.byteLength\)/)
+  assert.doesNotMatch(mediaStore, /fileHandle\.createWritable\(\)/)
+  assert.doesNotMatch(privateStore, /fileHandle\.createWritable\(\)/)
 })
 
 test('private document envelope uses the DTAgency v1 marker', () => {
