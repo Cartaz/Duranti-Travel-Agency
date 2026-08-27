@@ -1,4 +1,4 @@
-import type { TravelerDocument, TravelerDocumentAttachment, TravelerDocumentSecret } from '../../domain/entities'
+import type { Traveler, TravelerDocument, TravelerDocumentAttachment, TravelerDocumentSecret } from '../../domain/entities'
 
 export type TravelerDocumentMetadata = Omit<TravelerDocument, 'encryptedPayload'>
 export type TravelerDocumentView = TravelerDocumentMetadata & {
@@ -18,6 +18,10 @@ export interface TravelerDocumentRepositoryPort {
   softDelete(id: string): Promise<'not-found' | 'already-deleted' | 'tombstoned'>
 }
 
+export interface TravelerReaderPort {
+  get(id: string): Promise<Traveler | undefined>
+}
+
 export interface LocalSecurityPort {
   isConfigured(): Promise<boolean>
   isUnlocked(): boolean
@@ -28,5 +32,6 @@ export interface LocalSecurityPort {
 
 export interface TravelerDocumentApplicationDependencies {
   documents: TravelerDocumentRepositoryPort
+  travelers: TravelerReaderPort
   security: LocalSecurityPort
 }
