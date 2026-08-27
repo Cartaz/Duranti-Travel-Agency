@@ -1,4 +1,5 @@
 import { decryptBytes, encryptBytes } from '../../security/local-encryption'
+import { writeAndVerifyOpfsFile } from './verified-write'
 
 const ROOT_DIRECTORY = 'dtagency'
 const PRIVATE_DIRECTORY = 'private'
@@ -224,23 +225,18 @@ export async function writeEncryptedDocumentAttachment(
     )
     const envelope = buildEnvelope(encrypted.iv, encrypted.ciphertext)
     const fileHandle = await documentDirectory.getFileHandle(fileName, { create: true })
-    const writable = await fileHandle.createWritable()
 
     try {
-      await writable.write(envelope)
-      await writable.close()
+      await writeAndVerifyOpfsFile(fileHandle, envelope, envelope.byteLength)
     } catch (error) {
-      try {
-        await writable.abort()
-      } catch {
-        // Preserve the original write error.
-      }
       try {
         await documentDirectory.removeEntry(fileName)
       } catch {
         // Best-effort rollback only.
       }
       throw error
+    } finally {
+      envelope.fill(0)
     }
   } finally {
     plaintext.fill(0)
