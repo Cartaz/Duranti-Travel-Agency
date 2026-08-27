@@ -17,6 +17,29 @@ async function createTrip(page, title) {
   await expect(page.getByRole('heading', { name: title })).toBeVisible()
 }
 
+async function waitForPersistedPlannerText(page, expectedText) {
+  await page.waitForFunction(async (text) => {
+    const request = indexedDB.open('dtagency')
+    const database = await new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+
+    try {
+      const transaction = database.transaction('blocks', 'readonly')
+      const store = transaction.objectStore('blocks')
+      const rows = await new Promise((resolve, reject) => {
+        const all = store.getAll()
+        all.onsuccess = () => resolve(all.result)
+        all.onerror = () => reject(all.error)
+      })
+      return rows.some((row) => !row.deletedAt && row.type === 'text' && row.content?.text === text)
+    } finally {
+      database.close()
+    }
+  }, expectedText)
+}
+
 test('real UI persists a planner note across reload', async ({ page }) => {
   await openApp(page)
   await createTrip(page, 'Journey UI persistence')
@@ -35,14 +58,15 @@ test('real UI persists a planner note across reload', async ({ page }) => {
   await page.getByRole('button', { name: /Appunti/ }).click()
   await expect(page.getByText('Appunti aggiunto. Compila i dettagli nel nuovo blocco.')).toBeVisible()
 
+  const persistedNote = 'Nota persistente creata dal journey Playwright.'
   const note = page.getByPlaceholder('Scrivi appunti, idee, dettagli della giornata…')
-  await note.fill('Nota persistente creata dal journey Playwright.')
+  await note.fill(persistedNote)
   await page.getByRole('button', { name: 'Salva blocco' }).click()
-  await expect(note).toHaveValue('Nota persistente creata dal journey Playwright.')
+  await waitForPersistedPlannerText(page, persistedNote)
 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Prima giornata UI' })).toBeVisible()
-  await expect(page.getByPlaceholder('Scrivi appunti, idee, dettagli della giornata…')).toHaveValue('Nota persistente creata dal journey Playwright.')
+  await expect(page.getByPlaceholder('Scrivi appunti, idee, dettagli della giornata…')).toHaveValue(persistedNote)
 })
 
 test('real UI archives and restores a trip lifecycle', async ({ page }) => {
