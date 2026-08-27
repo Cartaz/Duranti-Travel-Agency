@@ -33,6 +33,7 @@ const CACHE_PREFIX = 'dtagency:nominatim:v1:'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const MIN_REQUEST_INTERVAL_MS = 1_000
 let lastRequestStartedAt = 0
+let requestQueue: Promise<void> = Promise.resolve()
 
 function first(...values: Array<string | undefined>): string | undefined {
   return values.find((value) => value?.trim())?.trim()
@@ -100,10 +101,46 @@ function writeCache(query: string, candidates: NominatimPlaceCandidate[]): void 
   }
 }
 
-async function respectRateLimit(): Promise<void> {
+async function waitForRequestSlot(): Promise<void> {
   const waitMs = Math.max(0, MIN_REQUEST_INTERVAL_MS - (Date.now() - lastRequestStartedAt))
   if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
   lastRequestStartedAt = Date.now()
+}
+
+function serializeRequest<T>(operation: () => Promise<T>): Promise<T> {
+  const scheduled = requestQueue.then(operation, operation)
+  requestQueue = scheduled.then(() => undefined, () => undefined)
+  return scheduled
+}
+
+async function fetchCandidates(query: string, endpoint: string): Promise<NominatimPlaceCandidate[]> {
+  await waitForRequestSlot()
+  const url = new URL('/search', endpoint)
+  url.searchParams.set('q', query)
+  url.searchParams.set('format', 'jsonv2')
+  url.searchParams.set('limit', '5')
+  url.searchParams.set('addressdetails', '1')
+  url.searchParams.set('extratags', '1')
+  url.searchParams.set('namedetails', '1')
+  url.searchParams.set('accept-language', 'it')
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      referrerPolicy: 'strict-origin-when-cross-origin',
+    })
+  } catch {
+    throw new Error('Non riesco a contattare OpenStreetMap. Controlla la connessione e riprova.')
+  }
+  if (!response.ok) throw new Error(`OpenStreetMap non è disponibile in questo momento (${response.status}).`)
+
+  const payload = await response.json() as NominatimResult[]
+  const candidates = payload
+    .filter((result) => Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lon)))
+    .map(candidateFromResult)
+  writeCache(query, candidates)
+  return candidates
 }
 
 export function createNominatimPlaceDiscovery(endpoint = 'https://nominatim.openstreetmap.org') {
@@ -112,33 +149,14 @@ export function createNominatimPlaceDiscovery(endpoint = 'https://nominatim.open
       const cached = readCache(query)
       if (cached) return cached
 
-      await respectRateLimit()
-      const url = new URL('/search', endpoint)
-      url.searchParams.set('q', query)
-      url.searchParams.set('format', 'jsonv2')
-      url.searchParams.set('limit', '5')
-      url.searchParams.set('addressdetails', '1')
-      url.searchParams.set('extratags', '1')
-      url.searchParams.set('namedetails', '1')
-      url.searchParams.set('accept-language', 'it')
-
-      let response: Response
-      try {
-        response = await fetch(url, {
-          headers: { Accept: 'application/json' },
-          referrerPolicy: 'strict-origin-when-cross-origin',
-        })
-      } catch {
-        throw new Error('Non riesco a contattare OpenStreetMap. Controlla la connessione e riprova.')
-      }
-      if (!response.ok) throw new Error(`OpenStreetMap non è disponibile in questo momento (${response.status}).`)
-
-      const payload = await response.json() as NominatimResult[]
-      const candidates = payload
-        .filter((result) => Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lon)))
-        .map(candidateFromResult)
-      writeCache(query, candidates)
-      return candidates
+      // Shared module queue guarantees one in-process request at a time. Tabs remain
+      // independent browser contexts, so cross-tab rate coordination is intentionally
+      // not claimed by this adapter.
+      return serializeRequest(async () => {
+        const refreshedCache = readCache(query)
+        if (refreshedCache) return refreshedCache
+        return fetchCandidates(query, endpoint)
+      })
     },
   }
 }
