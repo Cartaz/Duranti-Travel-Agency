@@ -25,6 +25,31 @@ export class ItineraryRepository extends Repository<Itinerary> {
       .filter((item) => !item.deletedAt)
   }
 
+  async appendManualToDay(value: Omit<Itinerary, 'position'>): Promise<Itinerary> {
+    return db.transaction('rw', db.trips, db.days, db.itineraries, async () => {
+      const trip = await db.trips.get(value.tripId)
+      if (!trip || trip.deletedAt) throw new Error('Il viaggio non esiste o è stato eliminato.')
+      if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di modificare l’itinerario.')
+      if (!value.dayId) throw new Error('La tappa deve appartenere a una giornata.')
+
+      const day = await db.days.get(value.dayId)
+      if (!day || day.deletedAt || day.tripId !== value.tripId) {
+        throw new Error('La giornata non appartiene a questo viaggio.')
+      }
+      if (value.reservationId || value.blockId) {
+        throw new Error('Le tappe derivate da prenotazioni non possono essere create dal percorso manuale.')
+      }
+      if (await db.itineraries.get(value.id)) throw new Error('Esiste già una tappa con questo identificatore.')
+
+      const siblings = (await db.itineraries.where('dayId').equals(value.dayId).toArray())
+        .filter((item) => !item.deletedAt && item.tripId === value.tripId)
+      const position = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
+      const itinerary: Itinerary = { ...value, position }
+      await db.itineraries.add(itinerary)
+      return itinerary
+    })
+  }
+
   async moveManualUntimed(
     tripId: string,
     dayId: string,
