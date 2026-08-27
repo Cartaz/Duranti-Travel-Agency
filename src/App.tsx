@@ -12,13 +12,18 @@ import TravelerDocumentsPage from './features/travelers/TravelerDocumentsPage'
 import TravelerFormPage from './features/travelers/TravelerFormPage'
 import TravelersPage from './features/travelers/TravelersPage'
 import VaultBackupPage from './features/vault/VaultBackupPage'
+import type { AppReadinessNotice } from './ui/readiness'
 import AppShell from './ui/layout/AppShell'
 
-export default function App() {
+export interface AppProps {
+  readinessNotices?: AppReadinessNotice[]
+}
+
+export default function App({ readinessNotices = [] }: AppProps) {
   return (
     <HashRouter>
       <Routes>
-        <Route element={<AppShell />}>
+        <Route element={<AppShell readinessNotices={readinessNotices} />}>
           <Route index element={<TravelIndexPage />} />
           <Route path="archive" element={<ArchivedTripsPage />} />
           <Route path="places" element={<PlaceCatalogPage />} />
