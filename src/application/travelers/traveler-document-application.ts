@@ -48,6 +48,9 @@ export class TravelerDocumentApplication {
     secret: TravelerDocumentSecret
     attachment?: File
   }): Promise<TravelerDocumentView> {
+    const traveler = await this.dependencies.travelers.get(input.travelerId)
+    if (!traveler || traveler.deletedAt) throw new Error('Il viaggiatore non esiste o è stato eliminato.')
+
     const document = await this.dependencies.documents.create({
       travelerId: input.travelerId,
       type: input.type,
