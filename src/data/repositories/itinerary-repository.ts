@@ -64,12 +64,12 @@ export class ItineraryRepository extends Repository<Itinerary> {
           .filter((item) => item.reservationId || item.blockId)
           .map((item) => item.position ?? 0)
         const basePosition = fixedPositions.reduce((maximum, position) => Math.max(maximum, position), 0)
-        const repairs = manualSiblings
-          .map((item, index) => {
-            const position = basePosition + index + 1
-            return item.position === position ? undefined : { ...item, position, updatedAt: repairedAt }
-          })
-          .filter((item): item is Itinerary => item !== undefined)
+        const repairs: Itinerary[] = []
+        for (const [index, item] of manualSiblings.entries()) {
+          const position = basePosition + index + 1
+          if (item.position === position) continue
+          repairs.push({ ...item, position, updatedAt: repairedAt })
+        }
         if (repairs.length > 0) await db.itineraries.bulkPut(repairs)
       }
 
