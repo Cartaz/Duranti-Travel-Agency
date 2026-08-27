@@ -11,8 +11,12 @@ function createRepository(): TravelerDocumentRepositoryPort {
   return {
     async create(input) { return { id: 'created', ...input, createdAt: '2026-01-04T00:00:00Z', updatedAt: '2026-01-04T00:00:00Z' } },
     async get(id) { return records.find((record) => record.id === id) },
-    async listMetadata() { return records.map(({ secret: _secret, ...record }) => record) },
-    async list() { return records },
+    async listMetadataByTraveler(travelerId) {
+      return records
+        .filter((record) => record.travelerId === travelerId)
+        .map(({ secret: _secret, ...record }) => record)
+    },
+    async listByTraveler(travelerId) { return records.filter((record) => record.travelerId === travelerId) },
     async updateSecret() {},
     async attachFile() { throw new Error('not used') },
     async getAttachment() { return undefined },
