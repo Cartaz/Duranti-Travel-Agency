@@ -1,5 +1,5 @@
 import { TravelerDocumentApplication } from '../application/travelers/traveler-document-application'
-import { secureTravelerDocumentRepository } from '../data/repositories/traveler-document-repository'
+import { scopedTravelerDocumentRepository } from '../data/repositories/scoped-traveler-document-repository'
 import {
   configureLocalEncryption,
   isLocalEncryptionConfigured,
@@ -9,7 +9,7 @@ import {
 } from '../security/local-encryption'
 
 export const travelerDocumentApplication = new TravelerDocumentApplication({
-  documents: secureTravelerDocumentRepository,
+  documents: scopedTravelerDocumentRepository,
   security: {
     isConfigured: isLocalEncryptionConfigured,
     isUnlocked: isLocalEncryptionUnlocked,
