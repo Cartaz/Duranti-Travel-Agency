@@ -1,4 +1,5 @@
 import type { Trip } from '../../domain/entities'
+import { normalizeOptionalDateOnly } from '../../domain/date-only'
 import { isDayDateWithinTripRange } from '../../domain/trip-calendar'
 import { normalizeCurrencyCode } from '../../lib/currency'
 import { applyTripStatus, validateEditableTripStatus } from './trip-lifecycle'
@@ -50,8 +51,8 @@ function validateDraft(input: TripDraft): TripDraft {
   if (title.length > 120) throw new Error('Il titolo del viaggio è troppo lungo.')
   const status = validateEditableTripStatus(input.status)
 
-  const startDate = cleanOptional(input.startDate)
-  const endDate = cleanOptional(input.endDate)
+  const startDate = normalizeOptionalDateOnly(input.startDate, 'La data di partenza')
+  const endDate = normalizeOptionalDateOnly(input.endDate, 'La data di ritorno')
   if (startDate && endDate && endDate < startDate) {
     throw new Error(
       `Date del viaggio non valide: il ritorno (${formatDisplayDate(endDate)}) precede la partenza (${formatDisplayDate(startDate)}).`,
