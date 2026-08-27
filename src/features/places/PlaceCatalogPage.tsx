@@ -44,9 +44,12 @@ export default function PlaceCatalogPage() {
   const [sourceUrl, setSourceUrl] = useState('')
   const [candidates, setCandidates] = useState<PlaceImportCandidate[]>([])
   const [selected, setSelected] = useState<EditableImport>()
+  const [editingPlaceId, setEditingPlaceId] = useState<string>()
+  const [editingDraft, setEditingDraft] = useState<PlaceDraft>()
   const [loading, setLoading] = useState(true)
   const [searching, setSearching] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [editingSaving, setEditingSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -99,6 +102,38 @@ export default function PlaceCatalogPage() {
       setError(cause instanceof Error ? cause.message : 'Impossibile salvare il luogo.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const beginEdit = (place: Place): void => {
+    setError('')
+    setNotice('')
+    setEditingPlaceId(place.id)
+    setEditingDraft(places.placeToDraft(place))
+  }
+
+  const cancelEdit = (): void => {
+    if (editingSaving) return
+    setEditingPlaceId(undefined)
+    setEditingDraft(undefined)
+  }
+
+  const saveEdit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault()
+    if (!editingPlaceId || !editingDraft || editingSaving) return
+    setEditingSaving(true)
+    setError('')
+    setNotice('')
+    try {
+      const updated = await places.updateCatalogPlace(editingPlaceId, editingDraft)
+      await loadCatalog()
+      setEditingPlaceId(undefined)
+      setEditingDraft(undefined)
+      setNotice(`“${updated.name}” è stato aggiornato. Le prenotazioni collegate useranno i nuovi dati.`)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile aggiornare il luogo.')
+    } finally {
+      setEditingSaving(false)
     }
   }
 
@@ -186,7 +221,21 @@ export default function PlaceCatalogPage() {
           <p className="place-catalog-empty">Non hai ancora salvato luoghi.</p>
         ) : (
           <div className="place-card-grid">
-            {catalog.map((place) => (
+            {catalog.map((place) => editingPlaceId === place.id && editingDraft ? (
+              <form className="place-card place-card-edit" key={place.id} onSubmit={(event) => void saveEdit(event)}>
+                <div className="place-card-edit-heading">
+                  <div><strong>Modifica {place.name}</strong><small>Aggiorni il dato canonico usato anche dalle prenotazioni collegate.</small></div>
+                </div>
+                <label><span>Nome *</span><input required maxLength={200} value={editingDraft.name} onChange={(event) => setEditingDraft({ ...editingDraft, name: event.target.value })} /></label>
+                <label><span>Indirizzo</span><input maxLength={500} value={editingDraft.formattedAddress ?? ''} onChange={(event) => setEditingDraft({ ...editingDraft, formattedAddress: event.target.value })} /></label>
+                <label><span>Telefono</span><input type="tel" maxLength={80} value={editingDraft.phone ?? ''} onChange={(event) => setEditingDraft({ ...editingDraft, phone: event.target.value })} /></label>
+                <label><span>Orari</span><textarea rows={3} maxLength={1000} value={editingDraft.openingHours ?? ''} onChange={(event) => setEditingDraft({ ...editingDraft, openingHours: event.target.value })} /></label>
+                <div className="place-card-edit-actions">
+                  <button type="button" disabled={editingSaving} onClick={cancelEdit}>Annulla</button>
+                  <button type="submit" disabled={editingSaving}>{editingSaving ? 'Salvo…' : 'Salva modifiche'}</button>
+                </div>
+              </form>
+            ) : (
               <article className="place-card" key={place.id}>
                 <div>
                   <strong>{place.name}</strong>
@@ -198,6 +247,7 @@ export default function PlaceCatalogPage() {
                 </dl>
                 <div className="place-card-actions">
                   <a href={googleMapsUrlForPlace(place)} target="_blank" rel="noreferrer">Apri in Google Maps ↗</a>
+                  <button type="button" disabled={Boolean(editingPlaceId)} onClick={() => beginEdit(place)}>Modifica</button>
                   {place.provider === 'openstreetmap' && <small>Fonte iniziale: OpenStreetMap</small>}
                 </div>
               </article>
