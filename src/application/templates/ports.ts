@@ -13,7 +13,6 @@ export interface TemplateBlockRepositoryPort {
 
 export interface TemplateDayRepositoryPort {
   get(id: string): Promise<Day | undefined>
-  listByTrip(tripId: string): Promise<Day[]>
 }
 
 export interface TemplateTripRepositoryPort {
@@ -21,7 +20,7 @@ export interface TemplateTripRepositoryPort {
 }
 
 export interface DayTemplateTransactionPort {
-  createDayWithBlocks(day: Day, blocks: Block[]): Promise<void>
+  createDayWithBlocks(day: Omit<Day, 'sequence'>, blocks: Block[]): Promise<Day>
 }
 
 export interface DayTemplateApplicationDependencies {
