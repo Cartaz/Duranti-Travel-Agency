@@ -1,4 +1,5 @@
 import type { Block, Day, Place, Trip } from '../../domain/entities'
+import type { SafeDeletePlaceResult } from '../../data/repositories/place-repository'
 
 export interface PlaceTripPort { get(id: string): Promise<Trip | undefined> }
 export interface PlaceDayPort { get(id: string): Promise<Day | undefined> }
@@ -7,6 +8,7 @@ export interface PlaceRepositoryPort {
   get(id: string): Promise<Place | undefined>
   list(): Promise<Place[]>
   put(place: Place): Promise<string>
+  safeDelete(id: string): Promise<SafeDeletePlaceResult>
 }
 export interface PlaceBlockTransactionPort {
   savePlaceForBlock(blockId: string, tripId: string, dayId: string, place: Place): Promise<void>
