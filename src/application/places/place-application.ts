@@ -24,6 +24,7 @@ export interface PlaceApplication {
   listCatalogPlaces(): Promise<Place[]>
   saveCatalogPlace(input: PlaceDraft): Promise<Place>
   updateCatalogPlace(placeId: string, input: PlaceDraft): Promise<Place>
+  deleteCatalogPlace(placeId: string): Promise<void>
   getPlannerPlace(tripId: string, dayId: string, blockId: string): Promise<Place | undefined>
   savePlannerPlace(tripId: string, dayId: string, blockId: string, input: PlaceDraft): Promise<Place>
 }
@@ -111,6 +112,14 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
     await deps.places.put(updated)
     return updated
   }
+  async function deleteCatalogPlace(placeId: string): Promise<void> {
+    const result = await deps.places.safeDelete(placeId)
+    if (result.status === 'not-found') throw new Error('Il luogo da eliminare non esiste più nel catalogo.')
+    if (result.status === 'in-use') {
+      const total = Object.values(result.references).reduce((sum, count) => sum + count, 0)
+      throw new Error(`Il luogo è ancora usato da ${total} elemento${total === 1 ? '' : 'i'} del viaggio. Rimuovi prima i collegamenti dal Planner, dalle prenotazioni, dall’itinerario o dai media.`)
+    }
+  }
   async function getPlannerPlace(tripId: string, dayId: string, blockId: string): Promise<Place | undefined> {
     await assertContext(tripId, dayId, false)
     const block = await getPlaceBlock(tripId, dayId, blockId)
@@ -131,5 +140,5 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
     await deps.blockTransactions.savePlaceForBlock(blockId, tripId, dayId, place)
     return place
   }
-  return { placeToDraft, listCatalogPlaces, saveCatalogPlace, updateCatalogPlace, getPlannerPlace, savePlannerPlace }
+  return { placeToDraft, listCatalogPlaces, saveCatalogPlace, updateCatalogPlace, deleteCatalogPlace, getPlannerPlace, savePlannerPlace }
 }
