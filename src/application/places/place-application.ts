@@ -23,6 +23,7 @@ export interface PlaceApplication {
   placeToDraft(place: Place): PlaceDraft
   listCatalogPlaces(): Promise<Place[]>
   saveCatalogPlace(input: PlaceDraft): Promise<Place>
+  updateCatalogPlace(placeId: string, input: PlaceDraft): Promise<Place>
   getPlannerPlace(tripId: string, dayId: string, blockId: string): Promise<Place | undefined>
   savePlannerPlace(tripId: string, dayId: string, blockId: string, input: PlaceDraft): Promise<Place>
 }
@@ -103,6 +104,13 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
     await deps.places.put(place)
     return place
   }
+  async function updateCatalogPlace(placeId: string, input: PlaceDraft): Promise<Place> {
+    const current = await deps.places.get(placeId)
+    if (!current) throw new Error('Il luogo da modificare non esiste più nel catalogo.')
+    const updated: Place = { ...current, ...placeBaseFromDraft(input), updatedAt: deps.now() }
+    await deps.places.put(updated)
+    return updated
+  }
   async function getPlannerPlace(tripId: string, dayId: string, blockId: string): Promise<Place | undefined> {
     await assertContext(tripId, dayId, false)
     const block = await getPlaceBlock(tripId, dayId, blockId)
@@ -123,5 +131,5 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
     await deps.blockTransactions.savePlaceForBlock(blockId, tripId, dayId, place)
     return place
   }
-  return { placeToDraft, listCatalogPlaces, saveCatalogPlace, getPlannerPlace, savePlannerPlace }
+  return { placeToDraft, listCatalogPlaces, saveCatalogPlace, updateCatalogPlace, getPlannerPlace, savePlannerPlace }
 }
