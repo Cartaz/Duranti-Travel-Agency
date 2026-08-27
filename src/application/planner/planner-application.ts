@@ -123,18 +123,14 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
 
   async function createPlannerBlock(tripId: string, dayId: string, type: PlannerBlockType): Promise<Block> {
     await assertPlannerDayContext(tripId, dayId, true)
-    const siblings = (await deps.blocks.listByDay(dayId)).filter((block) => block.tripId === tripId)
-    const position = siblings.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
     const now = deps.now()
     const content = ['place', 'transport', 'accommodation', 'restaurant', 'activity', 'expense'].includes(type)
       ? {}
       : contentFromDraft(defaultDraft(type as BasicPlannerBlockType))
 
-    const block: Block = {
-      id: deps.newId(), tripId, dayId, type, position, content, createdAt: now, updatedAt: now,
-    }
-    await deps.blocks.put(block)
-    return block
+    return deps.blocks.appendToDay({
+      id: deps.newId(), tripId, dayId, type, content, createdAt: now, updatedAt: now,
+    })
   }
 
   async function updatePlannerBlock(tripId: string, dayId: string, blockId: string, input: PlannerBlockDraft): Promise<Block> {
