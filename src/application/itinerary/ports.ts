@@ -25,6 +25,7 @@ export interface ItineraryRepositoryPort {
   listByDay(dayId: string): Promise<Itinerary[]>
   listByTrip(tripId: string): Promise<Itinerary[]>
   put(value: Itinerary): Promise<unknown>
+  appendManualToDay(value: Omit<Itinerary, 'position'>): Promise<Itinerary>
   softDelete(id: string): Promise<unknown>
   moveManualUntimed(tripId: string, dayId: string, itineraryId: string, direction: 'up' | 'down'): Promise<boolean>
 }
