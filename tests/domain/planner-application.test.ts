@@ -68,6 +68,7 @@ test('planner lists blocks through the semantic day query and keeps trip isolati
       },
       get: async () => undefined,
       put: async () => undefined,
+      appendToDay: async (value) => ({ ...value, position: 1 }),
       softDelete: async () => 'not-found',
       moveWithinDay: async () => 'boundary',
     },
@@ -83,15 +84,22 @@ test('planner lists blocks through the semantic day query and keeps trip isolati
   assert.deepEqual(listed.map((block) => block.id), ['block-earlier', 'block-later'])
 })
 
-test('planner assigns a new position from day-scoped siblings only', async () => {
+test('planner delegates new position allocation to the transactional append port', async () => {
   const { trip, day, blocks } = createFixture()
-  let saved: Block | undefined
+  let appendedWithoutPosition: Omit<Block, 'position'> | undefined
+  let putCalls = 0
 
   const application = createPlannerApplication({
     blocks: {
-      listByDay: async (dayId) => dayId === day.id ? blocks : [],
+      listByDay: async () => { throw new Error('create must not pre-read siblings') },
       get: async () => undefined,
-      put: async (block) => { saved = block; return block.id },
+      put: async () => { putCalls += 1 },
+      appendToDay: async (value) => {
+        appendedWithoutPosition = value
+        const localSiblings = blocks.filter((block) => block.tripId === trip.id && block.dayId === day.id)
+        const position = localSiblings.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
+        return { ...value, position }
+      },
       softDelete: async () => 'not-found',
       moveWithinDay: async () => 'boundary',
     },
@@ -104,7 +112,8 @@ test('planner assigns a new position from day-scoped siblings only', async () =>
   const created = await application.createPlannerBlock(trip.id, day.id, 'divider')
 
   assert.equal(created.position, 4)
-  assert.equal(saved?.id, created.id)
+  assert.equal(appendedWithoutPosition?.id, created.id)
+  assert.equal(putCalls, 0)
 })
 
 test('planner generic delete refuses blocks whose linked data needs a transactional delete', async () => {
@@ -126,6 +135,7 @@ test('planner generic delete refuses blocks whose linked data needs a transactio
       listByDay: async () => [expenseBlock],
       get: async (blockId) => blockId === expenseBlock.id ? expenseBlock : undefined,
       put: async () => undefined,
+      appendToDay: async (value) => ({ ...value, position: 1 }),
       softDelete: async () => { softDeleteCalls += 1; return 'tombstoned' },
       moveWithinDay: async () => 'boundary',
     },
@@ -161,6 +171,7 @@ test('planner generic delete still tombstones standalone blocks', async () => {
       listByDay: async () => [textBlock],
       get: async (blockId) => blockId === textBlock.id ? textBlock : undefined,
       put: async () => undefined,
+      appendToDay: async (value) => ({ ...value, position: 1 }),
       softDelete: async (blockId) => { deletedIds.push(blockId); return 'tombstoned' },
       moveWithinDay: async () => 'boundary',
     },
