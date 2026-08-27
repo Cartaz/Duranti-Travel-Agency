@@ -20,6 +20,28 @@ export class BlockRepository extends Repository<Block> {
       .filter((block) => !block.deletedAt)
   }
 
+  async appendToDay(value: Omit<Block, 'position'>): Promise<Block> {
+    return db.transaction('rw', db.trips, db.days, db.blocks, async () => {
+      const trip = await db.trips.get(value.tripId)
+      if (!trip || trip.deletedAt) throw new Error('Il viaggio non esiste o è stato eliminato.')
+      if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di modificare il planner.')
+      if (!value.dayId) throw new Error('Il nuovo blocco deve appartenere a una giornata.')
+
+      const day = await db.days.get(value.dayId)
+      if (!day || day.deletedAt || day.tripId !== value.tripId) {
+        throw new Error('La giornata non appartiene a questo viaggio.')
+      }
+      if (await db.blocks.get(value.id)) throw new Error('Esiste già un blocco con questo identificatore.')
+
+      const siblings = (await db.blocks.where('dayId').equals(value.dayId).toArray())
+        .filter((block) => !block.deletedAt && block.tripId === value.tripId)
+      const position = siblings.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
+      const block: Block = { ...value, position }
+      await db.blocks.add(block)
+      return block
+    })
+  }
+
   async moveWithinDay(
     blockId: string,
     tripId: string,
