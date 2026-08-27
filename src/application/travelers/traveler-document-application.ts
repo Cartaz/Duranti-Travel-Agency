@@ -33,14 +33,12 @@ export class TravelerDocumentApplication {
   }
 
   async listForTraveler(travelerId: string): Promise<TravelerDocumentMetadata[]> {
-    return (await this.dependencies.documents.listMetadata())
-      .filter((document) => document.travelerId === travelerId)
+    return (await this.dependencies.documents.listMetadataByTraveler(travelerId))
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
   }
 
   async listUnlockedForTraveler(travelerId: string): Promise<TravelerDocumentView[]> {
-    return (await this.dependencies.documents.list())
-      .filter((document) => document.travelerId === travelerId)
+    return (await this.dependencies.documents.listByTraveler(travelerId))
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
   }
 
