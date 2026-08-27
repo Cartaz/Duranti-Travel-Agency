@@ -33,7 +33,7 @@ test('real UI persists a planner note across reload', async ({ page }) => {
   await page.getByText('+ Aggiungi alla giornata', { exact: true }).click()
   await page.getByText('Altre opzioni', { exact: true }).click()
   await page.getByRole('button', { name: /Appunti/ }).click()
-  await expect(page.getByRole('status')).toContainText('Appunti aggiunto')
+  await expect(page.getByText('Appunti aggiunto. Compila i dettagli nel nuovo blocco.')).toBeVisible()
 
   const note = page.getByPlaceholder('Scrivi appunti, idee, dettagli della giornata…')
   await note.fill('Nota persistente creata dal journey Playwright.')
