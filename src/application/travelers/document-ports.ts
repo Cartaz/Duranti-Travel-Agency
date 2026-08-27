@@ -9,8 +9,8 @@ export type TravelerDocumentView = TravelerDocumentMetadata & {
 export interface TravelerDocumentRepositoryPort {
   create(input: { travelerId: string; type: TravelerDocument['type']; secret: TravelerDocumentSecret }): Promise<TravelerDocumentView>
   get(id: string): Promise<TravelerDocumentView | undefined>
-  listMetadata(): Promise<TravelerDocumentMetadata[]>
-  list(): Promise<TravelerDocumentView[]>
+  listMetadataByTraveler(travelerId: string): Promise<TravelerDocumentMetadata[]>
+  listByTraveler(travelerId: string): Promise<TravelerDocumentView[]>
   updateSecret(id: string, secret: TravelerDocumentSecret): Promise<void>
   attachFile(id: string, source: File): Promise<TravelerDocumentAttachment>
   getAttachment(id: string): Promise<File | undefined>
