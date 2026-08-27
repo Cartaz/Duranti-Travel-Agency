@@ -11,6 +11,8 @@ Two planner pages may therefore compose the following existing presentation modu
 - `DayPlannerPage.tsx`: expense editor, itinerary day summary, place Maps URL helper and reservation editor;
 - `GuidedDayPlannerPage.tsx`: day media gallery and day-template saver.
 
+`DayFormPage.tsx` may compose `DayTemplateManager` because choosing and maintaining a reusable starting structure is part of the same create-day workflow.
+
 `TripDetailPage.tsx` is the corresponding trip-level presentation composition root. It may compose the trip's day list, expense summary, itinerary overview and traveler-membership panel because those are sections of one trip workspace rather than reusable service dependencies.
 
 These exceptions are narrow and presentation-only. They do not permit a composition root to import another feature's persistence adapter, composition module or service bridge, and they do not make cross-feature imports generally acceptable.
