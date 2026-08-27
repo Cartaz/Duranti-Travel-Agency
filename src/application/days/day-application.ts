@@ -1,4 +1,5 @@
 import type { Day, Trip } from '../../domain/entities'
+import { normalizeDateOnly } from '../../domain/date-only'
 import { assertDayDateWithinTripRange } from '../../domain/trip-calendar'
 import type { DayApplicationDependencies } from './ports'
 
@@ -16,23 +17,6 @@ function cleanOptional(value: string | undefined): string | undefined {
   return cleaned ? cleaned : undefined
 }
 
-function validateDate(value: string): string {
-  const date = value.trim()
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('La data della giornata non è valida.')
-
-  const [year, month, day] = date.split('-').map(Number)
-  const parsed = new Date(year, month - 1, day)
-  if (
-    parsed.getFullYear() !== year ||
-    parsed.getMonth() !== month - 1 ||
-    parsed.getDate() !== day
-  ) {
-    throw new Error('La data della giornata non esiste nel calendario.')
-  }
-
-  return date
-}
-
 function validateDraft(input: DayDraft): DayDraft {
   const title = cleanOptional(input.title)
   if (title && title.length > 120) throw new Error('Il titolo della giornata è troppo lungo.')
@@ -46,7 +30,7 @@ function validateDraft(input: DayDraft): DayDraft {
   }
 
   return {
-    date: validateDate(input.date),
+    date: normalizeDateOnly(input.date, 'La data della giornata'),
     title,
     summary,
     journalText,
