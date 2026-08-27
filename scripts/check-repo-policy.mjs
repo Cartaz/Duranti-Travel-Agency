@@ -51,6 +51,12 @@ const presentationCompositionImports = new Map([
     '../media/DayMediaGallery',
     '../templates/DayTemplateSaver',
   ])],
+  ['src/features/trips/TripDetailPage.tsx', new Set([
+    '../days/TripDaysPanel',
+    '../expenses/TripExpenseSummary',
+    '../itinerary/TripItineraryOverview',
+    '../travelers/TripTravelersPanel',
+  ])],
 ])
 
 const violations = []
