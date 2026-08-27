@@ -39,7 +39,9 @@ export class DayRepository extends Repository<Day> {
         if (repairs.length > 0) await db.days.bulkPut(repairs)
       }
 
-      const sequence = siblings.length + 1
+      const sequence = hasDuplicateSequence
+        ? siblings.length + 1
+        : siblings.reduce((maximum, day) => Math.max(maximum, day.sequence), 0) + 1
       const day: Day = { ...value, sequence }
       await db.days.add(day)
       return day
