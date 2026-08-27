@@ -20,6 +20,7 @@ import {
   type VaultManifestV1,
   type VaultTableSnapshot,
 } from './format'
+import { validateVaultDatabaseSnapshotV1 } from './validate-snapshot-v1'
 
 const ROOT_DIRECTORY = 'dtagency'
 const IMPORT_STAGING_DIRECTORY = 'vault-import-staging'
@@ -358,6 +359,7 @@ function validateManifest(value: unknown, header: VaultHeaderV1): {
   }
 
   const tables = validateTables(value.database.tables)
+  validateVaultDatabaseSnapshotV1(tables)
   const { files, sourceBytes } = validateFiles(value.files)
 
   return {
