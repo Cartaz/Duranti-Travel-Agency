@@ -14,8 +14,9 @@ import { travelBookApplication } from './composition/travel-book'
 import { travelerDocumentApplication } from './composition/traveler-documents'
 import { travelerApplication } from './composition/travelers'
 import { tripApplication } from './composition/trips'
-import { bootstrapApplication } from './data/bootstrap'
+import { bootstrapApplication, type ApplicationBootstrapState } from './data/bootstrap'
 import { ApplicationProvider } from './ui/application-context'
+import type { AppReadinessNotice } from './ui/readiness'
 import './styles.css'
 import './ui/guided-ux.css'
 
@@ -23,9 +24,49 @@ const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('DTAgency root element was not found.')
 const root = ReactDOM.createRoot(rootElement)
 
+function readinessNoticesFrom(state: ApplicationBootstrapState): AppReadinessNotice[] {
+  const notices: AppReadinessNotice[] = []
+
+  if (state.storagePersistence === 'best-effort') {
+    notices.push({
+      id: 'storage-best-effort',
+      kind: 'warning',
+      title: 'Archiviazione locale non garantita',
+      message: 'Il browser può liberare i dati locali se lo spazio scarseggia. Mantieni un backup Vault aggiornato.',
+      backupAction: true,
+    })
+  } else if (state.storagePersistence === 'unsupported' || state.storagePersistence === 'unknown') {
+    notices.push({
+      id: 'storage-persistence-unknown',
+      kind: 'warning',
+      title: 'Durabilità locale non verificata',
+      message: 'Questo browser non permette di confermare che i dati locali siano persistenti. È consigliato mantenere un backup Vault aggiornato.',
+      backupAction: true,
+    })
+  }
+
+  if (state.restoreRecovery === 'rolled-back') {
+    notices.push({
+      id: 'vault-recovery-rollback',
+      kind: 'info',
+      title: 'Ripristino Vault recuperato',
+      message: 'Un ripristino interrotto è stato annullato automaticamente e DTAgency ha ripristinato lo stato precedente.',
+    })
+  } else if (state.restoreRecovery === 'finalized-committed') {
+    notices.push({
+      id: 'vault-recovery-finalized',
+      kind: 'info',
+      title: 'Ripristino Vault finalizzato',
+      message: 'DTAgency ha completato automaticamente la finalizzazione di un ripristino già committato prima dell’interruzione.',
+    })
+  }
+
+  return notices
+}
+
 async function startApplication(): Promise<void> {
   try {
-    await bootstrapApplication()
+    const bootstrap = await bootstrapApplication()
     root.render(
       <React.StrictMode>
         <ApplicationProvider services={{
@@ -43,7 +84,7 @@ async function startApplication(): Promise<void> {
           itinerary: itineraryApplication,
           travelBook: travelBookApplication,
         }}>
-          <App />
+          <App readinessNotices={readinessNoticesFrom(bootstrap)} />
         </ApplicationProvider>
       </React.StrictMode>,
     )
