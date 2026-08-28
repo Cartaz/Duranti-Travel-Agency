@@ -30,7 +30,7 @@ function assert(condition: unknown, message: string): asserts condition {
 export async function runApplicationContractTests(): Promise<ApplicationContractResult[]> {
   const results: ApplicationContractResult[] = []
 
-  results.push(await contract('Trip use case rejects a date range that would strand an existing day', async () => {
+  results.push(await contract('Trip use case delegates calendar safety to the atomic trip mutation', async () => {
     const timestamp = '2026-08-25T12:00:00.000Z'
     const trip: Trip = {
       id: 'trip-1',
@@ -57,9 +57,15 @@ export async function runApplicationContractTests(): Promise<ApplicationContract
         listArchivedTrips: async () => [],
         get: async (id) => id === stored.id ? stored : undefined,
         put: async (value) => { stored = value; return value.id },
-      },
-      days: {
-        listByTrip: async (tripId) => days.filter((day) => day.tripId === tripId),
+        updateEditable: async (value) => {
+          const stranded = days.find((day) => (
+            day.tripId === value.id
+            && ((value.startDate && day.date < value.startDate) || (value.endDate && day.date > value.endDate))
+          ))
+          if (stranded) throw new Error(`La giornata ${stranded.date} resterebbe fuori dalle nuove date del viaggio.`)
+          stored = value
+          return value
+        },
       },
       now: () => '2026-08-25T13:00:00.000Z',
       newId: () => 'new-trip',
@@ -81,7 +87,7 @@ export async function runApplicationContractTests(): Promise<ApplicationContract
     assert(stored.endDate === '2026-09-10', 'Rejected trip update mutated persisted state.')
   }))
 
-  results.push(await contract('Day use case assigns the next sequence using only days from its trip', async () => {
+  results.push(await contract('Day use case delegates sequence allocation to the contextual create mutation', async () => {
     const timestamp = '2026-08-25T12:00:00.000Z'
     const trip: Trip = {
       id: 'trip-1',
@@ -103,11 +109,16 @@ export async function runApplicationContractTests(): Promise<ApplicationContract
     let saved: Day | undefined
 
     const application = createDayApplication({
-      trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
       days: {
         listByTrip: async (tripId) => tripId === trip.id ? [...tripDays] : [],
         get: async () => undefined,
-        put: async (value) => { saved = value; return value.id },
+        createForTrip: async (value) => {
+          const siblings = tripDays.filter((day) => day.tripId === value.tripId)
+          const sequence = siblings.reduce((maximum, day) => Math.max(maximum, day.sequence), 0) + 1
+          saved = { ...value, sequence }
+          return saved
+        },
+        updateForTrip: async (value) => value,
       },
       now: () => '2026-08-25T13:00:00.000Z',
       newId: () => 'day-new',
@@ -115,7 +126,7 @@ export async function runApplicationContractTests(): Promise<ApplicationContract
 
     const created = await application.createTripDay(trip.id, { date: '2026-09-04', title: 'Fourth day' })
     assert(created.sequence === 4, `Expected sequence 4, got ${created.sequence}.`)
-    assert(saved?.id === created.id, 'Created day was not persisted through the port.')
+    assert(saved?.id === created.id, 'Created day was not persisted through the contextual port.')
   }))
 
   results.push(await contract('Expense summary includes explicit FX conversions in trip budget', async () => {
