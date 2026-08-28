@@ -9,6 +9,17 @@ function readReservationId(block: Block): string | undefined {
   return value
 }
 
+async function requireEditableTripDay(tripId: string, dayId: string): Promise<void> {
+  const trip = await db.trips.get(tripId)
+  if (!trip || trip.deletedAt) throw new Error('Il viaggio non esiste o è stato eliminato.')
+  if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di modificare le prenotazioni.')
+
+  const day = await db.days.get(dayId)
+  if (!day || day.deletedAt || day.tripId !== tripId) {
+    throw new Error('La giornata non appartiene a questo viaggio.')
+  }
+}
+
 function assertReservationContext(
   reservation: Reservation,
   tripId: string,
@@ -109,7 +120,8 @@ export class ReservationBlockRepository {
     dayId: string,
     reservation: Reservation,
   ): Promise<void> {
-    await db.transaction('rw', db.blocks, db.reservations, db.itineraries, async () => {
+    await db.transaction('rw', db.trips, db.days, db.blocks, db.reservations, db.itineraries, async () => {
+      await requireEditableTripDay(tripId, dayId)
       const block = await db.blocks.get(blockId)
       if (!block || block.deletedAt) throw new Error('Il blocco prenotazione non esiste più.')
       if (block.tripId !== tripId || block.dayId !== dayId) {
@@ -165,7 +177,8 @@ export class ReservationBlockRepository {
     reservationId: string,
     mediaId?: string,
   ): Promise<Reservation> {
-    return db.transaction('rw', db.blocks, db.reservations, db.media, async () => {
+    return db.transaction('rw', db.trips, db.days, db.blocks, db.reservations, db.media, async () => {
+      await requireEditableTripDay(tripId, dayId)
       const block = await db.blocks.get(blockId)
       if (!block || block.deletedAt || block.tripId !== tripId || block.dayId !== dayId) {
         throw new Error('Il blocco prenotazione non appartiene a questa giornata.')
@@ -207,7 +220,8 @@ export class ReservationBlockRepository {
   }
 
   async softDeleteReservationBlock(blockId: string, tripId: string, dayId: string): Promise<void> {
-    await db.transaction('rw', db.blocks, db.reservations, db.itineraries, db.media, async () => {
+    await db.transaction('rw', db.trips, db.days, db.blocks, db.reservations, db.itineraries, db.media, async () => {
+      await requireEditableTripDay(tripId, dayId)
       const block = await db.blocks.get(blockId)
       if (!block || block.deletedAt) return
       if (block.tripId !== tripId || block.dayId !== dayId) {
