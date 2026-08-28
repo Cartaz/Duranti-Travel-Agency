@@ -13,7 +13,7 @@ import {
   stageVaultImport,
   type StagedVaultImport,
   type VaultImportProgress,
-} from '../../vault/import'
+} from '../../vault/validated-import'
 import { commitStagedVaultImport, type VaultRestoreProgress } from '../../vault/restore'
 import { canShareVaultFile, downloadVaultFile, isDTAgencyVaultFile, shareVaultFile } from '../../vault/share'
 import './vault-backup.css'
@@ -270,7 +270,7 @@ export default function VaultBackupPage() {
         <div>
           <p className="eyebrow">2 · Recupera</p>
           <h2>Ripristina da un backup</h2>
-          <p>Il file viene prima verificato e decifrato in un’area isolata. I dati correnti non cambiano finché non confermi il ripristino.</p>
+          <p>Il file viene prima verificato, decifrato e validato semanticamente in un’area isolata. I dati correnti non cambiano finché non confermi il ripristino.</p>
         </div>
 
         <form className="vault-form" onSubmit={(event) => void handleStage(event)}>
