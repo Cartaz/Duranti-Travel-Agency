@@ -28,7 +28,15 @@ const applicationBackedFeatureRoots = [
   'src/features/trips/', 'src/features/days/', 'src/features/planner/', 'src/features/reservations/', 'src/features/media/', 'src/features/templates/', 'src/features/expenses/', 'src/features/travelers/', 'src/features/places/', 'src/features/itinerary/',
 ]
 const plannerPagePaths = new Set(['src/features/planner/DayPlannerPage.tsx', 'src/features/planner/GuidedDayPlannerPage.tsx'])
-const presentationCompositionFeature = 'planner'
+
+// Cross-feature presentation composition is deliberate only at these page boundaries.
+// Keeping the allowlist at file granularity prevents a whole feature directory from
+// becoming an implicit service locator for unrelated UI.
+const presentationCompositionImports = new Map([
+  ['src/features/planner/DayPlannerPage.tsx', new Set(['expenses', 'itinerary', 'places', 'reservations'])],
+  ['src/features/days/DayFormPage.tsx', new Set(['templates'])],
+  ['src/features/trips/TripDetailPage.tsx', new Set(['days', 'expenses', 'itinerary', 'travelers'])],
+])
 
 async function collectFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -65,12 +73,13 @@ function importedFeature(root, path, specifier) {
 function enforcePresentationDependencies(root, path, content, violations) {
   const owner = featureName(path)
   if (!owner) return
+  const allowedTargets = presentationCompositionImports.get(path)
 
   for (const specifier of importedSpecifiers(content)) {
     const target = importedFeature(root, path, specifier)
     if (!target || target === owner) continue
-    if (owner !== presentationCompositionFeature) {
-      violations.push(`${path}: feature ${owner} must not import presentation from feature ${target}; only ${presentationCompositionFeature} is the presentation composition root`)
+    if (!allowedTargets?.has(target)) {
+      violations.push(`${path}: feature ${owner} must not import presentation from feature ${target} outside an explicit page composition contract`)
     }
   }
 }
