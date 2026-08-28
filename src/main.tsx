@@ -16,6 +16,7 @@ import { travelerApplication } from './composition/travelers'
 import { tripApplication } from './composition/trips'
 import { bootstrapApplication } from './data/bootstrap'
 import { ApplicationProvider } from './ui/application-context'
+import type { AppShellReadiness } from './ui/layout/AppShell'
 import './styles.css'
 import './ui/guided-ux.css'
 
@@ -23,9 +24,28 @@ const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('DTAgency root element was not found.')
 const root = ReactDOM.createRoot(rootElement)
 
+function readinessFromBootstrap(
+  storagePersistence: 'persistent' | 'best-effort' | 'unsupported' | 'unknown',
+  restoreRecovery: 'none' | 'rolled-back' | 'finalized-committed',
+): AppShellReadiness {
+  return {
+    storageWarning: storagePersistence === 'best-effort'
+      ? 'best-effort'
+      : storagePersistence === 'persistent'
+        ? undefined
+        : 'unverified',
+    recoveryNotice: restoreRecovery === 'rolled-back'
+      ? 'rolled-back'
+      : restoreRecovery === 'finalized-committed'
+        ? 'finalized'
+        : undefined,
+  }
+}
+
 async function startApplication(): Promise<void> {
   try {
-    await bootstrapApplication()
+    const bootstrap = await bootstrapApplication()
+    const readiness = readinessFromBootstrap(bootstrap.storagePersistence, bootstrap.restoreRecovery)
     root.render(
       <React.StrictMode>
         <ApplicationProvider services={{
@@ -43,7 +63,7 @@ async function startApplication(): Promise<void> {
           itinerary: itineraryApplication,
           travelBook: travelBookApplication,
         }}>
-          <App />
+          <App readiness={readiness} />
         </ApplicationProvider>
       </React.StrictMode>,
     )
