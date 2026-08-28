@@ -24,19 +24,18 @@ const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('DTAgency root element was not found.')
 const root = ReactDOM.createRoot(rootElement)
 
-function readinessFromBootstrap(
-  storagePersistence: 'persistent' | 'best-effort' | 'unsupported' | 'unknown',
-  restoreRecovery: 'none' | 'rolled-back' | 'finalized-committed',
-): AppShellReadiness {
+type BootstrapState = Awaited<ReturnType<typeof bootstrapApplication>>
+
+function readinessFromBootstrap(bootstrap: BootstrapState): AppShellReadiness {
   return {
-    storageWarning: storagePersistence === 'best-effort'
+    storageWarning: bootstrap.storagePersistence === 'best-effort'
       ? 'best-effort'
-      : storagePersistence === 'persistent'
+      : bootstrap.storagePersistence === 'persistent'
         ? undefined
         : 'unverified',
-    recoveryNotice: restoreRecovery === 'rolled-back'
+    recoveryNotice: bootstrap.restoreRecovery === 'rolled-back'
       ? 'rolled-back'
-      : restoreRecovery === 'finalized-committed'
+      : bootstrap.restoreRecovery === 'finalized-committed'
         ? 'finalized'
         : undefined,
   }
@@ -45,7 +44,6 @@ function readinessFromBootstrap(
 async function startApplication(): Promise<void> {
   try {
     const bootstrap = await bootstrapApplication()
-    const readiness = readinessFromBootstrap(bootstrap.storagePersistence, bootstrap.restoreRecovery)
     root.render(
       <React.StrictMode>
         <ApplicationProvider services={{
@@ -63,7 +61,7 @@ async function startApplication(): Promise<void> {
           itinerary: itineraryApplication,
           travelBook: travelBookApplication,
         }}>
-          <App readiness={readiness} />
+          <App readiness={readinessFromBootstrap(bootstrap)} />
         </ApplicationProvider>
       </React.StrictMode>,
     )
