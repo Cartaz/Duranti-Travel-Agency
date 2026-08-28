@@ -1,5 +1,5 @@
 import type { Trip } from '../../domain/entities'
-import { isDayDateWithinTripRange } from '../../domain/trip-calendar'
+import { normalizeOptionalDateOnly } from '../../domain/date-only'
 import { normalizeCurrencyCode } from '../../lib/currency'
 import { applyTripStatus, validateEditableTripStatus } from './trip-lifecycle'
 import type { EditableTripStatus } from './trip-lifecycle'
@@ -50,8 +50,8 @@ function validateDraft(input: TripDraft): TripDraft {
   if (title.length > 120) throw new Error('Il titolo del viaggio è troppo lungo.')
   const status = validateEditableTripStatus(input.status)
 
-  const startDate = cleanOptional(input.startDate)
-  const endDate = cleanOptional(input.endDate)
+  const startDate = normalizeOptionalDateOnly(input.startDate, 'La data di partenza')
+  const endDate = normalizeOptionalDateOnly(input.endDate, 'La data di ritorno')
   if (startDate && endDate && endDate < startDate) {
     throw new Error(
       `Date del viaggio non valide: il ritorno (${formatDisplayDate(endDate)}) precede la partenza (${formatDisplayDate(startDate)}).`,
@@ -88,35 +88,8 @@ function tripSortValue(trip: Trip): string {
   return trip.startDate ?? trip.createdAt
 }
 
-function describeRange(range: Pick<Trip, 'startDate' | 'endDate'>): string {
-  if (range.startDate && range.endDate) {
-    return `dal ${formatDisplayDate(range.startDate)} al ${formatDisplayDate(range.endDate)}`
-  }
-  if (range.startDate) return `a partire dal ${formatDisplayDate(range.startDate)}`
-  if (range.endDate) return `fino al ${formatDisplayDate(range.endDate)}`
-  return 'senza limiti di data'
-}
-
 export function createTripApplication(dependencies: TripApplicationDependencies): TripApplication {
-  const { trips, days, now, newId } = dependencies
-
-  async function assertExistingDaysFitRange(
-    tripId: string,
-    range: Pick<Trip, 'startDate' | 'endDate'>,
-  ): Promise<void> {
-    const invalidDays = (await days.listByTrip(tripId))
-      .filter((day) => !isDayDateWithinTripRange(range, day.date))
-      .sort((left, right) => left.date.localeCompare(right.date))
-
-    if (invalidDays.length === 0) return
-
-    const first = invalidDays[0]
-    const extra = invalidDays.length > 1 ? ` Ci sono anche altre ${invalidDays.length - 1} giornate fuori intervallo.` : ''
-    throw new Error(
-      `Non posso salvare queste date: la giornata del ${formatDisplayDate(first.date)} resterebbe fuori dal nuovo intervallo ${describeRange(range)}.`
-        + `${extra} Modifica prima le giornate interessate oppure amplia l’intervallo del viaggio.`,
-    )
-  }
+  const { trips, now, newId } = dependencies
 
   return {
     async listBookTrips(): Promise<Trip[]> {
@@ -154,17 +127,13 @@ export function createTripApplication(dependencies: TripApplicationDependencies)
       }
 
       const draft = validateDraft(input)
-      const dateRangeChanged = draft.startDate !== existing.startDate || draft.endDate !== existing.endDate
-      if (dateRangeChanged) await assertExistingDaysFitRange(tripId, draft)
-
       const updated: Trip = {
         ...existing,
         ...draft,
         archivedFromStatus: undefined,
         updatedAt: now(),
       }
-      await trips.put(updated)
-      return updated
+      return trips.updateEditable(updated)
     },
 
     async setTripStatus(tripId: string, status: EditableTripStatus): Promise<Trip> {
