@@ -87,7 +87,7 @@ function readinessMessages(readiness: AppShellReadiness): string[] {
   if (readiness.recoveryNotice === 'rolled-back') {
     messages.push('DTAgency ha rilevato un ripristino interrotto e ha ripristinato automaticamente lo stato precedente.')
   } else if (readiness.recoveryNotice === 'finalized') {
-    messages.push('DTAgency ha rilevato un ripristino interrotto già commit­tato e ne ha completato automaticamente la finalizzazione.')
+    messages.push('DTAgency ha rilevato un ripristino interrotto già applicato e ne ha completato automaticamente la finalizzazione.')
   }
   return messages
 }
