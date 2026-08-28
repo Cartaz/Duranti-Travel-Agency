@@ -169,19 +169,14 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
     if (current && (current.reservationId || current.blockId)) throw new Error('Le tappe derivate da prenotazioni si modificano dal relativo blocco del planner.')
     if (current && (current.tripId !== tripId || current.dayId !== dayId)) throw new Error('La tappa non appartiene a questa giornata.')
     const draft = await normalizeManualDraft(tripId, dayId, input, current?.placeId)
-    const now = deps.now(); let position = current?.position
-    if (!current) {
-      const siblings = (await deps.itineraries.listByDay(dayId)).filter((item) => item.tripId === tripId && item.dayId === dayId)
-      position = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
-    }
-    const itinerary: Itinerary = current ? { ...current, ...draft, tripId, dayId, position, updatedAt: now } : { id: deps.newId(), ...draft, tripId, dayId, position, createdAt: now, updatedAt: now }
-    await deps.itineraries.put(itinerary); return itinerary
+    const now = deps.now()
+    const itinerary: Itinerary = current
+      ? { ...current, ...draft, tripId, dayId, updatedAt: now }
+      : { id: deps.newId(), ...draft, tripId, dayId, createdAt: now, updatedAt: now }
+    return deps.itineraries.saveManual(itinerary)
   }
   async function deleteManualItineraryItem(tripId: string, dayId: string, itineraryId: string): Promise<void> {
-    await assertContext(tripId, dayId, true); const itinerary = await deps.itineraries.get(itineraryId); if (!itinerary) return
-    if (itinerary.tripId !== tripId || itinerary.dayId !== dayId) throw new Error('La tappa non appartiene a questa giornata.')
-    if (itinerary.reservationId || itinerary.blockId) throw new Error('Le tappe derivate da prenotazioni si eliminano dal relativo blocco del planner.')
-    await deps.itineraries.softDelete(itineraryId)
+    await deps.itineraries.softDeleteManual(tripId, dayId, itineraryId)
   }
   async function reconcileDayReservationItineraries(tripId: string, dayId: string): Promise<number> {
     await assertContext(tripId, dayId, true)
@@ -196,27 +191,10 @@ export function createItineraryApplication(deps: ItineraryApplicationDependencie
     return reconciled
   }
   async function moveManualUntimedItineraryItem(tripId: string, dayId: string, itineraryId: string, direction: ManualItineraryMoveDirection): Promise<boolean> {
-    await assertContext(tripId, dayId, true); return deps.itineraries.moveManualUntimed(tripId, dayId, itineraryId, direction)
+    return deps.itineraries.moveManualUntimed(tripId, dayId, itineraryId, direction)
   }
   async function resolveOrphanedItineraryItem(tripId: string, dayId: string, itineraryId: string, action: OrphanResolutionAction): Promise<void> {
-    await assertContext(tripId, dayId, true)
-    const itinerary = await deps.itineraries.get(itineraryId)
-    if (!itinerary) throw new Error('La tappa non esiste più.')
-    if (itinerary.tripId !== tripId || itinerary.dayId !== dayId) throw new Error('La tappa non appartiene a questa giornata.')
-    if (!itinerary.reservationId && !itinerary.blockId) throw new Error('La tappa è già manuale e non richiede una riconciliazione.')
-    const blocks = (await deps.blocks.listByDay(dayId)).filter((block) => block.tripId === tripId && block.dayId === dayId)
-    const linkedBlock = itinerary.blockId ? blocks.find((block) => block.id === itinerary.blockId) : undefined
-    const reservationId = itinerary.reservationId ?? reservationIdFromBlock(linkedBlock)
-    if (reservationId) {
-      const reservation = await deps.reservations.get(reservationId)
-      const sourceBlocks = blocks.filter((block) => reservationIdFromBlock(block) === reservationId)
-      if (sourceBlocks.length > 1) throw new Error('Più blocchi attivi fanno riferimento alla stessa prenotazione: risolvi prima l’ambiguità nel planner.')
-      if (reservation && sourceBlocks.length === 1) throw new Error('La sorgente della tappa è di nuovo disponibile. Usa “Riallinea” invece di scollegarla.')
-    }
-    if (action === 'delete') { await deps.itineraries.softDelete(itinerary.id); return }
-    const siblings = (await deps.itineraries.listByDay(dayId)).filter((item) => item.tripId === tripId && item.dayId === dayId && !item.reservationId && !item.blockId && !item.startsAt)
-    const nextPosition = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
-    await deps.itineraries.put({ ...itinerary, reservationId: undefined, blockId: undefined, position: itinerary.startsAt ? itinerary.position : nextPosition, updatedAt: deps.now() })
+    await deps.itineraries.resolveOrphan(tripId, dayId, itineraryId, action, deps.now())
   }
   async function listTripItineraryOverview(tripId: string): Promise<TripItineraryOverview> {
     await requireTrip({ trips: deps.trips }, tripId)
