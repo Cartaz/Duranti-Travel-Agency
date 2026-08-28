@@ -1,13 +1,23 @@
-import type { Itinerary } from '../../domain/entities'
+import type { Block, Itinerary } from '../../domain/entities'
+import { reservationTypeForBlockType } from '../../domain/reservation-itinerary-mapping'
 import { db } from '../db/dtagency-db'
 import { Repository } from './base-repository'
 
 export type ItineraryMoveDirection = 'up' | 'down'
+export type OrphanResolutionAction = 'convert-to-manual' | 'delete'
 
 function compareManualUntimed(left: Itinerary, right: Itinerary): number {
   return (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER)
     || left.createdAt.localeCompare(right.createdAt)
     || left.id.localeCompare(right.id)
+}
+
+function reservationIdFromBlock(block: Block | undefined): string | undefined {
+  if (!block || !reservationTypeForBlockType(block.type)) return undefined
+  const value = block.content.reservationId
+  if (value === undefined) return undefined
+  if (typeof value !== 'string' || !value) throw new Error('Il planner contiene un riferimento prenotazione non valido.')
+  return value
 }
 
 async function requireEditableDay(tripId: string, dayId: string): Promise<void> {
@@ -74,6 +84,65 @@ export class ItineraryRepository extends Repository<Itinerary> {
       const now = new Date().toISOString()
       await db.itineraries.put({ ...itinerary, deletedAt: now, updatedAt: now })
       return 'deleted'
+    })
+  }
+
+  async resolveOrphan(
+    tripId: string,
+    dayId: string,
+    itineraryId: string,
+    action: OrphanResolutionAction,
+    updatedAt: string,
+  ): Promise<void> {
+    await db.transaction('rw', db.trips, db.days, db.itineraries, db.blocks, db.reservations, async () => {
+      await requireEditableDay(tripId, dayId)
+      const itinerary = await db.itineraries.get(itineraryId)
+      if (!itinerary || itinerary.deletedAt) throw new Error('La tappa non esiste più.')
+      if (itinerary.tripId !== tripId || itinerary.dayId !== dayId) throw new Error('La tappa non appartiene a questa giornata.')
+      if (!itinerary.reservationId && !itinerary.blockId) throw new Error('La tappa è già manuale e non richiede una riconciliazione.')
+
+      const blocks = (await db.blocks.where('dayId').equals(dayId).toArray())
+        .filter((block) => !block.deletedAt && block.tripId === tripId && block.dayId === dayId)
+      const linkedBlock = itinerary.blockId ? blocks.find((block) => block.id === itinerary.blockId) : undefined
+      const reservationId = itinerary.reservationId ?? reservationIdFromBlock(linkedBlock)
+      if (reservationId) {
+        const sourceBlocks = blocks.filter((block) => reservationIdFromBlock(block) === reservationId)
+        if (sourceBlocks.length > 1) {
+          throw new Error('Più blocchi attivi fanno riferimento alla stessa prenotazione: risolvi prima l’ambiguità nel planner.')
+        }
+        const reservation = await db.reservations.get(reservationId)
+        if (reservation && !reservation.deletedAt && sourceBlocks.length === 1) {
+          throw new Error('La sorgente della tappa è di nuovo disponibile. Usa “Riallinea” invece di scollegarla.')
+        }
+      }
+
+      if (action === 'delete') {
+        await db.itineraries.put({ ...itinerary, deletedAt: updatedAt, updatedAt })
+        return
+      }
+
+      let position = itinerary.position
+      if (!itinerary.startsAt) {
+        const siblings = (await db.itineraries.where('dayId').equals(dayId).toArray())
+          .filter((item) => (
+            !item.deletedAt
+            && item.id !== itinerary.id
+            && item.tripId === tripId
+            && item.dayId === dayId
+            && !item.reservationId
+            && !item.blockId
+            && !item.startsAt
+          ))
+        position = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
+      }
+
+      await db.itineraries.put({
+        ...itinerary,
+        reservationId: undefined,
+        blockId: undefined,
+        position,
+        updatedAt,
+      })
     })
   }
 
