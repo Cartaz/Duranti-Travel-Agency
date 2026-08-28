@@ -220,53 +220,57 @@ export class ReservationBlockRepository {
   }
 
   async softDeleteReservationBlock(blockId: string, tripId: string, dayId: string): Promise<void> {
-    await db.transaction('rw', db.trips, db.days, db.blocks, db.reservations, db.itineraries, db.media, async () => {
-      await requireEditableTripDay(tripId, dayId)
-      const block = await db.blocks.get(blockId)
-      if (!block || block.deletedAt) return
-      if (block.tripId !== tripId || block.dayId !== dayId) {
-        throw new Error('Il blocco prenotazione non appartiene a questa giornata.')
-      }
+    await db.transaction(
+      'rw',
+      [db.trips, db.days, db.blocks, db.reservations, db.itineraries, db.media],
+      async () => {
+        await requireEditableTripDay(tripId, dayId)
+        const block = await db.blocks.get(blockId)
+        if (!block || block.deletedAt) return
+        if (block.tripId !== tripId || block.dayId !== dayId) {
+          throw new Error('Il blocco prenotazione non appartiene a questa giornata.')
+        }
 
-      const expectedType = reservationTypeForBlockType(block.type)
-      if (!expectedType) throw new Error('Il blocco non è una prenotazione supportata.')
+        const expectedType = reservationTypeForBlockType(block.type)
+        if (!expectedType) throw new Error('Il blocco non è una prenotazione supportata.')
 
-      const now = new Date().toISOString()
-      const reservationId = readReservationId(block)
-      if (reservationId) {
-        const reservation = await db.reservations.get(reservationId)
-        if (reservation && !reservation.deletedAt) {
-          assertReservationContext(reservation, tripId, dayId, expectedType)
-          if (reservation.attachmentMediaId) {
-            const media = await db.media.get(reservation.attachmentMediaId)
-            if (media && !media.deletedAt) {
-              assertMediaContext(media, tripId, dayId, blockId)
-              await db.media.put({ ...media, deletedAt: now, updatedAt: now })
+        const now = new Date().toISOString()
+        const reservationId = readReservationId(block)
+        if (reservationId) {
+          const reservation = await db.reservations.get(reservationId)
+          if (reservation && !reservation.deletedAt) {
+            assertReservationContext(reservation, tripId, dayId, expectedType)
+            if (reservation.attachmentMediaId) {
+              const media = await db.media.get(reservation.attachmentMediaId)
+              if (media && !media.deletedAt) {
+                assertMediaContext(media, tripId, dayId, blockId)
+                await db.media.put({ ...media, deletedAt: now, updatedAt: now })
+              }
             }
+            await db.reservations.put({
+              ...reservation,
+              deletedAt: now,
+              updatedAt: now,
+            })
           }
-          await db.reservations.put({
-            ...reservation,
-            deletedAt: now,
-            updatedAt: now,
-          })
+
+          const itinerary = await findOwnedItinerary(tripId, dayId, blockId, reservationId)
+          if (itinerary) {
+            await db.itineraries.put({
+              ...itinerary,
+              deletedAt: now,
+              updatedAt: now,
+            })
+          }
         }
 
-        const itinerary = await findOwnedItinerary(tripId, dayId, blockId, reservationId)
-        if (itinerary) {
-          await db.itineraries.put({
-            ...itinerary,
-            deletedAt: now,
-            updatedAt: now,
-          })
-        }
-      }
-
-      await db.blocks.put({
-        ...block,
-        deletedAt: now,
-        updatedAt: now,
-      })
-    })
+        await db.blocks.put({
+          ...block,
+          deletedAt: now,
+          updatedAt: now,
+        })
+      },
+    )
   }
 }
 
