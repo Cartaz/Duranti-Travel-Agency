@@ -122,23 +122,17 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
   }
 
   async function createPlannerBlock(tripId: string, dayId: string, type: PlannerBlockType): Promise<Block> {
-    await assertPlannerDayContext(tripId, dayId, true)
-    const siblings = (await deps.blocks.listByDay(dayId)).filter((block) => block.tripId === tripId)
-    const position = siblings.reduce((maximum, block) => Math.max(maximum, block.position), 0) + 1
     const now = deps.now()
     const content = ['place', 'transport', 'accommodation', 'restaurant', 'activity', 'expense'].includes(type)
       ? {}
       : contentFromDraft(defaultDraft(type as BasicPlannerBlockType))
 
-    const block: Block = {
-      id: deps.newId(), tripId, dayId, type, position, content, createdAt: now, updatedAt: now,
-    }
-    await deps.blocks.put(block)
-    return block
+    return deps.blocks.createAtEnd({
+      id: deps.newId(), tripId, dayId, type, content, createdAt: now, updatedAt: now,
+    })
   }
 
   async function updatePlannerBlock(tripId: string, dayId: string, blockId: string, input: PlannerBlockDraft): Promise<Block> {
-    await assertPlannerDayContext(tripId, dayId, true)
     const block = await deps.blocks.get(blockId)
     if (!block || block.tripId !== tripId || block.dayId !== dayId) throw new Error('Il blocco non appartiene a questa giornata.')
     assertBasicPlannerType(block.type)
@@ -146,25 +140,23 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
 
     const draft = normalizeDraft(input, deps.newId)
     const updated: Block = { ...block, content: contentFromDraft(draft), updatedAt: deps.now() }
-    await deps.blocks.put(updated)
+    await deps.blocks.putInEditableDay(updated)
     return updated
   }
 
   async function movePlannerBlock(tripId: string, dayId: string, blockId: string, direction: BlockMoveDirection): Promise<void> {
-    await assertPlannerDayContext(tripId, dayId, true)
     const result = await deps.blocks.moveWithinDay(blockId, tripId, dayId, direction)
     if (result === 'not-found') throw new Error('Il blocco non esiste più.')
     if (result === 'invalid-context') throw new Error('Il blocco non appartiene a questa giornata.')
   }
 
   async function deletePlannerBlock(tripId: string, dayId: string, blockId: string): Promise<void> {
-    await assertPlannerDayContext(tripId, dayId, true)
     const block = await deps.blocks.get(blockId)
     if (!block || block.tripId !== tripId || block.dayId !== dayId) throw new Error('Il blocco non appartiene a questa giornata.')
     if (transactionalDeleteBlockTypes.has(block.type)) {
       throw new Error('Questo blocco deve essere eliminato dal suo editor dedicato per rimuovere in sicurezza i dati collegati.')
     }
-    const result = await deps.blocks.softDelete(blockId)
+    const result = await deps.blocks.softDeleteWithinDay(blockId, tripId, dayId)
     if (result === 'not-found') throw new Error('Il blocco non esiste più.')
   }
 

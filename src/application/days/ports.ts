@@ -1,18 +1,14 @@
-import type { Day, Trip } from '../../domain/entities'
+import type { Block, Day } from '../../domain/entities'
 
 export interface DayRepositoryPort {
   listByTrip(tripId: string): Promise<Day[]>
   get(id: string): Promise<Day | undefined>
-  put(value: Day): Promise<unknown>
-}
-
-export interface TripReaderPort {
-  getTrip(tripId: string): Promise<Trip | undefined>
+  createForTrip(value: Omit<Day, 'sequence'>, initialBlocks?: Block[]): Promise<Day>
+  updateForTrip(value: Day): Promise<Day>
 }
 
 export interface DayApplicationDependencies {
   days: DayRepositoryPort
-  trips: TripReaderPort
   now(): string
   newId(): string
 }

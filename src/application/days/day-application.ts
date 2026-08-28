@@ -1,5 +1,5 @@
-import type { Day, Trip } from '../../domain/entities'
-import { assertDayDateWithinTripRange } from '../../domain/trip-calendar'
+import type { Day } from '../../domain/entities'
+import { normalizeDateOnly } from '../../domain/date-only'
 import type { DayApplicationDependencies } from './ports'
 
 export interface DayDraft {
@@ -14,24 +14,7 @@ function cleanOptional(value: string | undefined): string | undefined {
   return cleaned ? cleaned : undefined
 }
 
-function validateDate(value: string): string {
-  const date = value.trim()
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('La data della giornata non è valida.')
-
-  const [year, month, day] = date.split('-').map(Number)
-  const parsed = new Date(year, month - 1, day)
-  if (
-    parsed.getFullYear() !== year ||
-    parsed.getMonth() !== month - 1 ||
-    parsed.getDate() !== day
-  ) {
-    throw new Error('La data della giornata non esiste nel calendario.')
-  }
-
-  return date
-}
-
-function validateDraft(input: DayDraft): DayDraft {
+export function normalizeDayDraft(input: DayDraft): DayDraft {
   const title = cleanOptional(input.title)
   if (title && title.length > 120) throw new Error('Il titolo della giornata è troppo lungo.')
 
@@ -44,7 +27,7 @@ function validateDraft(input: DayDraft): DayDraft {
   }
 
   return {
-    date: validateDate(input.date),
+    date: normalizeDateOnly(input.date, 'La data della giornata'),
     title,
     summary,
     journalText,
@@ -59,13 +42,6 @@ export interface DayApplication {
 }
 
 export function createDayApplication(deps: DayApplicationDependencies): DayApplication {
-  async function getEditableTrip(tripId: string): Promise<Trip> {
-    const trip = await deps.trips.getTrip(tripId)
-    if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
-    if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di modificare le sue giornate.')
-    return trip
-  }
-
   async function listTripDays(tripId: string): Promise<Day[]> {
     return (await deps.days.listByTrip(tripId))
       .sort((left, right) => left.sequence - right.sequence || left.date.localeCompare(right.date))
@@ -77,43 +53,27 @@ export function createDayApplication(deps: DayApplicationDependencies): DayAppli
   }
 
   async function createTripDay(tripId: string, input: DayDraft): Promise<Day> {
-    const trip = await getEditableTrip(tripId)
-    const draft = validateDraft(input)
-    assertDayDateWithinTripRange(trip, draft.date)
-
-    const days = await listTripDays(tripId)
+    const draft = normalizeDayDraft(input)
     const now = deps.now()
-    const nextSequence = days.reduce((maximum, day) => Math.max(maximum, day.sequence), 0) + 1
-
-    const entity: Day = {
+    return deps.days.createForTrip({
       id: deps.newId(),
       tripId,
-      sequence: nextSequence,
       createdAt: now,
       updatedAt: now,
       ...draft,
-    }
-
-    await deps.days.put(entity)
-    return entity
+    })
   }
 
   async function updateTripDay(tripId: string, dayId: string, input: DayDraft): Promise<Day> {
-    const trip = await getEditableTrip(tripId)
     const existing = await getTripDay(tripId, dayId)
     if (!existing) throw new Error('La giornata non esiste in questo viaggio.')
 
-    const draft = validateDraft(input)
-    assertDayDateWithinTripRange(trip, draft.date)
-
     const updated: Day = {
       ...existing,
-      ...draft,
+      ...normalizeDayDraft(input),
       updatedAt: deps.now(),
     }
-
-    await deps.days.put(updated)
-    return updated
+    return deps.days.updateForTrip(updated)
   }
 
   return { listTripDays, getTripDay, createTripDay, updateTripDay }

@@ -2,13 +2,13 @@ import type { Block, Day, Trip } from '../../domain/entities'
 
 export type BlockMoveDirection = 'up' | 'down'
 export type BlockMoveResult = 'moved' | 'boundary' | 'not-found' | 'invalid-context'
-export type SoftDeleteResult = 'not-found' | 'already-deleted' | 'tombstoned'
 
 export interface PlannerBlockRepositoryPort {
   listByDay(dayId: string): Promise<Block[]>
   get(id: string): Promise<Block | undefined>
-  put(value: Block): Promise<unknown>
-  softDelete(id: string): Promise<SoftDeleteResult>
+  createAtEnd(value: Omit<Block, 'position'>): Promise<Block>
+  putInEditableDay(value: Block): Promise<void>
+  softDeleteWithinDay(blockId: string, tripId: string, dayId: string): Promise<'not-found' | 'tombstoned'>
   moveWithinDay(blockId: string, tripId: string, dayId: string, direction: BlockMoveDirection): Promise<BlockMoveResult>
 }
 

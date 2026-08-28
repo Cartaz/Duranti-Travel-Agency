@@ -42,56 +42,58 @@ export class Repository<T extends EntityBase> {
 
   async put(entity: T): Promise<EntityId> {
     assertEntityBase(entity, 'Entity')
-
-    const existing = await this.table.get(entity.id)
-    if (existing?.deletedAt && !entity.deletedAt) {
-      throw new Error(`Entity ${entity.id} is tombstoned. Use restore() before updating it.`)
-    }
-
-    await this.table.put(entity)
-    return entity.id
+    return this.table.db.transaction('rw', this.table, async () => {
+      const existing = await this.table.get(entity.id)
+      if (existing?.deletedAt && !entity.deletedAt) {
+        throw new Error(`Entity ${entity.id} is tombstoned. Use restore() before updating it.`)
+      }
+      await this.table.put(entity)
+      return entity.id
+    })
   }
 
   async softDelete(id: EntityId): Promise<SoftDeleteResult> {
-    const entity = await this.table.get(id)
-    if (!entity) return 'not-found'
-    if (entity.deletedAt) return 'already-deleted'
+    return this.table.db.transaction('rw', this.table, async () => {
+      const entity = await this.table.get(id)
+      if (!entity) return 'not-found'
+      if (entity.deletedAt) return 'already-deleted'
 
-    const now = new Date().toISOString()
-    await this.table.put({
-      ...entity,
-      deletedAt: now,
-      updatedAt: now,
+      const now = new Date().toISOString()
+      await this.table.put({ ...entity, deletedAt: now, updatedAt: now })
+      return 'tombstoned'
     })
-    return 'tombstoned'
   }
 
   async restore(id: EntityId): Promise<RestoreResult> {
-    const entity = await this.table.get(id)
-    if (!entity) return 'not-found'
-    if (!entity.deletedAt) return 'already-active'
+    return this.table.db.transaction('rw', this.table, async () => {
+      const entity = await this.table.get(id)
+      if (!entity) return 'not-found'
+      if (!entity.deletedAt) return 'already-active'
 
-    await this.table.put({
-      ...entity,
-      deletedAt: undefined,
-      updatedAt: new Date().toISOString(),
+      await this.table.put({
+        ...entity,
+        deletedAt: undefined,
+        updatedAt: new Date().toISOString(),
+      })
+      return 'restored'
     })
-    return 'restored'
   }
 
   async purge(id: EntityId): Promise<PurgeResult> {
-    const entity = await this.table.get(id)
-    if (!entity) return 'not-found'
-    if (!entity.deletedAt) {
-      throw new Error(`Entity ${id} must be tombstoned before it can be purged.`)
-    }
+    return this.table.db.transaction('rw', this.table, async () => {
+      const entity = await this.table.get(id)
+      if (!entity) return 'not-found'
+      if (!entity.deletedAt) {
+        throw new Error(`Entity ${id} must be tombstoned before it can be purged.`)
+      }
 
-    await this.table.delete(id)
-    return 'purged'
+      await this.table.delete(id)
+      return 'purged'
+    })
   }
 
   async count(options: RepositoryReadOptions = {}): Promise<number> {
     if (options.includeDeleted) return this.table.count()
-    return (await this.list()).length
+    return this.table.filter((entity) => !entity.deletedAt).count()
   }
 }
