@@ -20,21 +20,26 @@ Short `maps.app.goo.gl` links are intentionally rejected in the first slice beca
 
 ## OpenStreetMap / Nominatim
 
-The initial discovery adapter uses the public Nominatim search endpoint only for searches explicitly triggered by the user. It requests `addressdetails=1`, `extratags=1` and `namedetails=1`; `extratags` may provide telephone and `opening_hours` when those tags exist in OpenStreetMap.
+The discovery adapter uses the public Nominatim search endpoint only for searches explicitly triggered by the user. It requests `addressdetails=1`, `extratags=1` and `namedetails=1`; `extratags` may provide telephone and `opening_hours` when those tags exist in OpenStreetMap.
 
 The adapter:
 
-- caps itself to at most one network request per second;
+- reserves request-start slots so concurrent callers in one page cannot exceed one network request per second;
+- deduplicates identical searches already in flight;
+- coordinates request slots across same-origin tabs through the Web Locks API when the browser supports it, storing the last reserved start time in local storage;
+- falls back to in-process serialization when Web Locks or shared local storage are unavailable;
 - caches successful query results locally for seven days;
 - sends a browser referrer policy suitable for application identification;
 - exposes OpenStreetMap attribution in the UI;
 - performs no autocomplete, background refresh, bulk download or systematic POI harvesting.
 
+The fallback deliberately makes no false cross-tab guarantee on browsers without Web Locks/shared local storage. DTAgency still remains conservative because searches are explicit, cached and deduplicated. If multi-tab traffic on such browsers becomes material, the public Nominatim adapter must be replaced by a provider whose quota DTAgency controls rather than adding a fragile home-grown distributed lock.
+
 The public Nominatim instance is an adapter, not an architectural dependency. If DTAgency grows beyond moderate personal use, the adapter must be switched to another compliant provider or a self-hosted service before increasing traffic.
 
 ## Persisted data
 
-`Place` gains optional `phone` and `openingHours` properties. These are additive object properties in the existing `places` table; no IndexedDB index or table layout changes, so database version 1 remains valid and older records simply omit the fields.
+`Place` has optional `phone` and `openingHours` properties. These are additive object properties in the existing `places` table; no IndexedDB index or table layout changes, so database version 1 remains valid and older records simply omit the fields.
 
 Imported candidates store `provider = "openstreetmap"` plus an OSM object identity (`osm_type:osm_id`) when available. Provider identity is provenance metadata, not ownership: after the user reviews and saves the record, the DTAgency copy is ordinary local application data and is included in the normal Vault export like other `Place` records.
 
