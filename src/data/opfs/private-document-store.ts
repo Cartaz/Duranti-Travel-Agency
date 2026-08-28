@@ -229,11 +229,15 @@ export async function writeEncryptedDocumentAttachment(
     try {
       await writable.write(envelope)
       await writable.close()
+      const stored = await fileHandle.getFile()
+      if (stored.size !== envelope.byteLength) {
+        throw new Error(`Encrypted private document write is incomplete: expected ${envelope.byteLength} bytes, found ${stored.size}.`)
+      }
     } catch (error) {
       try {
         await writable.abort()
       } catch {
-        // Preserve the original write error.
+        // Preserve the original write/verification error.
       }
       try {
         await documentDirectory.removeEntry(fileName)
@@ -241,6 +245,10 @@ export async function writeEncryptedDocumentAttachment(
         // Best-effort rollback only.
       }
       throw error
+    } finally {
+      envelope.fill(0)
+      encrypted.iv.fill(0)
+      encrypted.ciphertext.fill(0)
     }
   } finally {
     plaintext.fill(0)
