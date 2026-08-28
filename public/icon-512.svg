@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="DTAgency">
+  <rect width="512" height="512" rx="108" fill="#17130f"/>
+  <path d="M112 133h115c83 0 136 45 136 123s-53 123-136 123H112V133Zm83 67v112h32c40 0 64-19 64-56s-24-56-64-56h-32Z" fill="#f4e5c7"/>
+  <path d="M299 133h112v67h-21v179h-72V200h-19v-67Z" fill="#d8a95f"/>
+</svg>
