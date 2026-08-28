@@ -32,6 +32,8 @@ interface NominatimResult {
 const CACHE_PREFIX = 'dtagency:nominatim:v1:'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const MIN_REQUEST_INTERVAL_MS = 1_000
+const RATE_LIMIT_LOCK_NAME = 'dtagency:nominatim:request-slot:v1'
+const LAST_REQUEST_START_KEY = 'dtagency:nominatim:last-request-start:v1'
 
 function first(...values: Array<string | undefined>): string | undefined {
   return values.find((value) => value?.trim())?.trim()
@@ -99,16 +101,44 @@ function writeCache(query: string, candidates: NominatimPlaceCandidate[]): void 
   }
 }
 
+function readSharedLastRequestStart(): number {
+  try {
+    const value = Number(localStorage.getItem(LAST_REQUEST_START_KEY))
+    return Number.isFinite(value) && value > 0 ? value : 0
+  } catch {
+    return 0
+  }
+}
+
+function writeSharedLastRequestStart(value: number): void {
+  try {
+    localStorage.setItem(LAST_REQUEST_START_KEY, String(value))
+  } catch {
+    // In-process serialization still applies when shared browser storage is unavailable.
+  }
+}
+
 export function createNominatimPlaceDiscovery(endpoint = 'https://nominatim.openstreetmap.org') {
   let nextRequestStartAt = 0
   const inFlightSearches = new Map<string, Promise<NominatimPlaceCandidate[]>>()
 
-  async function waitForRequestSlot(): Promise<void> {
+  async function reserveRequestSlot(): Promise<void> {
     const now = Date.now()
-    const scheduledAt = Math.max(now, nextRequestStartAt)
+    const sharedNextStartAt = readSharedLastRequestStart() + MIN_REQUEST_INTERVAL_MS
+    const scheduledAt = Math.max(now, nextRequestStartAt, sharedNextStartAt)
     nextRequestStartAt = scheduledAt + MIN_REQUEST_INTERVAL_MS
     const waitMs = scheduledAt - now
     if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
+    writeSharedLastRequestStart(scheduledAt)
+  }
+
+  async function waitForRequestSlot(): Promise<void> {
+    const locks = typeof navigator === 'undefined' ? undefined : navigator.locks
+    if (!locks) {
+      await reserveRequestSlot()
+      return
+    }
+    await locks.request(RATE_LIMIT_LOCK_NAME, reserveRequestSlot)
   }
 
   async function searchRemote(query: string): Promise<NominatimPlaceCandidate[]> {
