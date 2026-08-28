@@ -1,5 +1,5 @@
 import type { Traveler, TripTraveler } from '../../domain/entities'
-import { normalizeOptionalDateOnly } from '../../domain/date-only'
+import { normalizeOptionalDateOnly } from '../../domain/date-only.ts'
 import type { TravelerApplicationDependencies, TravelerRole } from './ports'
 
 export type { TravelerRole }
