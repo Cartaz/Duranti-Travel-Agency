@@ -1,5 +1,7 @@
 import { DB_NAME, DB_VERSION, db } from '../../src/data/db/dtagency-db'
 import { readMediaFile, writeMediaFile } from '../../src/data/opfs/opfs-store'
+import { dayRepository } from '../../src/data/repositories/day-repository'
+import { plannerBlockRepository } from '../../src/data/repositories/block-repository'
 import { prepareVaultExport, loadPreparedVaultFile } from '../../src/vault/export'
 import { stageVaultImport } from '../../src/vault/import'
 import { commitStagedVaultImport, recoverInterruptedVaultRestore } from '../../src/vault/restore'
@@ -197,6 +199,36 @@ await run('OPFS media CRUD uses the DTAgency namespace', async () => {
   assert(path === `dtagency/media/${mediaId}/original`, `Unexpected media path ${path}.`)
   const stored = await readMediaFile(mediaId)
   assert(await readText(stored) === expected, 'OPFS round-trip changed media bytes.')
+})
+
+await run('Concurrent day and block creation allocate unique ordered positions', async () => {
+  await resetEnvironment()
+  const now = new Date().toISOString()
+  const tripId = 'browser-concurrent-trip'
+  await db.trips.add({
+    id: tripId,
+    title: 'Concurrent allocation trip',
+    status: 'planned',
+    startDate: '2026-09-01',
+    endDate: '2026-09-03',
+    createdAt: now,
+    updatedAt: now,
+  })
+
+  const [firstDay, secondDay] = await Promise.all([
+    dayRepository.createForTrip({ id: 'concurrent-day-a', tripId, date: '2026-09-01', createdAt: now, updatedAt: now }),
+    dayRepository.createForTrip({ id: 'concurrent-day-b', tripId, date: '2026-09-02', createdAt: now, updatedAt: now }),
+  ])
+  const sequences = [firstDay.sequence, secondDay.sequence].sort((a, b) => a - b)
+  assert(sequences.join(',') === '1,2', `Concurrent days received invalid sequences ${sequences.join(',')}.`)
+
+  const dayId = firstDay.id
+  const [firstBlock, secondBlock] = await Promise.all([
+    plannerBlockRepository.createAtEnd({ id: 'concurrent-block-a', tripId, dayId, type: 'text', content: {}, createdAt: now, updatedAt: now }),
+    plannerBlockRepository.createAtEnd({ id: 'concurrent-block-b', tripId, dayId, type: 'text', content: {}, createdAt: now, updatedAt: now }),
+  ])
+  const positions = [firstBlock.position, secondBlock.position].sort((a, b) => a - b)
+  assert(positions.join(',') === '1,2', `Concurrent blocks received invalid positions ${positions.join(',')}.`)
 })
 
 await run('Vault export wipe import restore round-trips IndexedDB and OPFS', async () => {
