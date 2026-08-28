@@ -33,7 +33,7 @@ export async function runMediaHistoricalPlaceContract(): Promise<MediaHistorical
           return media
         },
         setDayOrder: async () => undefined,
-        softDelete: async () => undefined,
+        softDeleteForDay: async () => undefined,
         purge: async () => undefined,
       },
       blocks: { listByDay: async () => [] },
@@ -126,8 +126,9 @@ export async function runMediaHistoricalPlaceContract(): Promise<MediaHistorical
         get: async (id) => id === itinerary.id ? itinerary : undefined,
         listByDay: async () => [itinerary],
         listByTrip: async () => [itinerary],
-        put: async (value) => { itinerary = value },
-        softDelete: async () => undefined,
+        saveManual: async (value) => { itinerary = value; return itinerary },
+        softDeleteManual: async () => 'deleted',
+        resolveOrphan: async () => undefined,
         moveManualUntimed: async () => false,
       },
       places: {
