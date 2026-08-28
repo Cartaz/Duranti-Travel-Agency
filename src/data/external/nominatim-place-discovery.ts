@@ -32,7 +32,6 @@ interface NominatimResult {
 const CACHE_PREFIX = 'dtagency:nominatim:v1:'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const MIN_REQUEST_INTERVAL_MS = 1_000
-let lastRequestStartedAt = 0
 
 function first(...values: Array<string | undefined>): string | undefined {
   return values.find((value) => value?.trim())?.trim()
@@ -100,45 +99,62 @@ function writeCache(query: string, candidates: NominatimPlaceCandidate[]): void 
   }
 }
 
-async function respectRateLimit(): Promise<void> {
-  const waitMs = Math.max(0, MIN_REQUEST_INTERVAL_MS - (Date.now() - lastRequestStartedAt))
-  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
-  lastRequestStartedAt = Date.now()
-}
-
 export function createNominatimPlaceDiscovery(endpoint = 'https://nominatim.openstreetmap.org') {
+  let nextRequestStartAt = 0
+  const inFlightSearches = new Map<string, Promise<NominatimPlaceCandidate[]>>()
+
+  async function waitForRequestSlot(): Promise<void> {
+    const now = Date.now()
+    const scheduledAt = Math.max(now, nextRequestStartAt)
+    nextRequestStartAt = scheduledAt + MIN_REQUEST_INTERVAL_MS
+    const waitMs = scheduledAt - now
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
+  }
+
+  async function searchRemote(query: string): Promise<NominatimPlaceCandidate[]> {
+    await waitForRequestSlot()
+    const url = new URL('/search', endpoint)
+    url.searchParams.set('q', query)
+    url.searchParams.set('format', 'jsonv2')
+    url.searchParams.set('limit', '5')
+    url.searchParams.set('addressdetails', '1')
+    url.searchParams.set('extratags', '1')
+    url.searchParams.set('namedetails', '1')
+    url.searchParams.set('accept-language', 'it')
+
+    let response: Response
+    try {
+      response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        referrerPolicy: 'strict-origin-when-cross-origin',
+      })
+    } catch {
+      throw new Error('Non riesco a contattare OpenStreetMap. Controlla la connessione e riprova.')
+    }
+    if (!response.ok) throw new Error(`OpenStreetMap non è disponibile in questo momento (${response.status}).`)
+
+    const payload = await response.json() as NominatimResult[]
+    const candidates = payload
+      .filter((result) => Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lon)))
+      .map(candidateFromResult)
+    writeCache(query, candidates)
+    return candidates
+  }
+
   return {
     async search(query: string): Promise<NominatimPlaceCandidate[]> {
-      const cached = readCache(query)
+      const normalizedQuery = query.trim()
+      const cached = readCache(normalizedQuery)
       if (cached) return cached
 
-      await respectRateLimit()
-      const url = new URL('/search', endpoint)
-      url.searchParams.set('q', query)
-      url.searchParams.set('format', 'jsonv2')
-      url.searchParams.set('limit', '5')
-      url.searchParams.set('addressdetails', '1')
-      url.searchParams.set('extratags', '1')
-      url.searchParams.set('namedetails', '1')
-      url.searchParams.set('accept-language', 'it')
+      const key = cacheKey(normalizedQuery)
+      const pending = inFlightSearches.get(key)
+      if (pending) return pending
 
-      let response: Response
-      try {
-        response = await fetch(url, {
-          headers: { Accept: 'application/json' },
-          referrerPolicy: 'strict-origin-when-cross-origin',
-        })
-      } catch {
-        throw new Error('Non riesco a contattare OpenStreetMap. Controlla la connessione e riprova.')
-      }
-      if (!response.ok) throw new Error(`OpenStreetMap non è disponibile in questo momento (${response.status}).`)
-
-      const payload = await response.json() as NominatimResult[]
-      const candidates = payload
-        .filter((result) => Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lon)))
-        .map(candidateFromResult)
-      writeCache(query, candidates)
-      return candidates
+      const request = searchRemote(normalizedQuery)
+        .finally(() => inFlightSearches.delete(key))
+      inFlightSearches.set(key, request)
+      return request
     },
   }
 }
