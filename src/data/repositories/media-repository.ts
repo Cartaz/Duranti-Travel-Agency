@@ -37,6 +37,33 @@ export type SoftDeleteMediaResult = 'not-found' | 'already-deleted' | 'tombstone
 export type RestoreMediaResult = 'not-found' | 'already-active' | 'restored'
 export type PurgeMediaResult = 'not-found' | 'purged'
 
+async function requireEditableMediaContext(media: Pick<Media, 'tripId' | 'dayId' | 'blockId'>): Promise<void> {
+  if (!media.tripId && !media.dayId && !media.blockId) return
+  if (!media.tripId) throw new Error('Il media contestuale deve appartenere a un viaggio.')
+
+  const trip = await db.trips.get(media.tripId)
+  if (!trip || trip.deletedAt) throw new Error('Il viaggio non esiste o è stato eliminato.')
+  if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di modificare i media.')
+
+  if (media.dayId) {
+    const day = await db.days.get(media.dayId)
+    if (!day || day.deletedAt || day.tripId !== media.tripId) {
+      throw new Error('La giornata del media non appartiene a questo viaggio.')
+    }
+  }
+
+  if (media.blockId) {
+    const block = await db.blocks.get(media.blockId)
+    if (
+      !block || block.deletedAt ||
+      block.tripId !== media.tripId ||
+      (media.dayId !== undefined && block.dayId !== media.dayId)
+    ) {
+      throw new Error('Il blocco del media non appartiene al suo contesto.')
+    }
+  }
+}
+
 export class MediaRepository {
   async create(input: CreateMediaInput, source: Blob): Promise<Media> {
     const id = crypto.randomUUID()
@@ -55,7 +82,10 @@ export class MediaRepository {
 
     try {
       assertEntityBase(entity, 'Media')
-      await db.media.add(entity)
+      await db.transaction('rw', db.trips, db.days, db.blocks, db.media, async () => {
+        await requireEditableMediaContext(entity)
+        await db.media.add(entity)
+      })
       return entity
     } catch (error) {
       try {
@@ -107,19 +137,21 @@ export class MediaRepository {
   }
 
   async updateDayMetadata(id: string, input: DayMediaMetadataUpdate): Promise<Media> {
-    const media = await this.get(id)
-    if (!media) throw new Error(`Active media ${id} was not found.`)
-    const updatedAt = new Date().toISOString()
-    const changes: DayMediaMetadataUpdate & { updatedAt: string } = {
-      caption: input.caption?.trim() || undefined,
-      placeId: input.placeId || undefined,
-      itineraryId: input.itineraryId || undefined,
-      reservationId: input.reservationId || undefined,
-      updatedAt,
-    }
-    const updated = await db.media.update(id, changes)
-    if (updated !== 1) throw new Error(`Media ${id} metadata could not be updated.`)
-    return { ...media, ...changes }
+    return db.transaction('rw', db.trips, db.days, db.blocks, db.media, async () => {
+      const media = await db.media.get(id)
+      if (!media || media.deletedAt) throw new Error(`Active media ${id} was not found.`)
+      await requireEditableMediaContext(media)
+      const updatedAt = new Date().toISOString()
+      const changes: DayMediaMetadataUpdate & { updatedAt: string } = {
+        caption: input.caption?.trim() || undefined,
+        placeId: input.placeId || undefined,
+        itineraryId: input.itineraryId || undefined,
+        reservationId: input.reservationId || undefined,
+        updatedAt,
+      }
+      await db.media.put({ ...media, ...changes })
+      return { ...media, ...changes }
+    })
   }
 
   async updateCaption(id: string, caption: string | undefined): Promise<Media> {
@@ -134,36 +166,53 @@ export class MediaRepository {
   }
 
   async setDayOrder(tripId: string, dayId: string, orderedIds: string[]): Promise<void> {
-    const current = await this.listForDay(tripId, dayId)
-    if (current.length !== orderedIds.length) throw new Error('The day media order is incomplete.')
+    await db.transaction('rw', db.trips, db.days, db.media, async () => {
+      await requireEditableMediaContext({ tripId, dayId })
+      const current = (await db.media.where('dayId').equals(dayId).toArray())
+        .filter((item) => (
+          !item.deletedAt && item.tripId === tripId && !item.blockId && (item.kind === 'image' || item.kind === 'video')
+        ))
+      if (current.length !== orderedIds.length) throw new Error('The day media order is incomplete.')
 
-    const currentIds = new Set(current.map((item) => item.id))
-    if (orderedIds.some((id) => !currentIds.has(id)) || new Set(orderedIds).size !== orderedIds.length) {
-      throw new Error('The day media order contains invalid entries.')
-    }
-
-    const updatedAt = new Date().toISOString()
-    await db.transaction('rw', db.media, async () => {
-      for (const [index, id] of orderedIds.entries()) {
-        const updated = await db.media.update(id, { position: index + 1, updatedAt })
-        if (updated !== 1) throw new Error(`Media ${id} order could not be updated.`)
+      const currentIds = new Set(current.map((item) => item.id))
+      if (orderedIds.some((id) => !currentIds.has(id)) || new Set(orderedIds).size !== orderedIds.length) {
+        throw new Error('The day media order contains invalid entries.')
       }
+
+      const updatedAt = new Date().toISOString()
+      const updates = orderedIds.map((id, index) => ({
+        ...current.find((item) => item.id === id)!,
+        position: index + 1,
+        updatedAt,
+      }))
+      await db.media.bulkPut(updates)
+    })
+  }
+
+  async softDeleteForDay(id: string, tripId: string, dayId: string): Promise<SoftDeleteMediaResult> {
+    return db.transaction('rw', db.trips, db.days, db.media, async () => {
+      await requireEditableMediaContext({ tripId, dayId })
+      const media = await db.media.get(id)
+      if (!media) return 'not-found'
+      if (media.deletedAt) return 'already-deleted'
+      if (media.tripId !== tripId || media.dayId !== dayId || media.blockId) {
+        throw new Error('La foto o il video non appartiene a questa giornata.')
+      }
+      const now = new Date().toISOString()
+      await db.media.put({ ...media, deletedAt: now, updatedAt: now })
+      return 'tombstoned'
     })
   }
 
   async softDelete(id: string): Promise<SoftDeleteMediaResult> {
-    const media = await db.media.get(id)
-    if (!media) return 'not-found'
-    if (media.deletedAt) return 'already-deleted'
-
-    const now = new Date().toISOString()
-    const updated = await db.media.update(id, {
-      deletedAt: now,
-      updatedAt: now,
+    return db.transaction('rw', db.media, async () => {
+      const media = await db.media.get(id)
+      if (!media) return 'not-found'
+      if (media.deletedAt) return 'already-deleted'
+      const now = new Date().toISOString()
+      await db.media.put({ ...media, deletedAt: now, updatedAt: now })
+      return 'tombstoned'
     })
-
-    if (updated !== 1) throw new Error(`Media ${id} could not be tombstoned.`)
-    return 'tombstoned'
   }
 
   async restore(id: string): Promise<RestoreMediaResult> {
@@ -175,13 +224,13 @@ export class MediaRepository {
       throw new Error(`Media ${id} cannot be restored because its OPFS file is missing.`)
     }
 
-    const updated = await db.media.update(id, {
-      deletedAt: undefined,
-      updatedAt: new Date().toISOString(),
+    return db.transaction('rw', db.media, async () => {
+      const current = await db.media.get(id)
+      if (!current) return 'not-found'
+      if (!current.deletedAt) return 'already-active'
+      await db.media.put({ ...current, deletedAt: undefined, updatedAt: new Date().toISOString() })
+      return 'restored'
     })
-
-    if (updated !== 1) throw new Error(`Media ${id} could not be restored.`)
-    return 'restored'
   }
 
   async purge(id: string): Promise<PurgeMediaResult> {
@@ -197,8 +246,13 @@ export class MediaRepository {
       if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error
     }
 
-    await db.media.delete(id)
-    return 'purged'
+    return db.transaction('rw', db.media, async () => {
+      const current = await db.media.get(id)
+      if (!current) return 'not-found'
+      if (!current.deletedAt) throw new Error(`Media ${id} must be tombstoned before it can be purged.`)
+      await db.media.delete(id)
+      return 'purged'
+    })
   }
 }
 
