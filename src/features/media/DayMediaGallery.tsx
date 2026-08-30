@@ -58,12 +58,12 @@ export default function DayMediaGallery({
     void refresh()
   }, [refresh])
 
-  const addFiles = async (files: FileList | null): Promise<void> => {
-    if (readOnly || importing || !files?.length) return
+  const addFiles = async (files: readonly File[]): Promise<void> => {
+    if (readOnly || importing || files.length === 0) return
     setImporting(true)
     setError('')
     try {
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         await mediaApplication.importDayMedia(tripId, dayId, file)
       }
       await refresh()
@@ -104,7 +104,7 @@ export default function DayMediaGallery({
               multiple
               disabled={importing}
               onChange={(event) => {
-                const files = event.currentTarget.files
+                const files = Array.from(event.currentTarget.files ?? [])
                 event.currentTarget.value = ''
                 void addFiles(files)
               }}
