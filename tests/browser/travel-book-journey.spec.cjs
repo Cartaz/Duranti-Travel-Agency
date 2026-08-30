@@ -4,7 +4,7 @@ test('real app reads day media through the travel book and navigates chapters', 
   const tripTitle = 'Libro UI con ricordi'
   const firstDayTitle = 'Arrivo in città'
   const secondDayTitle = 'Passeggiata sul mare'
-  const mediaName = 'ricordo-ui.svg'
+  const mediaName = 'ricordo-ui.png'
 
   await page.goto('/')
   await page.getByRole('link', { name: 'Nuovo viaggio' }).click()
@@ -29,8 +29,8 @@ test('real app reads day media through the travel book and navigates chapters', 
   await expect(page.getByRole('heading', { name: firstDayTitle })).toBeVisible()
   await page.getByLabel('+ Aggiungi ricordi').setInputFiles({
     name: mediaName,
-    mimeType: 'image/svg+xml',
-    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><rect width="2" height="2" fill="black"/></svg>'),
+    mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
   })
   await expect(page.getByText(new RegExp(mediaName))).toBeVisible()
 
