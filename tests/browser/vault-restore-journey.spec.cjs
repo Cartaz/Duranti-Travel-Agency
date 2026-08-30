@@ -18,7 +18,7 @@ test('real app restores a downloaded Vault snapshot and reloads the restored dat
   await page.getByRole('button', { name: 'Crea viaggio' }).click()
   await expect(page.getByRole('heading', { name: 'Backup originale' })).toBeVisible()
 
-  await page.goto('/backup')
+  await page.getByRole('link', { name: 'Backup', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Backup e ripristino' })).toBeVisible()
   const protectCard = page.locator('.vault-card').first()
   await protectCard.getByLabel('Password del backup').fill(password)
@@ -34,14 +34,14 @@ test('real app restores a downloaded Vault snapshot and reloads the restored dat
   expect(backupName.endsWith('.dtagency')).toBe(true)
   expect(backupBuffer.length).toBeGreaterThan(0)
 
-  await page.goto('/')
+  await page.getByRole('link', { name: 'Viaggi', exact: true }).click()
   await page.getByRole('link', { name: 'Backup originale' }).click()
   await page.getByRole('link', { name: 'Modifica' }).click()
   await page.getByLabel('Titolo *').fill('Dati da sostituire')
   await page.getByRole('button', { name: 'Salva modifiche' }).click()
   await expect(page.getByRole('heading', { name: 'Dati da sostituire' })).toBeVisible()
 
-  await page.goto('/backup')
+  await page.getByRole('link', { name: 'Backup', exact: true }).click()
   const restoreCard = page.locator('.vault-restore-card')
   await restoreCard.getByLabel('File DTAgency').setInputFiles({
     name: backupName,
@@ -60,7 +60,7 @@ test('real app restores a downloaded Vault snapshot and reloads the restored dat
   await reloadPromise
 
   await expect(page.getByRole('heading', { name: 'Backup e ripristino' })).toBeVisible()
-  await page.getByRole('link', { name: /Torna ai viaggi/ }).click()
+  await page.getByRole('link', { name: 'Viaggi', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Il nostro libro dei viaggi' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Backup originale' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Dati da sostituire' })).toHaveCount(0)
