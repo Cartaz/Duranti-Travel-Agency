@@ -12,6 +12,16 @@ function compareManualUntimed(left: Itinerary, right: Itinerary): number {
     || left.id.localeCompare(right.id)
 }
 
+async function normalizeManualUntimedPositions(items: Itinerary[]): Promise<Itinerary[]> {
+  const ordered = [...items].sort(compareManualUntimed)
+  if (ordered.every((item, index) => item.position === index + 1)) return ordered
+
+  const updatedAt = new Date().toISOString()
+  const normalized = ordered.map((item, index) => ({ ...item, position: index + 1, updatedAt }))
+  await db.itineraries.bulkPut(normalized)
+  return normalized
+}
+
 function reservationIdFromBlock(block: Block | undefined): string | undefined {
   if (!block || !reservationTypeForBlockType(block.type)) return undefined
   const value = block.content.reservationId
@@ -55,11 +65,19 @@ export class ItineraryRepository extends Repository<Itinerary> {
         throw new Error('La tappa non appartiene a questa giornata.')
       }
 
-      let position = existing?.position
-      if (!existing) {
-        const siblings = (await db.itineraries.where('dayId').equals(value.dayId).toArray())
-          .filter((item) => !item.deletedAt && item.tripId === value.tripId)
-        position = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
+      let position: number | undefined
+      if (!value.startsAt) {
+        const siblings = await normalizeManualUntimedPositions(
+          (await db.itineraries.where('dayId').equals(value.dayId).toArray())
+            .filter((item) => (
+              !item.deletedAt
+              && item.tripId === value.tripId
+              && !item.reservationId
+              && !item.blockId
+              && !item.startsAt
+            )),
+        )
+        position = siblings.find((item) => item.id === value.id)?.position ?? siblings.length + 1
       }
 
       const persisted: Itinerary = {
@@ -121,19 +139,21 @@ export class ItineraryRepository extends Repository<Itinerary> {
         return
       }
 
-      let position = itinerary.position
+      let position: number | undefined
       if (!itinerary.startsAt) {
-        const siblings = (await db.itineraries.where('dayId').equals(dayId).toArray())
-          .filter((item) => (
-            !item.deletedAt
-            && item.id !== itinerary.id
-            && item.tripId === tripId
-            && item.dayId === dayId
-            && !item.reservationId
-            && !item.blockId
-            && !item.startsAt
-          ))
-        position = siblings.reduce((maximum, item) => Math.max(maximum, item.position ?? 0), 0) + 1
+        const siblings = await normalizeManualUntimedPositions(
+          (await db.itineraries.where('dayId').equals(dayId).toArray())
+            .filter((item) => (
+              !item.deletedAt
+              && item.id !== itinerary.id
+              && item.tripId === tripId
+              && item.dayId === dayId
+              && !item.reservationId
+              && !item.blockId
+              && !item.startsAt
+            )),
+        )
+        position = siblings.length + 1
       }
 
       await db.itineraries.put({
@@ -160,15 +180,16 @@ export class ItineraryRepository extends Repository<Itinerary> {
       if (target.reservationId || target.blockId) throw new Error('Le tappe derivate da prenotazioni seguono l’ordine del planner.')
       if (target.startsAt) throw new Error('Le tappe con orario sono ordinate cronologicamente.')
 
-      const items = (await db.itineraries.where('dayId').equals(dayId).toArray())
-        .filter((item) => (
-          !item.deletedAt
-          && item.tripId === tripId
-          && !item.reservationId
-          && !item.blockId
-          && !item.startsAt
-        ))
-        .sort(compareManualUntimed)
+      const items = await normalizeManualUntimedPositions(
+        (await db.itineraries.where('dayId').equals(dayId).toArray())
+          .filter((item) => (
+            !item.deletedAt
+            && item.tripId === tripId
+            && !item.reservationId
+            && !item.blockId
+            && !item.startsAt
+          )),
+      )
 
       const currentIndex = items.findIndex((item) => item.id === itineraryId)
       if (currentIndex < 0) return false
