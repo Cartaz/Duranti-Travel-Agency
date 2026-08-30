@@ -5,6 +5,22 @@ import { Repository } from './base-repository'
 
 export type NewTripDay = Omit<Day, 'sequence'>
 
+function compareTripDays(left: Day, right: Day): number {
+  return left.sequence - right.sequence
+    || left.createdAt.localeCompare(right.createdAt)
+    || left.id.localeCompare(right.id)
+}
+
+async function normalizeTripDaySequences(days: Day[]): Promise<Day[]> {
+  const ordered = [...days].sort(compareTripDays)
+  if (ordered.every((day, index) => day.sequence === index + 1)) return ordered
+
+  const updatedAt = new Date().toISOString()
+  const normalized = ordered.map((day, index) => ({ ...day, sequence: index + 1, updatedAt }))
+  await db.days.bulkPut(normalized)
+  return normalized
+}
+
 async function requireEditableTripDayContext(tripId: string, dayId?: string) {
   const trip = await db.trips.get(tripId)
   if (!trip || trip.deletedAt) throw new Error('Il viaggio non esiste o è stato eliminato.')
@@ -32,10 +48,11 @@ export class DayRepository extends Repository<Day> {
       assertDayDateWithinTripRange(trip, day.date)
 
       if (await db.days.get(day.id)) throw new Error('Esiste già una giornata con questo identificatore.')
-      const siblings = (await db.days.where('tripId').equals(day.tripId).toArray())
-        .filter((candidate) => !candidate.deletedAt)
-      const sequence = siblings.reduce((maximum, candidate) => Math.max(maximum, candidate.sequence), 0) + 1
-      const entity: Day = { ...day, sequence }
+      const siblings = await normalizeTripDaySequences(
+        (await db.days.where('tripId').equals(day.tripId).toArray())
+          .filter((candidate) => !candidate.deletedAt),
+      )
+      const entity: Day = { ...day, sequence: siblings.length + 1 }
 
       const blocks = initialBlocks.map((block, index) => {
         if (block.tripId !== day.tripId || block.dayId !== day.id || block.deletedAt) {
