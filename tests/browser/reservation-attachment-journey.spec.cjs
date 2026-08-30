@@ -40,8 +40,12 @@ test('real app persists reservation changes and attachment removal across reload
   await expect(reloadedAttachment.getByText('biglietto-museo.pdf', { exact: true })).toBeVisible()
 
   await reloadedActivity.getByLabel('Titolo *').fill('Museo Archeologico aggiornato')
-  await reloadedActivity.getByRole('button', { name: 'Salva prenotazione' }).click()
-  await expect(reloadedActivity.getByLabel('Titolo *')).toHaveValue('Museo Archeologico aggiornato')
+  const saveButton = reloadedActivity.locator('.reservation-actions button[type="submit"]')
+  await Promise.all([
+    expect(saveButton).toHaveText('Salvataggio…'),
+    saveButton.click(),
+  ])
+  await expect(saveButton).toHaveText('Salva prenotazione')
 
   await page.reload()
   const updatedActivity = page.locator('.reservation-block-activity')
