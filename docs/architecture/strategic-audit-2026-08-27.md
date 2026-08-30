@@ -8,7 +8,7 @@ Scope: current `main` after the Travel Book reader milestone, including applicat
 
 This section records subsequent work without rewriting the findings below. The original findings remain the historical audit of `main` on 2026-08-27.
 
-Verified remediation branch: `chatgpt/strategic-audit-remediation` at `cbd076426bf0459606b684e0e1d0ea2ec706dec7`.
+Verified remediation branch: `chatgpt/strategic-audit-remediation` at `a2f5f88e5f3fa196285ad53925c7f04f7e3c04b2`.
 
 | Finding | Status on remediation branch | Verification / design outcome |
 | --- | --- | --- |
@@ -22,12 +22,12 @@ Verified remediation branch: `chatgpt/strategic-audit-remediation` at `cbd076426
 | A8 | Remediated | Traveler-document creation validates active parent ownership through the application/data boundary rather than trusting the route. |
 | A9 | Remediated | Date-only validation is centralized and reused so impossible calendar dates are rejected consistently. |
 | A10 | Remediated | Presentation dependency policy has one source of truth. Cross-feature composition is restricted to explicitly named page composition roots rather than broad feature exemptions. |
-| A11 | In progress | Real UI Playwright now covers trip → templated day/planner → reload; reservation + attachment → update/remove → reload; and Vault backup → downloaded snapshot → staged replace → automatic reload. Encrypted traveler-document and Travel Book navigation journeys remain to be added. |
+| A11 | Remediated | Real UI Playwright covers all five high-value journeys from the audit: trip → templated day/planner → reload; reservation + attachment → update/remove → reload; Vault backup → downloaded snapshot → staged replace → automatic reload; encrypted traveler-document configure/unlock/add attachment → reload/lock; and Travel Book chapter/media navigation. The final journey also exposed and fixed a live-`FileList` ownership bug by snapshotting selected media before resetting the file input. |
 | A12 | Deliberately deferred | Still acceptable P3 debt for a rare destructive operation; revisit when a schema-v2 migration has an independent justification. |
 | A13 | Remediated | Generic active counts use database/collection count operations instead of materializing the table. |
 | A14 | Remediated | Install manifest includes 192/512 maskable-capable icons and a regression contract. |
 
-CI run `33335516844` on the verified commit passed repository policy, dependency audits, **75/75 Node tests**, TypeScript/Vite build, and **5/5 Playwright suites**. The browser suite includes real IndexedDB/OPFS/Vault execution rather than only mocked application contracts.
+CI run `33339216269` on the verified commit passed repository policy, dependency audits, **75/75 Node tests**, TypeScript/Vite build, and **7/7 Playwright suites**. The browser suite includes real IndexedDB/OPFS/Vault execution rather than only mocked application contracts.
 
 The **3D gate remains closed**. The audit requires A1–A4 and their regressions to be green on `main`; these remediations are currently verified only on the remediation branch. Do not treat branch-local green CI as satisfying the integration gate. Merge/integrate only through the normal review path, then require green `main` CI before beginning the Three.js reader milestone.
 
