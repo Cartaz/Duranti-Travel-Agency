@@ -9,8 +9,8 @@ test('real app keeps traveler document secrets locked across reload and session 
   await page.getByRole('link', { name: 'Viaggiatori' }).click()
   await expect(page.getByRole('heading', { name: 'Viaggiatori' })).toBeVisible()
   await page.getByRole('link', { name: 'Nuovo profilo' }).click()
-  await page.getByLabel('Nome *').fill('Ada')
-  await page.getByLabel('Cognome *').fill('Viaggiatrice')
+  await page.getByLabel('Nome *', { exact: true }).fill('Ada')
+  await page.getByLabel('Cognome *', { exact: true }).fill('Viaggiatrice')
   await page.getByRole('button', { name: 'Crea profilo' }).click()
 
   const travelerCard = page.locator('.traveler-card').filter({ hasText: 'Ada Viaggiatrice' })
