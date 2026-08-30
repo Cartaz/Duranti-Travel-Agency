@@ -2,6 +2,7 @@ import { DB_NAME, DB_VERSION, db } from '../../src/data/db/dtagency-db'
 import { readMediaFile, writeMediaFile } from '../../src/data/opfs/opfs-store'
 import { dayRepository } from '../../src/data/repositories/day-repository'
 import { plannerBlockRepository } from '../../src/data/repositories/block-repository'
+import { itineraryRepository } from '../../src/data/repositories/itinerary-repository'
 import { prepareVaultExport, loadPreparedVaultFile } from '../../src/vault/export'
 import { stageVaultImport } from '../../src/vault/import'
 import { commitStagedVaultImport, recoverInterruptedVaultRestore } from '../../src/vault/restore'
@@ -201,7 +202,7 @@ await run('OPFS media CRUD uses the DTAgency namespace', async () => {
   assert(await readText(stored) === expected, 'OPFS round-trip changed media bytes.')
 })
 
-await run('Concurrent day and block creation allocate unique ordered positions', async () => {
+await run('Concurrent ordered writes stay unique and repair legacy duplicate order values', async () => {
   await resetEnvironment()
   const now = new Date().toISOString()
   const tripId = 'browser-concurrent-trip'
@@ -219,16 +220,62 @@ await run('Concurrent day and block creation allocate unique ordered positions',
     dayRepository.createForTrip({ id: 'concurrent-day-a', tripId, date: '2026-09-01', createdAt: now, updatedAt: now }),
     dayRepository.createForTrip({ id: 'concurrent-day-b', tripId, date: '2026-09-02', createdAt: now, updatedAt: now }),
   ])
-  const sequences = [firstDay.sequence, secondDay.sequence].sort((a, b) => a - b)
-  assert(sequences.join(',') === '1,2', `Concurrent days received invalid sequences ${sequences.join(',')}.`)
+  const concurrentSequences = [firstDay.sequence, secondDay.sequence].sort((a, b) => a - b)
+  assert(concurrentSequences.join(',') === '1,2', `Concurrent days received invalid sequences ${concurrentSequences.join(',')}.`)
+
+  await db.days.bulkPut([
+    { ...firstDay, sequence: 9 },
+    { ...secondDay, sequence: 9 },
+  ])
+  const thirdDay = await dayRepository.createForTrip({
+    id: 'concurrent-day-c', tripId, date: '2026-09-03', createdAt: now, updatedAt: now,
+  })
+  const repairedSequences = (await dayRepository.listByTrip(tripId)).map((day) => day.sequence).sort((a, b) => a - b)
+  assert(thirdDay.sequence === 3 && repairedSequences.join(',') === '1,2,3', `Day sequence repair failed: ${repairedSequences.join(',')}.`)
 
   const dayId = firstDay.id
   const [firstBlock, secondBlock] = await Promise.all([
     plannerBlockRepository.createAtEnd({ id: 'concurrent-block-a', tripId, dayId, type: 'text', content: {}, createdAt: now, updatedAt: now }),
     plannerBlockRepository.createAtEnd({ id: 'concurrent-block-b', tripId, dayId, type: 'text', content: {}, createdAt: now, updatedAt: now }),
   ])
-  const positions = [firstBlock.position, secondBlock.position].sort((a, b) => a - b)
-  assert(positions.join(',') === '1,2', `Concurrent blocks received invalid positions ${positions.join(',')}.`)
+  const concurrentPositions = [firstBlock.position, secondBlock.position].sort((a, b) => a - b)
+  assert(concurrentPositions.join(',') === '1,2', `Concurrent blocks received invalid positions ${concurrentPositions.join(',')}.`)
+
+  await db.blocks.bulkPut([
+    { ...firstBlock, position: 8 },
+    { ...secondBlock, position: 8 },
+  ])
+  const thirdBlock = await plannerBlockRepository.createAtEnd({
+    id: 'concurrent-block-c', tripId, dayId, type: 'text', content: {}, createdAt: now, updatedAt: now,
+  })
+  const repairedBlockPositions = (await plannerBlockRepository.listByDay(dayId)).map((block) => block.position).sort((a, b) => a - b)
+  assert(thirdBlock.position === 3 && repairedBlockPositions.join(',') === '1,2,3', `Block position repair failed: ${repairedBlockPositions.join(',')}.`)
+
+  const [firstItinerary, secondItinerary] = await Promise.all([
+    itineraryRepository.saveManual({ id: 'concurrent-itinerary-a', tripId, dayId, title: 'Prima tappa', type: 'custom', status: 'planned', createdAt: now, updatedAt: now }),
+    itineraryRepository.saveManual({ id: 'concurrent-itinerary-b', tripId, dayId, title: 'Seconda tappa', type: 'custom', status: 'planned', createdAt: now, updatedAt: now }),
+  ])
+  const concurrentItineraryPositions = [firstItinerary.position, secondItinerary.position].sort((a, b) => (a ?? 0) - (b ?? 0))
+  assert(concurrentItineraryPositions.join(',') === '1,2', `Concurrent itinerary items received invalid positions ${concurrentItineraryPositions.join(',')}.`)
+
+  await db.itineraries.bulkPut([
+    { ...firstItinerary, position: 7 },
+    { ...secondItinerary, position: 7 },
+  ])
+  const thirdItinerary = await itineraryRepository.saveManual({
+    id: 'concurrent-itinerary-c', tripId, dayId, title: 'Terza tappa', type: 'custom', status: 'planned', createdAt: now, updatedAt: now,
+  })
+  const repairedItineraryPositions = (await itineraryRepository.listByDay(dayId))
+    .filter((item) => !item.startsAt && !item.reservationId && !item.blockId)
+    .map((item) => item.position)
+    .sort((a, b) => (a ?? 0) - (b ?? 0))
+  assert(thirdItinerary.position === 3 && repairedItineraryPositions.join(',') === '1,2,3', `Itinerary position repair failed: ${repairedItineraryPositions.join(',')}.`)
+
+  const timedItinerary = await itineraryRepository.saveManual({
+    id: 'timed-itinerary', tripId, dayId, title: 'Tappa con orario', type: 'custom', status: 'planned',
+    startsAt: '2026-09-01T10:00', createdAt: now, updatedAt: now,
+  })
+  assert(timedItinerary.position === undefined, 'Timed manual itinerary retained an unnecessary manual-order position.')
 })
 
 await run('Vault export wipe import restore round-trips IndexedDB and OPFS', async () => {
