@@ -1,8 +1,35 @@
 # Strategic programming audit — 2026-08-27
 
-Status: **3D blocked pending P0/P1 remediation**.
+Status at audit time: **3D blocked pending P0/P1 remediation**.
 
 Scope: current `main` after the Travel Book reader milestone, including application/domain boundaries, IndexedDB/Dexie persistence, OPFS, Vault import/restore, local encryption, cross-aggregate ownership, UI composition, query proportionality, third-party place discovery, and automated regression coverage.
+
+## Remediation status — 2026-08-30
+
+This section records subsequent work without rewriting the findings below. The original findings remain the historical audit of `main` on 2026-08-27.
+
+Verified remediation branch: `chatgpt/strategic-audit-remediation` at `cbd076426bf0459606b684e0e1d0ea2ec706dec7`.
+
+| Finding | Status on remediation branch | Verification / design outcome |
+| --- | --- | --- |
+| A1 | Remediated | Day plus template blocks are created by one transaction-owned mutation; application-level compensating cleanup was removed and atomicity is guarded. |
+| A2 | Remediated | Vault v1 staging performs table-specific semantic validation and reference/ownership validation before live replacement, with negative fixtures. |
+| A3 | Remediated | Traveler-document queries are traveler-scoped and decrypt only requested records; proportionality is guarded. |
+| A4 | Remediated | Day sequence, planner block position, and manual untimed itinerary position allocation are transaction-owned. Existing duplicate/gapped order values are deterministically normalized by the same owner before allocation or movement. Browser contracts cover concurrent writes and legacy repair. Timed manual itinerary items no longer retain redundant manual-order state. |
+| A5 | Remediated | Normal media and private-document OPFS writes verify final stored byte length before reporting success, preserving their respective storage/encryption boundaries. |
+| A6 | Remediated | Bootstrap persistence/recovery state reaches presentation. Best-effort/unverified storage and interrupted-restore recovery are surfaced non-blockingly, with a direct backup action. |
+| A7 | Remediated | Nominatim requests reserve serialized request slots, deduplicate identical in-flight searches, cache results, and coordinate same-origin tabs with Web Locks when available; fallback limits are documented. |
+| A8 | Remediated | Traveler-document creation validates active parent ownership through the application/data boundary rather than trusting the route. |
+| A9 | Remediated | Date-only validation is centralized and reused so impossible calendar dates are rejected consistently. |
+| A10 | Remediated | Presentation dependency policy has one source of truth. Cross-feature composition is restricted to explicitly named page composition roots rather than broad feature exemptions. |
+| A11 | In progress | Real UI Playwright now covers trip → templated day/planner → reload; reservation + attachment → update/remove → reload; and Vault backup → downloaded snapshot → staged replace → automatic reload. Encrypted traveler-document and Travel Book navigation journeys remain to be added. |
+| A12 | Deliberately deferred | Still acceptable P3 debt for a rare destructive operation; revisit when a schema-v2 migration has an independent justification. |
+| A13 | Remediated | Generic active counts use database/collection count operations instead of materializing the table. |
+| A14 | Remediated | Install manifest includes 192/512 maskable-capable icons and a regression contract. |
+
+CI run `33335516844` on the verified commit passed repository policy, dependency audits, **75/75 Node tests**, TypeScript/Vite build, and **5/5 Playwright suites**. The browser suite includes real IndexedDB/OPFS/Vault execution rather than only mocked application contracts.
+
+The **3D gate remains closed**. The audit requires A1–A4 and their regressions to be green on `main`; these remediations are currently verified only on the remediation branch. Do not treat branch-local green CI as satisfying the integration gate. Merge/integrate only through the normal review path, then require green `main` CI before beginning the Three.js reader milestone.
 
 ## Executive assessment
 
