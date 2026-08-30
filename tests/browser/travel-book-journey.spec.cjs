@@ -20,7 +20,7 @@ test('real app reads day media through the travel book and navigates chapters', 
   await expect(page.getByRole('heading', { name: tripTitle })).toBeVisible()
 
   await page.getByRole('link', { name: 'Nuova giornata' }).click()
-  await page.getByLabel('Data della giornata *', { exact: true }).fill('2026-09-11')
+  await page.getByLabel(/^Data della giornata \*/).fill('2026-09-11')
   await page.getByLabel('Titolo della giornata').fill(secondDayTitle)
   await page.getByRole('button', { name: 'Crea giornata' }).click()
   await expect(page.getByRole('heading', { name: tripTitle })).toBeVisible()
