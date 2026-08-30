@@ -6,6 +6,22 @@ export type BlockMoveDirection = 'up' | 'down'
 export type BlockMoveResult = 'moved' | 'boundary' | 'not-found' | 'invalid-context'
 export type NewPlannerBlock = Omit<Block, 'position'>
 
+function compareDayBlocks(left: Block, right: Block): number {
+  return left.position - right.position
+    || left.createdAt.localeCompare(right.createdAt)
+    || left.id.localeCompare(right.id)
+}
+
+async function normalizeDayBlockPositions(blocks: Block[]): Promise<Block[]> {
+  const ordered = [...blocks].sort(compareDayBlocks)
+  if (ordered.every((block, index) => block.position === index + 1)) return ordered
+
+  const updatedAt = new Date().toISOString()
+  const normalized = ordered.map((block, index) => ({ ...block, position: index + 1, updatedAt }))
+  await db.blocks.bulkPut(normalized)
+  return normalized
+}
+
 async function requireEditableDay(tripId: string, dayId: string): Promise<void> {
   const trip = await db.trips.get(tripId)
   if (!trip || trip.deletedAt) throw new Error('Il viaggio non esiste o è stato eliminato.')
@@ -35,10 +51,11 @@ export class BlockRepository extends Repository<Block> {
       await requireEditableDay(block.tripId, block.dayId)
       if (await db.blocks.get(block.id)) throw new Error('Esiste già un blocco con questo identificatore.')
 
-      const siblings = (await db.blocks.where('dayId').equals(block.dayId).toArray())
-        .filter((candidate) => !candidate.deletedAt && candidate.tripId === block.tripId)
-      const position = siblings.reduce((maximum, candidate) => Math.max(maximum, candidate.position), 0) + 1
-      const entity: Block = { ...block, position }
+      const siblings = await normalizeDayBlockPositions(
+        (await db.blocks.where('dayId').equals(block.dayId).toArray())
+          .filter((candidate) => !candidate.deletedAt && candidate.tripId === block.tripId),
+      )
+      const entity: Block = { ...block, position: siblings.length + 1 }
       await db.blocks.add(entity)
       return entity
     })
@@ -85,13 +102,10 @@ export class BlockRepository extends Repository<Block> {
       if (!block || block.deletedAt) return 'not-found'
       if (block.tripId !== tripId || block.dayId !== dayId) return 'invalid-context'
 
-      const siblings = (await db.blocks.where('dayId').equals(dayId).toArray())
-        .filter((candidate) => !candidate.deletedAt && candidate.tripId === tripId)
-        .sort((left, right) => (
-          left.position - right.position ||
-          left.createdAt.localeCompare(right.createdAt) ||
-          left.id.localeCompare(right.id)
-        ))
+      const siblings = await normalizeDayBlockPositions(
+        (await db.blocks.where('dayId').equals(dayId).toArray())
+          .filter((candidate) => !candidate.deletedAt && candidate.tripId === tripId),
+      )
 
       const currentIndex = siblings.findIndex((candidate) => candidate.id === blockId)
       if (currentIndex < 0) return 'not-found'
