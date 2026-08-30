@@ -20,14 +20,15 @@ test('real app persists a trip and templated day across reload', async ({ page }
   await page.getByRole('button', { name: 'Crea e apri giornata' }).click()
 
   await expect(page.getByRole('heading', { name: 'Centro storico' })).toBeVisible()
-  await expect(page.getByDisplayValue('Mattina')).toBeVisible()
-  await expect(page.getByDisplayValue('Pranzo')).toBeVisible()
+  const sectionHeadings = page.getByPlaceholder('Titolo della sezione')
+  await expect(sectionHeadings.nth(0)).toHaveValue('Mattina')
+  await expect(sectionHeadings.nth(1)).toHaveValue('Pranzo')
 
   const dayUrl = page.url()
   await page.reload()
 
   await expect(page).toHaveURL(dayUrl)
   await expect(page.getByRole('heading', { name: 'Centro storico' })).toBeVisible()
-  await expect(page.getByDisplayValue('Mattina')).toBeVisible()
-  await expect(page.getByDisplayValue('Pranzo')).toBeVisible()
+  await expect(sectionHeadings.nth(0)).toHaveValue('Mattina')
+  await expect(sectionHeadings.nth(1)).toHaveValue('Pranzo')
 })
