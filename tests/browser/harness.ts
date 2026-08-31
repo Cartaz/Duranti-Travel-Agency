@@ -1,3 +1,4 @@
+import Dexie from 'dexie'
 import { DB_NAME, DB_VERSION, db } from '../../src/data/db/dtagency-db'
 import { readMediaFile, writeMediaFile } from '../../src/data/opfs/opfs-store'
 import { dayRepository } from '../../src/data/repositories/day-repository'
@@ -181,15 +182,39 @@ async function createInterruptedRestoreFixture(): Promise<string> {
   return mediaId
 }
 
-await run('IndexedDB exposes only the DTAgency v1 baseline', async () => {
-  await resetEnvironment()
-  assert(db.name === DB_NAME, `Expected database ${DB_NAME}, got ${db.name}.`)
+await run('IndexedDB upgrades the v1 baseline to v2 without rewriting user rows', async () => {
+  db.close()
+  await db.delete()
+  const legacy = new Dexie(DB_NAME)
+  legacy.version(1).stores({
+    blocks: 'id, tripId, dayId, parentBlockId, [dayId+position], updatedAt',
+    media: 'id, tripId, dayId, blockId, kind, sha256, updatedAt',
+  })
+  await legacy.open()
+  const now = new Date().toISOString()
+  const placeId = 'legacy-place'
+  await legacy.table('blocks').add({
+    id: 'legacy-block', tripId: 'legacy-trip', dayId: 'legacy-day', type: 'place', position: 1,
+    content: { placeId }, createdAt: now, updatedAt: now,
+  })
+  await legacy.table('media').add({
+    id: 'legacy-media', tripId: 'legacy-trip', dayId: 'legacy-day', kind: 'image', placeId,
+    mimeType: 'image/jpeg', originalName: 'legacy.jpg', sizeBytes: 1, opfsPath: 'dtagency/media/legacy-media/original',
+    createdAt: now, updatedAt: now,
+  })
+  legacy.close()
+
+  await db.open()
   assert(DB_NAME === 'dtagency', `Unexpected DB_NAME ${DB_NAME}.`)
-  assert(DB_VERSION === 1, `Unexpected DB_VERSION ${DB_VERSION}.`)
-  assert(db.verno === 1, `Unexpected Dexie version ${db.verno}.`)
+  assert(DB_VERSION === 2, `Unexpected DB_VERSION ${DB_VERSION}.`)
+  assert(db.verno === 2, `Unexpected Dexie version ${db.verno}.`)
   const tableNames = db.tables.map((table) => table.name).sort()
-  assert(tableNames.length === 15, `Expected 15 tables, got ${tableNames.length}.`)
-  assert(tableNames.includes('appMeta') && tableNames.includes('travelerDocuments'), 'Required v1 tables are missing.')
+  assert(tableNames.length === 15, `Expected 15 tables after migration, got ${tableNames.length}.`)
+  assert(tableNames.includes('appMeta') && tableNames.includes('travelerDocuments'), 'Required tables are missing after migration.')
+  const blocks = await db.blocks.where('content.placeId').equals(placeId).toArray()
+  const media = await db.media.where('placeId').equals(placeId).toArray()
+  assert(blocks.length === 1 && blocks[0]?.id === 'legacy-block', 'v1 block row or its new nested index was lost during migration.')
+  assert(media.length === 1 && media[0]?.id === 'legacy-media', 'v1 media row or its new place index was lost during migration.')
 })
 
 await run('OPFS media CRUD uses the DTAgency namespace', async () => {
