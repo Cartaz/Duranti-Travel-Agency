@@ -46,7 +46,7 @@ function formatTripDates(trip: Trip): string {
 }
 
 export default function TravelIndexPage() {
-  const { trips: tripApplication } = useApplicationServices()
+  const { trips: tripApplication } = useApplicationServices('trips')
   const [trips, setTrips] = useState<Trip[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

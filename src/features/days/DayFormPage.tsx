@@ -23,7 +23,7 @@ function rangeHint(startDate?: string, endDate?: string): string | undefined {
 export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { tripId, dayId } = useParams<{ tripId: string; dayId: string }>()
   const navigate = useNavigate()
-  const { trips: tripApplication, days: dayApplication, templates: templateApplication } = useApplicationServices()
+  const { trips: tripApplication, days: dayApplication, templates: templateApplication } = useApplicationServices('trips', 'days', 'templates')
   const [tripTitle, setTripTitle] = useState('')
   const [tripRange, setTripRange] = useState<{ startDate?: string; endDate?: string }>({})
   const [draft, setDraft] = useState<DayDraft>({ date: '', title: '', summary: '', journalText: '' })

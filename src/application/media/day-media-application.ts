@@ -1,3 +1,4 @@
+import { placeIdForBlock } from '../../domain/block-content'
 import type { Media, Place } from '../../domain/entities'
 import { assertTripDayContext } from '../shared/trip-day-context'
 import type { DayMediaApplicationDependencies } from './ports'
@@ -63,10 +64,6 @@ function mediaDescriptor(file: File): { kind: 'image' | 'video'; mimeType: strin
   return { kind, mimeType, originalName }
 }
 
-function placeIdFromBlockContent(content: Record<string, unknown>): string | undefined {
-  return typeof content.placeId === 'string' && content.placeId ? content.placeId : undefined
-}
-
 function itineraryOptionKey(reservationId: string | undefined, itineraryId: string): string {
   return reservationId ? `reservation:${reservationId}` : `itinerary:${itineraryId}`
 }
@@ -109,7 +106,7 @@ export function createDayMediaApplication(deps: DayMediaApplicationDependencies)
     const dayPlaceIds = new Set<string>()
     for (const block of blocks) {
       if (block.tripId !== tripId || block.dayId !== dayId || block.type !== 'place') continue
-      const placeId = placeIdFromBlockContent(block.content)
+      const placeId = placeIdForBlock(block)
       if (placeId) dayPlaceIds.add(placeId)
     }
     for (const item of itineraryItems) {

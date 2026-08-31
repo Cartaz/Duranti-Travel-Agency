@@ -6,7 +6,7 @@ import { useApplicationServices } from '../../ui/application-context'
 import './day-template-manager.css'
 
 export default function DayTemplateManager({ templates, disabled = false, onChanged }: { templates: Template[]; disabled?: boolean; onChanged: () => Promise<void> }) {
-  const { templates: templateApplication } = useApplicationServices()
+  const { templates: templateApplication } = useApplicationServices('templates')
   const [editingId, setEditingId] = useState<string>()
   const [name, setName] = useState('')
   const [busyId, setBusyId] = useState<string>()

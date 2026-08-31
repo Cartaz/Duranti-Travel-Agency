@@ -12,7 +12,7 @@ function formatDayDate(value: string): string {
 }
 
 export default function TripDaysPanel({ trip }: { trip: Trip }) {
-  const { days: dayApplication } = useApplicationServices()
+  const { days: dayApplication } = useApplicationServices('days')
   const [days, setDays] = useState<Day[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

@@ -25,7 +25,7 @@ export default function ExpenseBlockEditor({ block, tripId, dayId, dayDate, trip
   canMoveDown: boolean
   onChanged: () => Promise<void>
 }) {
-  const { planner, expenses } = useApplicationServices()
+  const { planner, expenses } = useApplicationServices('planner', 'expenses')
   const fallbackCurrency = tripCurrency ?? 'EUR'
   const normalizedTripCurrency = tripCurrency?.trim().toUpperCase()
   const [expense, setExpense] = useState<Expense>()

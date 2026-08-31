@@ -29,7 +29,7 @@ export default function DayMediaGallery({
   dayId: string
   readOnly: boolean
 }) {
-  const { media: mediaApplication } = useApplicationServices()
+  const { media: mediaApplication } = useApplicationServices('media')
   const [items, setItems] = useState<Media[]>([])
   const [context, setContext] = useState<DayMediaContextOptions>(EMPTY_CONTEXT)
   const [loading, setLoading] = useState(true)
@@ -179,7 +179,7 @@ function DayMediaCard({
   onMove: (direction: DayMediaMoveDirection) => Promise<void>
   onChanged: () => Promise<void>
 }) {
-  const { media: mediaApplication } = useApplicationServices()
+  const { media: mediaApplication } = useApplicationServices('media')
   const [objectUrl, setObjectUrl] = useState('')
   const [previewError, setPreviewError] = useState('')
   const [caption, setCaption] = useState(media.caption ?? '')

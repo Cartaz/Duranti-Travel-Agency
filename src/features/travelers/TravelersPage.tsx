@@ -12,7 +12,7 @@ function formatDate(value: string | undefined): string | undefined {
 }
 
 export default function TravelersPage() {
-  const { travelers: travelerApplication } = useApplicationServices()
+  const { travelers: travelerApplication } = useApplicationServices('travelers')
   const [travelers, setTravelers] = useState<Traveler[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

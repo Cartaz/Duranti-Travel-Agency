@@ -14,10 +14,6 @@ export type SafeDeletePlaceResult =
   | { status: 'in-use'; references: PlaceReferenceCounts }
   | { status: 'deleted' }
 
-function blockReferencesPlace(content: Record<string, unknown>, placeId: string): boolean {
-  return content.placeId === placeId
-}
-
 export class PlaceRepository extends Repository<Place> {
   constructor() {
     super(db.places)
@@ -29,10 +25,10 @@ export class PlaceRepository extends Repository<Place> {
       if (!place || place.deletedAt) return { status: 'not-found' }
 
       const [blocks, reservations, itineraries, media] = await Promise.all([
-        db.blocks.toArray().then((items) => items.filter((item) => !item.deletedAt && blockReferencesPlace(item.content, id)).length),
+        db.blocks.where('content.placeId').equals(id).toArray().then((items) => items.filter((item) => !item.deletedAt).length),
         db.reservations.where('placeId').equals(id).toArray().then((items) => items.filter((item) => !item.deletedAt).length),
         db.itineraries.where('placeId').equals(id).toArray().then((items) => items.filter((item) => !item.deletedAt).length),
-        db.media.toArray().then((items) => items.filter((item) => !item.deletedAt && item.placeId === id).length),
+        db.media.where('placeId').equals(id).toArray().then((items) => items.filter((item) => !item.deletedAt).length),
       ])
       const references = { blocks, reservations, itineraries, media }
       if (Object.values(references).some((count) => count > 0)) return { status: 'in-use', references }

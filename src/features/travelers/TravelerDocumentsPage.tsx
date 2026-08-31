@@ -46,7 +46,7 @@ function buildSecret(form: HTMLFormElement): TravelerDocumentSecret {
 
 export default function TravelerDocumentsPage() {
   const { travelerId } = useParams()
-  const { travelers, travelerDocuments } = useApplicationServices()
+  const { travelers, travelerDocuments } = useApplicationServices('travelers', 'travelerDocuments')
   const [traveler, setTraveler] = useState<Traveler>()
   const [configured, setConfigured] = useState(false)
   const [unlocked, setUnlocked] = useState(false)
