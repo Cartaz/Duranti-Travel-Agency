@@ -13,26 +13,34 @@ export interface ReservationPlacePort {
   list(): Promise<Place[]>
 }
 
-export interface ReservationMediaCreateInput {
-  tripId?: string
-  dayId?: string
-  blockId?: string
-  kind: Media['kind']
-  mimeType?: string
-  originalName?: string
-}
-
 export interface ReservationMediaPort {
   get(id: string): Promise<Media | undefined>
   getFile(id: string): Promise<File>
-  create(input: ReservationMediaCreateInput, source: Blob): Promise<Media>
-  softDelete(id: string): Promise<unknown>
   purge(id: string): Promise<unknown>
+}
+
+export interface ReservationAttachmentCreateInput {
+  kind: Extract<Media['kind'], 'image' | 'document'>
+  mimeType: string
+  originalName: string
+}
+
+export interface ReservationAttachmentWriteResult {
+  reservation: Reservation
+  media: Media
 }
 
 export interface ReservationTransactionPort {
   saveReservationForBlock(blockId: string, tripId: string, dayId: string, reservation: Reservation): Promise<void>
-  setReservationAttachment(blockId: string, tripId: string, dayId: string, reservationId: string, mediaId?: string): Promise<Reservation>
+  attachReservationFile(
+    blockId: string,
+    tripId: string,
+    dayId: string,
+    reservationId: string,
+    input: ReservationAttachmentCreateInput,
+    source: Blob,
+  ): Promise<ReservationAttachmentWriteResult>
+  removeReservationAttachment(blockId: string, tripId: string, dayId: string, reservationId: string): Promise<Reservation>
   softDeleteReservationBlock(blockId: string, tripId: string, dayId: string): Promise<void>
 }
 

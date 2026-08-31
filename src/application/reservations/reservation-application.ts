@@ -116,7 +116,7 @@ function assertAttachmentContext(media: Media, tripId: string, dayId: string, bl
   if (media.kind !== 'image' && media.kind !== 'document') throw new Error('Il media collegato non è un allegato supportato.')
 }
 
-function attachmentDescriptor(file: File): { mimeType: string; kind: Media['kind']; originalName: string } {
+function attachmentDescriptor(file: File): { mimeType: string; kind: Extract<Media['kind'], 'image' | 'document'>; originalName: string } {
   if (file.size <= 0) throw new Error('Il file selezionato è vuoto.')
   if (file.size > MAX_RESERVATION_ATTACHMENT_BYTES) throw new Error('L’allegato supera il limite di 25 MiB.')
   const originalName = file.name.trim()
@@ -243,17 +243,11 @@ export function createReservationApplication(deps: ReservationApplicationDepende
     if (!reservation) throw new Error('Salva prima la prenotazione, poi aggiungi l’allegato.')
     const descriptor = attachmentDescriptor(file)
     const previousMediaId = reservation.attachmentMediaId
-    const media = await deps.media.create({ tripId, dayId, blockId, kind: descriptor.kind, mimeType: descriptor.mimeType, originalName: descriptor.originalName }, file)
-    try {
-      const updated = await deps.transactions.setReservationAttachment(blockId, tripId, dayId, reservation.id, media.id)
-      if (previousMediaId && previousMediaId !== media.id) {
-        try { await deps.media.purge(previousMediaId) } catch { /* tombstone remains authoritative */ }
-      }
-      return { reservation: updated, media }
-    } catch (error) {
-      try { await deps.media.softDelete(media.id); await deps.media.purge(media.id) } catch { /* preserve original error */ }
-      throw error
+    const result = await deps.transactions.attachReservationFile(blockId, tripId, dayId, reservation.id, descriptor, file)
+    if (previousMediaId && previousMediaId !== result.media.id) {
+      try { await deps.media.purge(previousMediaId) } catch { /* tombstone remains authoritative */ }
     }
+    return result
   }
 
   async function removePlannerReservationAttachment(tripId: string, dayId: string, blockId: string): Promise<Reservation> {
@@ -262,7 +256,7 @@ export function createReservationApplication(deps: ReservationApplicationDepende
     if (!reservation) throw new Error('La prenotazione non esiste ancora.')
     if (!reservation.attachmentMediaId) return reservation
     const previousMediaId = reservation.attachmentMediaId
-    const updated = await deps.transactions.setReservationAttachment(blockId, tripId, dayId, reservation.id, undefined)
+    const updated = await deps.transactions.removeReservationAttachment(blockId, tripId, dayId, reservation.id)
     try { await deps.media.purge(previousMediaId) } catch { /* metadata tombstone is authoritative */ }
     return updated
   }

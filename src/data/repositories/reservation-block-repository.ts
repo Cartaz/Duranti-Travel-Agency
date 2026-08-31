@@ -1,6 +1,8 @@
 import type { Block, Itinerary, Media, Reservation } from '../../domain/entities'
 import { itineraryStatusForReservation, itineraryTypeForReservation, reservationTypeForBlockType } from '../../domain/reservation-itinerary-mapping'
 import { db } from '../db/dtagency-db'
+import { assertEntityBase } from '../db/validate'
+import { deleteMediaFile, writeMediaFile } from '../opfs/opfs-store'
 
 function readReservationId(block: Block): string | undefined {
   const value = block.content.reservationId
@@ -113,6 +115,29 @@ function itineraryFromReservation(
   }
 }
 
+async function requireLinkedReservation(
+  blockId: string,
+  tripId: string,
+  dayId: string,
+  reservationId: string,
+): Promise<{ block: Block; reservation: Reservation }> {
+  await requireEditableTripDay(tripId, dayId)
+  const block = await db.blocks.get(blockId)
+  if (!block || block.deletedAt || block.tripId !== tripId || block.dayId !== dayId) {
+    throw new Error('Il blocco prenotazione non appartiene a questa giornata.')
+  }
+
+  const expectedType = reservationTypeForBlockType(block.type)
+  if (!expectedType || readReservationId(block) !== reservationId) {
+    throw new Error('La prenotazione non è collegata a questo blocco.')
+  }
+
+  const reservation = await db.reservations.get(reservationId)
+  if (!reservation || reservation.deletedAt) throw new Error('La prenotazione non esiste più.')
+  assertReservationContext(reservation, tripId, dayId, expectedType)
+  return { block, reservation }
+}
+
 export class ReservationBlockRepository {
   async saveReservationForBlock(
     blockId: string,
@@ -170,50 +195,77 @@ export class ReservationBlockRepository {
     })
   }
 
-  async setReservationAttachment(
+  async attachReservationFile(
     blockId: string,
     tripId: string,
     dayId: string,
     reservationId: string,
-    mediaId?: string,
+    input: {
+      kind: Extract<Media['kind'], 'image' | 'document'>
+      mimeType: string
+      originalName: string
+    },
+    source: Blob,
+  ): Promise<{ reservation: Reservation; media: Media }> {
+    const mediaId = crypto.randomUUID()
+    const opfsPath = await writeMediaFile(mediaId, source)
+    const now = new Date().toISOString()
+    const media: Media = {
+      id: mediaId,
+      tripId,
+      dayId,
+      blockId,
+      kind: input.kind,
+      mimeType: source.type || input.mimeType,
+      originalName: input.originalName,
+      sizeBytes: source.size,
+      opfsPath,
+      createdAt: now,
+      updatedAt: now,
+    }
+
+    try {
+      assertEntityBase(media, 'Reservation attachment media')
+      return await db.transaction('rw', db.trips, db.days, db.blocks, db.reservations, db.media, async () => {
+        const { reservation } = await requireLinkedReservation(blockId, tripId, dayId, reservationId)
+        const previousMediaId = reservation.attachmentMediaId
+        if (previousMediaId) {
+          const previous = await db.media.get(previousMediaId)
+          if (previous && !previous.deletedAt) {
+            assertMediaContext(previous, tripId, dayId, blockId)
+            await db.media.put({ ...previous, deletedAt: now, updatedAt: now })
+          }
+        }
+
+        await db.media.add(media)
+        const updated: Reservation = { ...reservation, attachmentMediaId: media.id, updatedAt: now }
+        await db.reservations.put(updated)
+        return { reservation: updated, media }
+      })
+    } catch (error) {
+      try { await deleteMediaFile(mediaId) } catch { /* orphan scanner remains the fallback after interrupted cleanup */ }
+      throw error
+    }
+  }
+
+  async removeReservationAttachment(
+    blockId: string,
+    tripId: string,
+    dayId: string,
+    reservationId: string,
   ): Promise<Reservation> {
     return db.transaction('rw', db.trips, db.days, db.blocks, db.reservations, db.media, async () => {
-      await requireEditableTripDay(tripId, dayId)
-      const block = await db.blocks.get(blockId)
-      if (!block || block.deletedAt || block.tripId !== tripId || block.dayId !== dayId) {
-        throw new Error('Il blocco prenotazione non appartiene a questa giornata.')
-      }
-
-      const expectedType = reservationTypeForBlockType(block.type)
-      if (!expectedType || readReservationId(block) !== reservationId) {
-        throw new Error('La prenotazione non è collegata a questo blocco.')
-      }
-
-      const reservation = await db.reservations.get(reservationId)
-      if (!reservation || reservation.deletedAt) throw new Error('La prenotazione non esiste più.')
-      assertReservationContext(reservation, tripId, dayId, expectedType)
-
-      if (mediaId) {
-        const media = await db.media.get(mediaId)
-        if (!media || media.deletedAt) throw new Error('Il nuovo allegato non esiste più.')
-        assertMediaContext(media, tripId, dayId, blockId)
-      }
+      const { reservation } = await requireLinkedReservation(blockId, tripId, dayId, reservationId)
+      if (!reservation.attachmentMediaId) return reservation
 
       const now = new Date().toISOString()
-      const previousMediaId = reservation.attachmentMediaId
-      if (previousMediaId && previousMediaId !== mediaId) {
-        const previous = await db.media.get(previousMediaId)
-        if (previous && !previous.deletedAt) {
-          assertMediaContext(previous, tripId, dayId, blockId)
-          await db.media.put({ ...previous, deletedAt: now, updatedAt: now })
-        }
+      const previous = await db.media.get(reservation.attachmentMediaId)
+      if (previous && !previous.deletedAt) {
+        assertMediaContext(previous, tripId, dayId, blockId)
+        await db.media.put({ ...previous, deletedAt: now, updatedAt: now })
       }
 
-      const updated: Reservation = {
-        ...reservation,
-        attachmentMediaId: mediaId,
-        updatedAt: now,
-      }
+      const updated: Reservation = { ...reservation, attachmentMediaId: undefined, updatedAt: now }
       await db.reservations.put(updated)
       return updated
     })
