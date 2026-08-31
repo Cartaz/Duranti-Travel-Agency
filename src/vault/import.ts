@@ -1,4 +1,5 @@
 import { DB_NAME, DB_VERSION, db } from '../data/db/dtagency-db'
+import { normalizeVaultDatabaseSchemaVersion } from './database-schema-compatibility.ts'
 import { assertBlock, assertEntityBase, isRecord } from '../data/db/validate'
 import {
   MAX_VAULT_MANIFEST_BYTES,
@@ -353,9 +354,10 @@ function validateManifest(value: unknown, header: VaultHeaderV1): {
   }
 
   if (!isRecord(value.database)) throw new Error('Vault database manifest is missing.')
-  if (value.database.name !== DB_NAME || value.database.schemaVersion !== DB_VERSION) {
+  if (value.database.name !== DB_NAME) {
     throw new Error('Vault database schema is incompatible with this app version.')
   }
+  normalizeVaultDatabaseSchemaVersion(value.database.schemaVersion)
 
   const tables = validateTables(value.database.tables)
   const { files, sourceBytes } = validateFiles(value.files)

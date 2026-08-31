@@ -2,9 +2,9 @@ import Dexie, { type Table } from 'dexie'
 import type { DatabaseTables } from './schema'
 
 export const DB_NAME = 'dtagency'
-export const DB_VERSION = 1
+export const DB_VERSION = 2
 
-const STORES = {
+const STORES_V1 = {
   appMeta: 'key',
   trips: 'id, status, startDate, endDate, updatedAt',
   travelers: 'id, displayName, lastName, updatedAt',
@@ -20,6 +20,12 @@ const STORES = {
   expenses: 'id, tripId, dayId, paidByTravelerId, category, occurredAt, updatedAt',
   reservations: 'id, tripId, dayId, type, placeId, startsAt, status, updatedAt',
   auditLog: 'id, entityType, entityId, action, timestamp',
+} as const
+
+const STORES_V2 = {
+  ...STORES_V1,
+  blocks: 'id, tripId, dayId, parentBlockId, content.placeId, [dayId+position], updatedAt',
+  media: 'id, tripId, dayId, blockId, placeId, kind, sha256, updatedAt',
 } as const
 
 export class DTAgencyDatabase extends Dexie {
@@ -41,7 +47,8 @@ export class DTAgencyDatabase extends Dexie {
 
   constructor() {
     super(DB_NAME)
-    this.version(DB_VERSION).stores(STORES)
+    this.version(1).stores(STORES_V1)
+    this.version(DB_VERSION).stores(STORES_V2)
   }
 }
 

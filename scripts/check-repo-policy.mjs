@@ -11,7 +11,7 @@ const legacyProductName = 'Dura' + 'nti Travel Agency'
 const legacyVaultExtension = '.' + legacyToken
 const legacyVaultMagic = 'DUR' + 'VLT'
 const legacyDocumentMagic = 'DUR' + 'DOC'
-const maximumSchemaVersionBeforeVaultMigration = 1
+const maximumSchemaVersionBeforeVaultMigration = 2
 
 const violations = []
 

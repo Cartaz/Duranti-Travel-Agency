@@ -1,4 +1,4 @@
-import { resolveNominatimEndpoint } from './runtime-config'
+import { resolveNominatimEndpoint } from './runtime-config.ts'
 
 type NominatimAddress = Record<string, string | undefined>
 type NominatimExtraTags = Record<string, string | undefined>
