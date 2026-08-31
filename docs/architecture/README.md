@@ -1,4 +1,9 @@
-# Duranti Architecture
+# DTAgency Architecture
+
+## Current quality gate
+
+- **Pre-3D closure:** [`pre-3d-closure-2026-08-31.md`](./pre-3d-closure-2026-08-31.md) is the canonical status of findings N1–N9 and the integration gate before introducing a 3D renderer.
+- Historical strategic audits remain decision context; they do not override the current closure record.
 
 ## Decisions
 
@@ -33,7 +38,7 @@
 ## Storage model
 
 ```text
-                    Duranti PWA
+                    DTAgency PWA
                          |
               +----------+----------+
               |                     |
