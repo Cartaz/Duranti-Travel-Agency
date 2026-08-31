@@ -1,10 +1,6 @@
-import type { Block, Place } from '../../domain/entities'
+import { placeIdForBlock, withPlaceId } from '../../domain/block-content'
+import type { Place } from '../../domain/entities'
 import { db } from '../db/dtagency-db'
-
-function readPlaceId(block: Block): string | undefined {
-  const value = block.content.placeId
-  return typeof value === 'string' && value.length > 0 ? value : undefined
-}
 
 export class PlaceBlockRepository {
   async savePlaceForBlock(
@@ -20,7 +16,7 @@ export class PlaceBlockRepository {
         throw new Error('Il blocco non è un luogo di questa giornata.')
       }
 
-      const currentPlaceId = readPlaceId(block)
+      const currentPlaceId = placeIdForBlock(block)
       const currentPlace = currentPlaceId ? await db.places.get(currentPlaceId) : undefined
       const currentPlaceIsActive = Boolean(currentPlace && !currentPlace.deletedAt)
 
@@ -36,18 +32,12 @@ export class PlaceBlockRepository {
         throw new Error('Esiste già un altro luogo con questo identificatore.')
       }
 
-      if (currentPlaceIsActive) {
-        await db.places.put(place)
-      } else {
-        await db.places.add(place)
-      }
+      if (currentPlaceIsActive) await db.places.put(place)
+      else await db.places.add(place)
 
       await db.blocks.put({
         ...block,
-        content: {
-          ...block.content,
-          placeId: place.id,
-        },
+        content: withPlaceId(block.content, place.id),
         updatedAt: new Date().toISOString(),
       })
     })

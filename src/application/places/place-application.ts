@@ -1,3 +1,4 @@
+import { placeIdForBlock } from '../../domain/block-content'
 import type { Block, Place } from '../../domain/entities'
 import { assertTripDayContext } from '../shared/trip-day-context'
 import type { PlaceApplicationDependencies } from './ports'
@@ -77,12 +78,6 @@ function placeBaseFromDraft(input: PlaceDraft): Omit<Place, 'id' | 'createdAt' |
   const draft = normalizeDraft(input)
   return { ...draft, provider: draft.provider ?? 'manual', mapsUrl: buildGoogleMapsSearchUrl(draft) }
 }
-function placeIdFromBlock(block: Block): string | undefined {
-  const value = block.content.placeId
-  if (value === undefined) return undefined
-  if (typeof value !== 'string' || !value) throw new Error('Il riferimento al luogo del blocco non è valido.')
-  return value
-}
 
 export function createPlaceApplication(deps: PlaceApplicationDependencies): PlaceApplication {
   async function assertContext(tripId: string, dayId: string, editable: boolean) {
@@ -96,21 +91,14 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
   function placeToDraft(place: Place): PlaceDraft {
     return { name: place.name, formattedAddress: place.formattedAddress, city: place.city, countryCode: place.countryCode, category: place.category, phone: place.phone, openingHours: place.openingHours, notes: place.notes, latitude: place.latitude, longitude: place.longitude, provider: place.provider, providerPlaceId: place.providerPlaceId }
   }
-  async function listCatalogPlaces(): Promise<Place[]> {
-    return (await deps.places.list()).sort((left, right) => left.name.localeCompare(right.name, 'it'))
-  }
+  async function listCatalogPlaces(): Promise<Place[]> { return (await deps.places.list()).sort((left, right) => left.name.localeCompare(right.name, 'it')) }
   async function saveCatalogPlace(input: PlaceDraft): Promise<Place> {
-    const timestamp = deps.now()
-    const place: Place = { id: deps.newId(), ...placeBaseFromDraft(input), createdAt: timestamp, updatedAt: timestamp }
-    await deps.places.put(place)
-    return place
+    const timestamp = deps.now(); const place: Place = { id: deps.newId(), ...placeBaseFromDraft(input), createdAt: timestamp, updatedAt: timestamp }
+    await deps.places.put(place); return place
   }
   async function updateCatalogPlace(placeId: string, input: PlaceDraft): Promise<Place> {
-    const current = await deps.places.get(placeId)
-    if (!current) throw new Error('Il luogo da modificare non esiste più nel catalogo.')
-    const updated: Place = { ...current, ...placeBaseFromDraft(input), updatedAt: deps.now() }
-    await deps.places.put(updated)
-    return updated
+    const current = await deps.places.get(placeId); if (!current) throw new Error('Il luogo da modificare non esiste più nel catalogo.')
+    const updated: Place = { ...current, ...placeBaseFromDraft(input), updatedAt: deps.now() }; await deps.places.put(updated); return updated
   }
   async function deleteCatalogPlace(placeId: string): Promise<void> {
     const result = await deps.places.safeDelete(placeId)
@@ -121,24 +109,14 @@ export function createPlaceApplication(deps: PlaceApplicationDependencies): Plac
     }
   }
   async function getPlannerPlace(tripId: string, dayId: string, blockId: string): Promise<Place | undefined> {
-    await assertContext(tripId, dayId, false)
-    const block = await getPlaceBlock(tripId, dayId, blockId)
-    const placeId = placeIdFromBlock(block)
-    if (!placeId) return undefined
-    return deps.places.get(placeId)
+    await assertContext(tripId, dayId, false); const block = await getPlaceBlock(tripId, dayId, blockId); const placeId = placeIdForBlock(block)
+    return placeId ? deps.places.get(placeId) : undefined
   }
   async function savePlannerPlace(tripId: string, dayId: string, blockId: string, input: PlaceDraft): Promise<Place> {
-    await assertContext(tripId, dayId, true)
-    const block = await getPlaceBlock(tripId, dayId, blockId)
-    const currentPlaceId = placeIdFromBlock(block)
-    const currentPlace = currentPlaceId ? await deps.places.get(currentPlaceId) : undefined
-    const now = deps.now()
-    const base = placeBaseFromDraft(input)
-    const place: Place = currentPlace
-      ? { ...currentPlace, ...base, updatedAt: now }
-      : { id: deps.newId(), ...base, createdAt: now, updatedAt: now }
-    await deps.blockTransactions.savePlaceForBlock(blockId, tripId, dayId, place)
-    return place
+    await assertContext(tripId, dayId, true); const block = await getPlaceBlock(tripId, dayId, blockId); const currentPlaceId = placeIdForBlock(block)
+    const currentPlace = currentPlaceId ? await deps.places.get(currentPlaceId) : undefined; const now = deps.now(); const base = placeBaseFromDraft(input)
+    const place: Place = currentPlace ? { ...currentPlace, ...base, updatedAt: now } : { id: deps.newId(), ...base, createdAt: now, updatedAt: now }
+    await deps.blockTransactions.savePlaceForBlock(blockId, tripId, dayId, place); return place
   }
   return { placeToDraft, listCatalogPlaces, saveCatalogPlace, updateCatalogPlace, deleteCatalogPlace, getPlannerPlace, savePlannerPlace }
 }
