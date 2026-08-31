@@ -28,7 +28,7 @@ export interface DayMediaRepositoryPort {
   create(input: DayMediaCreateInput, source: Blob): Promise<Media>
   updateDayMetadata(id: string, input: DayMediaMetadataUpdate): Promise<Media>
   setDayOrder(tripId: string, dayId: string, orderedIds: string[]): Promise<void>
-  softDelete(id: string): Promise<unknown>
+  softDeleteForDay(id: string, tripId: string, dayId: string): Promise<unknown>
   purge(id: string): Promise<unknown>
 }
 

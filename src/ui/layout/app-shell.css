@@ -1,3 +1,53 @@
+.app-readiness-notice {
+  width: min(760px, calc(100% - 32px));
+  margin: 14px auto 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(164, 117, 58, .45);
+  border-radius: 16px;
+  background: rgba(255, 246, 227, .92);
+  color: #4a3523;
+}
+
+.app-readiness-notice > div:first-child {
+  min-width: 0;
+}
+
+.app-readiness-notice strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 14px;
+}
+
+.app-readiness-notice p {
+  margin: 4px 0 0;
+  line-height: 1.45;
+  font-size: 13px;
+}
+
+.app-readiness-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-readiness-actions a,
+.app-readiness-actions button {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.app-readiness-actions a {
+  color: inherit;
+  font-weight: 700;
+}
+
 .app-validation-notice {
   position: fixed;
   z-index: 100;
@@ -73,10 +123,15 @@
 }
 
 @media (max-width: 520px) {
+  .app-readiness-notice,
   .app-validation-notice {
     align-items: stretch;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .app-readiness-actions {
+    justify-content: flex-end;
   }
 
   .app-validation-notice button {

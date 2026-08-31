@@ -1,5 +1,4 @@
 import type { Block, Day, Template, Trip } from '../../domain/entities'
-import type { DayDraft } from '../days/day-application'
 
 export interface TemplateRepositoryPort {
   listByCategory(category: string, options?: { includeDeleted?: boolean }): Promise<Template[]>
@@ -10,24 +9,15 @@ export interface TemplateRepositoryPort {
 
 export interface TemplateBlockRepositoryPort {
   listByDay(dayId: string): Promise<Block[]>
-  put(value: Block): Promise<unknown>
-  softDelete(id: string): Promise<unknown>
-  purge(id: string): Promise<unknown>
 }
 
 export interface TemplateDayRepositoryPort {
   get(id: string): Promise<Day | undefined>
-  put(value: Day): Promise<unknown>
-  softDelete(id: string): Promise<unknown>
-  purge(id: string): Promise<unknown>
+  createForTrip(value: Omit<Day, 'sequence'>, initialBlocks?: Block[]): Promise<Day>
 }
 
 export interface TemplateTripRepositoryPort {
   get(id: string): Promise<Trip | undefined>
-}
-
-export interface DayCreatorPort {
-  createTripDay(tripId: string, input: DayDraft): Promise<Day>
 }
 
 export interface DayTemplateApplicationDependencies {
@@ -35,7 +25,6 @@ export interface DayTemplateApplicationDependencies {
   blocks: TemplateBlockRepositoryPort
   days: TemplateDayRepositoryPort
   trips: TemplateTripRepositoryPort
-  dayCreator: DayCreatorPort
   now(): string
   newId(): string
 }

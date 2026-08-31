@@ -12,13 +12,13 @@ import TravelerDocumentsPage from './features/travelers/TravelerDocumentsPage'
 import TravelerFormPage from './features/travelers/TravelerFormPage'
 import TravelersPage from './features/travelers/TravelersPage'
 import VaultBackupPage from './features/vault/VaultBackupPage'
-import AppShell from './ui/layout/AppShell'
+import AppShell, { type AppShellReadiness } from './ui/layout/AppShell'
 
-export default function App() {
+export default function App({ readiness = {} }: { readiness?: AppShellReadiness }) {
   return (
     <HashRouter>
       <Routes>
-        <Route element={<AppShell />}>
+        <Route element={<AppShell readiness={readiness} />}>
           <Route index element={<TravelIndexPage />} />
           <Route path="archive" element={<ArchivedTripsPage />} />
           <Route path="places" element={<PlaceCatalogPage />} />

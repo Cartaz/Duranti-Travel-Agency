@@ -75,16 +75,9 @@ async function decryptPrivateData(record: TravelerDocument): Promise<TravelerDoc
   return decryptJson<TravelerDocumentPrivateData>(ENCRYPTION_PURPOSE, record.id, record.encryptedPayload)
 }
 
-function viewFrom(
-  record: TravelerDocument,
-  privateData: TravelerDocumentPrivateData,
-): TravelerDocumentView {
+function viewFrom(record: TravelerDocument, privateData: TravelerDocumentPrivateData): TravelerDocumentView {
   const { attachment, ...secret } = privateData
-  return {
-    ...metadataFrom(record),
-    secret,
-    ...(attachment ? { attachment } : {}),
-  }
+  return { ...metadataFrom(record), secret, ...(attachment ? { attachment } : {}) }
 }
 
 async function decryptRecord(record: TravelerDocument): Promise<TravelerDocumentView> {
@@ -105,7 +98,6 @@ export class TravelerDocumentRepository {
     const now = new Date().toISOString()
     const privateData: TravelerDocumentPrivateData = { ...input.secret }
     const encryptedPayload = await encryptJson(ENCRYPTION_PURPOSE, id, privateData)
-
     const entity: TravelerDocument = {
       id,
       travelerId: input.travelerId,
@@ -115,32 +107,35 @@ export class TravelerDocumentRepository {
       updatedAt: now,
     }
 
-    await db.travelerDocuments.add(entity)
+    await db.transaction('rw', db.travelers, db.travelerDocuments, async () => {
+      const traveler = await db.travelers.get(input.travelerId)
+      if (!traveler || traveler.deletedAt) throw new Error('Il profilo viaggiatore non esiste più.')
+      await db.travelerDocuments.add(entity)
+    })
     return viewFrom(entity, privateData)
   }
 
-  async get(
-    id: string,
-    options: TravelerDocumentReadOptions = {},
-  ): Promise<TravelerDocumentView | undefined> {
+  async get(id: string, options: TravelerDocumentReadOptions = {}): Promise<TravelerDocumentView | undefined> {
     const raw = await db.travelerDocuments.get(id)
     if (!raw || (!options.includeDeleted && raw.deletedAt)) return undefined
     return decryptRecord(requireSecureRecord(raw, id))
   }
 
-  async listMetadata(
+  async listMetadataByTraveler(
+    travelerId: string,
     options: TravelerDocumentReadOptions = {},
   ): Promise<TravelerDocumentMetadata[]> {
-    const records = await db.travelerDocuments.toArray()
+    const records = await db.travelerDocuments.where('travelerId').equals(travelerId).toArray()
     return records
       .filter((record) => options.includeDeleted || !record.deletedAt)
       .map((record) => metadataFrom(requireSecureRecord(record, record.id)))
   }
 
-  async list(
+  async listByTraveler(
+    travelerId: string,
     options: TravelerDocumentReadOptions = {},
   ): Promise<TravelerDocumentView[]> {
-    const records = await db.travelerDocuments.toArray()
+    const records = await db.travelerDocuments.where('travelerId').equals(travelerId).toArray()
     const result: TravelerDocumentView[] = []
     for (const raw of records) {
       if (!options.includeDeleted && raw.deletedAt) continue
@@ -182,15 +177,8 @@ export class TravelerDocumentRepository {
     }
 
     try {
-      const encryptedPayload = await encryptJson<TravelerDocumentPrivateData>(
-        ENCRYPTION_PURPOSE,
-        id,
-        { ...current, attachment },
-      )
-      const updated = await db.travelerDocuments.update(id, {
-        encryptedPayload,
-        updatedAt: new Date().toISOString(),
-      })
+      const encryptedPayload = await encryptJson<TravelerDocumentPrivateData>(ENCRYPTION_PURPOSE, id, { ...current, attachment })
+      const updated = await db.travelerDocuments.update(id, { encryptedPayload, updatedAt: new Date().toISOString() })
       if (updated !== 1) throw new Error(`Traveler document ${id} attachment could not be linked.`)
     } catch (error) {
       await deleteAttachmentBestEffort(id, attachmentId)
@@ -210,11 +198,7 @@ export class TravelerDocumentRepository {
 
     const plaintext = await readEncryptedDocumentAttachment(id, attachment.id)
     try {
-      return new File(
-        [plaintext],
-        attachment.originalName || `traveler-document-${id}`,
-        { type: attachment.mimeType },
-      )
+      return new File([plaintext], attachment.originalName || `traveler-document-${id}`, { type: attachment.mimeType })
     } finally {
       plaintext.fill(0)
     }
@@ -228,15 +212,8 @@ export class TravelerDocumentRepository {
 
     const attachment = privateData.attachment
     const { attachment: _removed, ...withoutAttachment } = privateData
-    const encryptedPayload = await encryptJson<TravelerDocumentPrivateData>(
-      ENCRYPTION_PURPOSE,
-      id,
-      withoutAttachment,
-    )
-    const updated = await db.travelerDocuments.update(id, {
-      encryptedPayload,
-      updatedAt: new Date().toISOString(),
-    })
+    const encryptedPayload = await encryptJson<TravelerDocumentPrivateData>(ENCRYPTION_PURPOSE, id, withoutAttachment)
+    const updated = await db.travelerDocuments.update(id, { encryptedPayload, updatedAt: new Date().toISOString() })
     if (updated !== 1) throw new Error(`Traveler document ${id} attachment could not be unlinked.`)
 
     await deleteAttachmentBestEffort(id, attachment.id)
@@ -244,14 +221,14 @@ export class TravelerDocumentRepository {
   }
 
   async softDelete(id: string): Promise<TravelerDocumentDeleteResult> {
-    const record = await db.travelerDocuments.get(id)
-    if (!record) return 'not-found'
-    if (record.deletedAt) return 'already-deleted'
-
-    const now = new Date().toISOString()
-    const updated = await db.travelerDocuments.update(id, { deletedAt: now, updatedAt: now })
-    if (updated !== 1) throw new Error(`Traveler document ${id} could not be tombstoned.`)
-    return 'tombstoned'
+    return db.transaction('rw', db.travelerDocuments, async () => {
+      const record = await db.travelerDocuments.get(id)
+      if (!record) return 'not-found'
+      if (record.deletedAt) return 'already-deleted'
+      const now = new Date().toISOString()
+      await db.travelerDocuments.put({ ...record, deletedAt: now, updatedAt: now })
+      return 'tombstoned'
+    })
   }
 
   async restore(id: string): Promise<TravelerDocumentRestoreResult> {
@@ -259,29 +236,24 @@ export class TravelerDocumentRepository {
     if (!raw) return 'not-found'
     if (!raw.deletedAt) return 'already-active'
     const record = requireSecureRecord(raw, id)
-
     const privateData = await decryptPrivateData(record)
-    if (
-      privateData.attachment &&
-      !(await encryptedDocumentAttachmentExists(id, privateData.attachment.id))
-    ) {
+    if (privateData.attachment && !(await encryptedDocumentAttachmentExists(id, privateData.attachment.id))) {
       throw new Error(`Traveler document ${id} cannot be restored because its encrypted attachment is missing.`)
     }
 
-    const updated = await db.travelerDocuments.update(id, {
-      deletedAt: undefined,
-      updatedAt: new Date().toISOString(),
+    return db.transaction('rw', db.travelerDocuments, async () => {
+      const current = await db.travelerDocuments.get(id)
+      if (!current) return 'not-found'
+      if (!current.deletedAt) return 'already-active'
+      await db.travelerDocuments.put({ ...current, deletedAt: undefined, updatedAt: new Date().toISOString() })
+      return 'restored'
     })
-    if (updated !== 1) throw new Error(`Traveler document ${id} could not be restored.`)
-    return 'restored'
   }
 
   async purge(id: string): Promise<TravelerDocumentPurgeResult> {
     const record = await db.travelerDocuments.get(id)
     if (!record) return 'not-found'
-    if (!record.deletedAt) {
-      throw new Error(`Traveler document ${id} must be tombstoned before it can be purged.`)
-    }
+    if (!record.deletedAt) throw new Error(`Traveler document ${id} must be tombstoned before it can be purged.`)
 
     try {
       await deleteEncryptedDocumentDirectory(id)
@@ -289,8 +261,13 @@ export class TravelerDocumentRepository {
       if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error
     }
 
-    await db.travelerDocuments.delete(id)
-    return 'purged'
+    return db.transaction('rw', db.travelerDocuments, async () => {
+      const current = await db.travelerDocuments.get(id)
+      if (!current) return 'not-found'
+      if (!current.deletedAt) throw new Error(`Traveler document ${id} must be tombstoned before it can be purged.`)
+      await db.travelerDocuments.delete(id)
+      return 'purged'
+    })
   }
 }
 

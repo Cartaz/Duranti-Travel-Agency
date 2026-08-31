@@ -32,7 +32,8 @@ interface NominatimResult {
 const CACHE_PREFIX = 'dtagency:nominatim:v1:'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const MIN_REQUEST_INTERVAL_MS = 1_000
-let lastRequestStartedAt = 0
+const RATE_LIMIT_LOCK_NAME = 'dtagency:nominatim:request-slot:v1'
+const LAST_REQUEST_START_KEY = 'dtagency:nominatim:last-request-start:v1'
 
 function first(...values: Array<string | undefined>): string | undefined {
   return values.find((value) => value?.trim())?.trim()
@@ -100,45 +101,90 @@ function writeCache(query: string, candidates: NominatimPlaceCandidate[]): void 
   }
 }
 
-async function respectRateLimit(): Promise<void> {
-  const waitMs = Math.max(0, MIN_REQUEST_INTERVAL_MS - (Date.now() - lastRequestStartedAt))
-  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
-  lastRequestStartedAt = Date.now()
+function readSharedLastRequestStart(): number {
+  try {
+    const value = Number(localStorage.getItem(LAST_REQUEST_START_KEY))
+    return Number.isFinite(value) && value > 0 ? value : 0
+  } catch {
+    return 0
+  }
+}
+
+function writeSharedLastRequestStart(value: number): void {
+  try {
+    localStorage.setItem(LAST_REQUEST_START_KEY, String(value))
+  } catch {
+    // In-process serialization still applies when shared browser storage is unavailable.
+  }
 }
 
 export function createNominatimPlaceDiscovery(endpoint = 'https://nominatim.openstreetmap.org') {
+  let nextRequestStartAt = 0
+  const inFlightSearches = new Map<string, Promise<NominatimPlaceCandidate[]>>()
+
+  async function reserveRequestSlot(): Promise<void> {
+    const now = Date.now()
+    const sharedNextStartAt = readSharedLastRequestStart() + MIN_REQUEST_INTERVAL_MS
+    const scheduledAt = Math.max(now, nextRequestStartAt, sharedNextStartAt)
+    nextRequestStartAt = scheduledAt + MIN_REQUEST_INTERVAL_MS
+    const waitMs = scheduledAt - now
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs))
+    writeSharedLastRequestStart(scheduledAt)
+  }
+
+  async function waitForRequestSlot(): Promise<void> {
+    const locks = typeof navigator === 'undefined' ? undefined : navigator.locks
+    if (!locks) {
+      await reserveRequestSlot()
+      return
+    }
+    await locks.request(RATE_LIMIT_LOCK_NAME, reserveRequestSlot)
+  }
+
+  async function searchRemote(query: string): Promise<NominatimPlaceCandidate[]> {
+    await waitForRequestSlot()
+    const url = new URL('/search', endpoint)
+    url.searchParams.set('q', query)
+    url.searchParams.set('format', 'jsonv2')
+    url.searchParams.set('limit', '5')
+    url.searchParams.set('addressdetails', '1')
+    url.searchParams.set('extratags', '1')
+    url.searchParams.set('namedetails', '1')
+    url.searchParams.set('accept-language', 'it')
+
+    let response: Response
+    try {
+      response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        referrerPolicy: 'strict-origin-when-cross-origin',
+      })
+    } catch {
+      throw new Error('Non riesco a contattare OpenStreetMap. Controlla la connessione e riprova.')
+    }
+    if (!response.ok) throw new Error(`OpenStreetMap non è disponibile in questo momento (${response.status}).`)
+
+    const payload = await response.json() as NominatimResult[]
+    const candidates = payload
+      .filter((result) => Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lon)))
+      .map(candidateFromResult)
+    writeCache(query, candidates)
+    return candidates
+  }
+
   return {
     async search(query: string): Promise<NominatimPlaceCandidate[]> {
-      const cached = readCache(query)
+      const normalizedQuery = query.trim()
+      const cached = readCache(normalizedQuery)
       if (cached) return cached
 
-      await respectRateLimit()
-      const url = new URL('/search', endpoint)
-      url.searchParams.set('q', query)
-      url.searchParams.set('format', 'jsonv2')
-      url.searchParams.set('limit', '5')
-      url.searchParams.set('addressdetails', '1')
-      url.searchParams.set('extratags', '1')
-      url.searchParams.set('namedetails', '1')
-      url.searchParams.set('accept-language', 'it')
+      const key = cacheKey(normalizedQuery)
+      const pending = inFlightSearches.get(key)
+      if (pending) return pending
 
-      let response: Response
-      try {
-        response = await fetch(url, {
-          headers: { Accept: 'application/json' },
-          referrerPolicy: 'strict-origin-when-cross-origin',
-        })
-      } catch {
-        throw new Error('Non riesco a contattare OpenStreetMap. Controlla la connessione e riprova.')
-      }
-      if (!response.ok) throw new Error(`OpenStreetMap non è disponibile in questo momento (${response.status}).`)
-
-      const payload = await response.json() as NominatimResult[]
-      const candidates = payload
-        .filter((result) => Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lon)))
-        .map(candidateFromResult)
-      writeCache(query, candidates)
-      return candidates
+      const request = searchRemote(normalizedQuery)
+        .finally(() => inFlightSearches.delete(key))
+      inFlightSearches.set(key, request)
+      return request
     },
   }
 }

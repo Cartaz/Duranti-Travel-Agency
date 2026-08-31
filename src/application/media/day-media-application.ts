@@ -196,10 +196,7 @@ export function createDayMediaApplication(deps: DayMediaApplicationDependencies)
   }
 
   async function removeDayMedia(tripId: string, dayId: string, mediaId: string): Promise<void> {
-    await assertDayContext(tripId, dayId, true)
-    const media = await deps.media.get(mediaId)
-    if (!media || media.tripId !== tripId || media.dayId !== dayId || media.blockId) throw new Error('La foto o il video non appartiene a questa giornata.')
-    await deps.media.softDelete(mediaId)
+    await deps.media.softDeleteForDay(mediaId, tripId, dayId)
     try { await deps.media.purge(mediaId) } catch { /* tombstone keeps media hidden */ }
   }
 

@@ -268,7 +268,7 @@ export default function TravelerDocumentsPage() {
         {!configured && <label><span>Ripeti passphrase</span><input type="password" autoComplete="new-password" minLength={12} required value={passphraseConfirm} onChange={(event) => setPassphraseConfirm(event.target.value)} /></label>}
         <button className="trip-primary-action" type="submit" disabled={busy}>{busy ? 'Attendo…' : configured ? 'Sblocca' : 'Configura e sblocca'}</button>
       </form>
-      {configured && metadata.length > 0 && <p className="traveler-locked-count">{metadata.length} document{metadata.length === 1 ? 'o' : 'i'} protett{metadata.length === 1 ? 'o' : 'i'} presenti. I dettagli restano nascosti finché la cassaforte è bloccata.</p>}
+      {configured && metadata.length > 0 && <p className="traveler-locked-count">{metadata.length === 1 ? '1 documento protetto presente.' : `${metadata.length} documenti protetti presenti.`} I dettagli restano nascosti finché la cassaforte è bloccata.</p>}
     </article>}
 
     {unlocked && <>

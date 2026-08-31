@@ -1,5 +1,5 @@
 import type { Block, BlockType, Day, Template } from '../../domain/entities'
-import type { DayDraft } from '../days/day-application'
+import { normalizeDayDraft, type DayDraft } from '../days/day-application'
 import { requireTripDay } from '../shared/trip-day-context'
 import type { DayTemplateApplicationDependencies } from './ports'
 
@@ -241,30 +241,30 @@ export function createDayTemplateApplication(deps: DayTemplateApplicationDepende
     const template = await deps.templates.get(templateId)
     if (!template) throw new Error('Il template selezionato non è più disponibile.')
     validateTemplate(template)
-    const day = await deps.dayCreator.createTripDay(tripId, draft)
-    const createdBlockIds: string[] = []
-    try {
-      const now = deps.now()
-      const updatedDay: Day = { ...day, templateId: template.id, updatedAt: now }
-      await deps.days.put(updatedDay)
-      const orderedBlocks = [...template.definition.blocks].sort((left, right) => left.position - right.position)
-      for (const [index, definition] of orderedBlocks.entries()) {
-        const block: Block = {
-          id: deps.newId(), tripId, dayId: day.id, type: definition.type, position: index + 1,
-          content: reusableBlockContent(definition.type, cloneContent(definition.content), true, deps.newId),
-          createdAt: now, updatedAt: now,
-        }
-        await deps.blocks.put(block)
-        createdBlockIds.push(block.id)
-      }
-      return updatedDay
-    } catch (error) {
-      for (const blockId of createdBlockIds) {
-        try { await deps.blocks.softDelete(blockId); await deps.blocks.purge(blockId) } catch { /* preserve original error */ }
-      }
-      try { await deps.days.softDelete(day.id); await deps.days.purge(day.id) } catch { /* tombstone is safer */ }
-      throw error
-    }
+
+    const normalizedDraft = normalizeDayDraft(draft)
+    const now = deps.now()
+    const dayId = deps.newId()
+    const orderedBlocks = [...template.definition.blocks].sort((left, right) => left.position - right.position)
+    const blocks: Block[] = orderedBlocks.map((definition, index) => ({
+      id: deps.newId(),
+      tripId,
+      dayId,
+      type: definition.type,
+      position: index + 1,
+      content: reusableBlockContent(definition.type, cloneContent(definition.content), true, deps.newId),
+      createdAt: now,
+      updatedAt: now,
+    }))
+
+    return deps.days.createForTrip({
+      id: dayId,
+      tripId,
+      templateId: template.id,
+      createdAt: now,
+      updatedAt: now,
+      ...normalizedDraft,
+    }, blocks)
   }
 
   return {

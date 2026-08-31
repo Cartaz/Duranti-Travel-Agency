@@ -67,8 +67,9 @@ test('planner lists blocks through the semantic day query and keeps trip isolati
         return blocks
       },
       get: async () => undefined,
-      put: async () => undefined,
-      softDelete: async () => 'not-found',
+      createAtEnd: async () => { throw new Error('unexpected create') },
+      putInEditableDay: async () => undefined,
+      softDeleteWithinDay: async () => 'not-found',
       moveWithinDay: async () => 'boundary',
     },
     trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
@@ -83,16 +84,20 @@ test('planner lists blocks through the semantic day query and keeps trip isolati
   assert.deepEqual(listed.map((block) => block.id), ['block-earlier', 'block-later'])
 })
 
-test('planner assigns a new position from day-scoped siblings only', async () => {
-  const { trip, day, blocks } = createFixture()
-  let saved: Block | undefined
+test('planner delegates end-position allocation to the atomic block mutation', async () => {
+  const { trip, day } = createFixture()
+  let received: Omit<Block, 'position'> | undefined
 
   const application = createPlannerApplication({
     blocks: {
-      listByDay: async (dayId) => dayId === day.id ? blocks : [],
+      listByDay: async () => { throw new Error('application must not allocate position from a pre-read') },
       get: async () => undefined,
-      put: async (block) => { saved = block; return block.id },
-      softDelete: async () => 'not-found',
+      createAtEnd: async (block) => {
+        received = block
+        return { ...block, position: 4 }
+      },
+      putInEditableDay: async () => undefined,
+      softDeleteWithinDay: async () => 'not-found',
       moveWithinDay: async () => 'boundary',
     },
     trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
@@ -104,7 +109,10 @@ test('planner assigns a new position from day-scoped siblings only', async () =>
   const created = await application.createPlannerBlock(trip.id, day.id, 'divider')
 
   assert.equal(created.position, 4)
-  assert.equal(saved?.id, created.id)
+  assert.equal(received?.id, 'block-new')
+  assert.equal(received?.tripId, trip.id)
+  assert.equal(received?.dayId, day.id)
+  assert.equal(received?.type, 'divider')
 })
 
 test('planner generic delete refuses blocks whose linked data needs a transactional delete', async () => {
@@ -125,8 +133,9 @@ test('planner generic delete refuses blocks whose linked data needs a transactio
     blocks: {
       listByDay: async () => [expenseBlock],
       get: async (blockId) => blockId === expenseBlock.id ? expenseBlock : undefined,
-      put: async () => undefined,
-      softDelete: async () => { softDeleteCalls += 1; return 'tombstoned' },
+      createAtEnd: async () => { throw new Error('unexpected create') },
+      putInEditableDay: async () => undefined,
+      softDeleteWithinDay: async () => { softDeleteCalls += 1; return 'tombstoned' },
       moveWithinDay: async () => 'boundary',
     },
     trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
@@ -142,7 +151,7 @@ test('planner generic delete refuses blocks whose linked data needs a transactio
   assert.equal(softDeleteCalls, 0)
 })
 
-test('planner generic delete still tombstones standalone blocks', async () => {
+test('planner generic delete delegates standalone tombstones to the contextual mutation', async () => {
   const { trip, day } = createFixture()
   const textBlock: Block = {
     id: 'text-block',
@@ -154,14 +163,18 @@ test('planner generic delete still tombstones standalone blocks', async () => {
     createdAt: timestamp,
     updatedAt: timestamp,
   }
-  const deletedIds: string[] = []
+  const deleted: Array<[string, string, string]> = []
 
   const application = createPlannerApplication({
     blocks: {
       listByDay: async () => [textBlock],
       get: async (blockId) => blockId === textBlock.id ? textBlock : undefined,
-      put: async () => undefined,
-      softDelete: async (blockId) => { deletedIds.push(blockId); return 'tombstoned' },
+      createAtEnd: async () => { throw new Error('unexpected create') },
+      putInEditableDay: async () => undefined,
+      softDeleteWithinDay: async (blockId, tripId, dayId) => {
+        deleted.push([blockId, tripId, dayId])
+        return 'tombstoned'
+      },
       moveWithinDay: async () => 'boundary',
     },
     trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
@@ -172,5 +185,5 @@ test('planner generic delete still tombstones standalone blocks', async () => {
 
   await application.deletePlannerBlock(trip.id, day.id, textBlock.id)
 
-  assert.deepEqual(deletedIds, [textBlock.id])
+  assert.deepEqual(deleted, [[textBlock.id, trip.id, day.id]])
 })

@@ -24,8 +24,9 @@ export interface ItineraryRepositoryPort {
   get(id: string): Promise<Itinerary | undefined>
   listByDay(dayId: string): Promise<Itinerary[]>
   listByTrip(tripId: string): Promise<Itinerary[]>
-  put(value: Itinerary): Promise<unknown>
-  softDelete(id: string): Promise<unknown>
+  saveManual(value: Itinerary): Promise<Itinerary>
+  softDeleteManual(tripId: string, dayId: string, itineraryId: string): Promise<'not-found' | 'deleted'>
+  resolveOrphan(tripId: string, dayId: string, itineraryId: string, action: 'convert-to-manual' | 'delete', updatedAt: string): Promise<void>
   moveManualUntimed(tripId: string, dayId: string, itineraryId: string, direction: 'up' | 'down'): Promise<boolean>
 }
 export interface ItineraryReservationSyncPort {

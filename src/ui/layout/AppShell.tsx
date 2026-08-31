@@ -8,6 +8,11 @@ function navClassName({ isActive }: { isActive: boolean }): string {
 
 type ValidatableControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 
+export interface AppShellReadiness {
+  storageWarning?: 'best-effort' | 'unverified'
+  recoveryNotice?: 'rolled-back' | 'finalized'
+}
+
 function controlLabel(control: ValidatableControl): string {
   const explicit = control.getAttribute('aria-label')?.trim()
   if (explicit) return explicit
@@ -71,9 +76,27 @@ function readableValidationMessage(control: ValidatableControl): string {
   return control.validationMessage || `Controlla “${label}”.`
 }
 
-export default function AppShell() {
+function readinessMessages(readiness: AppShellReadiness): string[] {
+  const messages: string[] = []
+  if (readiness.storageWarning === 'best-effort') {
+    messages.push('Il browser conserva questi dati in modalità best-effort: in condizioni di spazio ridotto potrebbe rimuoverli. Mantieni un backup .dtagency aggiornato fuori dal browser.')
+  } else if (readiness.storageWarning === 'unverified') {
+    messages.push('Non è stato possibile verificare se questo browser protegge stabilmente l’archivio locale. Mantieni un backup .dtagency aggiornato fuori dal browser.')
+  }
+
+  if (readiness.recoveryNotice === 'rolled-back') {
+    messages.push('DTAgency ha rilevato un ripristino interrotto e ha ripristinato automaticamente lo stato precedente.')
+  } else if (readiness.recoveryNotice === 'finalized') {
+    messages.push('DTAgency ha rilevato un ripristino interrotto già applicato e ne ha completato automaticamente la finalizzazione.')
+  }
+  return messages
+}
+
+export default function AppShell({ readiness = {} }: { readiness?: AppShellReadiness }) {
   const [validationNotice, setValidationNotice] = useState('')
+  const [readinessVisible, setReadinessVisible] = useState(true)
   const validationLockRef = useRef(false)
+  const statusMessages = readinessMessages(readiness)
 
   const handleInvalid = (event: FormEvent<HTMLElement>): void => {
     event.preventDefault()
@@ -111,6 +134,19 @@ export default function AppShell() {
         </NavLink>
         <span className="offline-badge">offline-first</span>
       </header>
+
+      {readinessVisible && statusMessages.length > 0 && (
+        <aside className="app-readiness-notice" aria-label="Stato archivio locale" role="status">
+          <div>
+            <strong>Stato archivio locale</strong>
+            {statusMessages.map((message) => <p key={message}>{message}</p>)}
+          </div>
+          <div className="app-readiness-actions">
+            {readiness.storageWarning && <NavLink to="/backup">Apri backup</NavLink>}
+            <button type="button" onClick={() => setReadinessVisible(false)}>Chiudi</button>
+          </div>
+        </aside>
+      )}
 
       <main className="app-content">
         <Outlet />

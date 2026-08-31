@@ -65,11 +65,15 @@ export async function writeMediaFile(mediaId: string, source: Blob): Promise<str
   try {
     await writable.write(source)
     await writable.close()
+    const stored = await fileHandle.getFile()
+    if (stored.size !== source.size) {
+      throw new Error(`Media ${mediaId} OPFS write is incomplete: expected ${source.size} bytes, found ${stored.size}.`)
+    }
   } catch (error) {
     try {
       await writable.abort()
     } catch {
-      // Preserve the original write failure.
+      // Preserve the original write/verification failure.
     }
     try {
       await mediaDirectory.removeEntry(mediaId, { recursive: true })
