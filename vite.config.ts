@@ -24,6 +24,7 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/Duranti-Travel-Agency/index.html',
+        globIgnores: ['**/runtime-config.json'],
       },
     }),
   ],
