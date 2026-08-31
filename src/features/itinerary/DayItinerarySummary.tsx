@@ -71,7 +71,7 @@ export default function DayItinerarySummary({ items, tripId, dayId, dayDate, tri
   readOnly: boolean
   onChanged: () => Promise<void>
 }) {
-  const { itinerary } = useApplicationServices()
+  const { itinerary } = useApplicationServices('itinerary')
   const [places, setPlaces] = useState<Place[]>([])
   const [editingId, setEditingId] = useState<string>()
   const [pendingAction, setPendingAction] = useState<PendingItineraryAction>()

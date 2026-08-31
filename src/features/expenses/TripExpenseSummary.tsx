@@ -25,7 +25,7 @@ function BudgetCard({ budget }: { budget: TripBudgetSummary }) {
 }
 
 export default function TripExpenseSummary({ tripId }: { tripId: string }) {
-  const { expenses } = useApplicationServices()
+  const { expenses } = useApplicationServices('expenses')
   const [summary, setSummary] = useState<TripExpenseSummaryData>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

@@ -47,7 +47,7 @@ function attentionLabel(item: DayItineraryItem): string | undefined {
 function stateClass(item: DayItineraryItem): string { if (item.source === 'manual' && hasSourceReference(item)) return 'orphaned'; return item.syncState }
 
 export default function TripItineraryOverview({ tripId }: { tripId: string }) {
-  const { itinerary } = useApplicationServices()
+  const { itinerary } = useApplicationServices('itinerary')
   const [overview, setOverview] = useState<TripItineraryOverviewData>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

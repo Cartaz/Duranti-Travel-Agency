@@ -23,7 +23,7 @@ function draftFromEditable(value: EditableImport): PlaceDraft {
 function detail(value: string | undefined, fallback = 'Non disponibile'): string { return value?.trim() || fallback }
 
 export default function PlaceCatalogPage() {
-  const { places, placeImport } = useApplicationServices()
+  const { places, placeImport } = useApplicationServices('places', 'placeImport')
   const [catalog, setCatalog] = useState<Place[]>([])
   const [sourceUrl, setSourceUrl] = useState('')
   const [candidates, setCandidates] = useState<PlaceImportCandidate[]>([])

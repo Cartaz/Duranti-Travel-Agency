@@ -35,7 +35,7 @@ function choiceLabel(type: PlannerBlockType): string {
 
 export default function GuidedDayPlannerPage() {
   const { tripId, dayId } = useParams<{ tripId: string; dayId: string }>()
-  const { trips: tripApplication, planner: plannerApplication } = useApplicationServices()
+  const { trips: tripApplication, planner: plannerApplication } = useApplicationServices('trips', 'planner')
   const [revision, setRevision] = useState(0)
   const [busyType, setBusyType] = useState<PlannerBlockType>()
   const [canEdit, setCanEdit] = useState(false)

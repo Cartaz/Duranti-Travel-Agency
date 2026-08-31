@@ -34,7 +34,7 @@ function lifecycleAction(status: EditableTripStatus): { target: EditableTripStat
 }
 
 export default function TripDetailPage() {
-  const { trips: tripApplication } = useApplicationServices()
+  const { trips: tripApplication } = useApplicationServices('trips')
   const { tripId } = useParams<{ tripId: string }>()
   const navigate = useNavigate()
   const [trip, setTrip] = useState<Trip>()

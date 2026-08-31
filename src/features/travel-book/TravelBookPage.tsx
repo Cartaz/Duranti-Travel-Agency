@@ -13,7 +13,7 @@ function formatDate(value: string | undefined): string {
 }
 
 export default function TravelBookPage() {
-  const { travelBook: travelBookApplication } = useApplicationServices()
+  const { travelBook: travelBookApplication } = useApplicationServices('travelBook')
   const { tripId } = useParams<{ tripId: string }>()
   const [book, setBook] = useState<TravelBook>()
   const [chapterIndex, setChapterIndex] = useState(0)

@@ -15,7 +15,7 @@ export interface TravelBookMediaGalleryProps {
 }
 
 export default function TravelBookMediaGallery({ tripId, dayId, media }: TravelBookMediaGalleryProps) {
-  const { travelBook } = useApplicationServices()
+  const { travelBook } = useApplicationServices('travelBook')
   const [items, setItems] = useState<LoadedTravelBookMedia[]>([])
   const [loading, setLoading] = useState(false)
 

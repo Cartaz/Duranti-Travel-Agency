@@ -7,7 +7,7 @@ import { useApplicationServices } from '../../ui/application-context'
 import './day-template-saver.css'
 
 export default function DayTemplateSaver({ tripId, dayId }: { tripId: string; dayId: string }) {
-  const { days, templates } = useApplicationServices()
+  const { days, templates } = useApplicationServices('days', 'templates')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)

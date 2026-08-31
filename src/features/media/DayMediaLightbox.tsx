@@ -15,7 +15,7 @@ export default function DayMediaLightbox({
   dayId: string
   onClose: () => void
 }) {
-  const { media: mediaApplication } = useApplicationServices()
+  const { media: mediaApplication } = useApplicationServices('media')
   const [index, setIndex] = useState(() => Math.min(Math.max(initialIndex, 0), Math.max(items.length - 1, 0)))
   const [objectUrl, setObjectUrl] = useState('')
   const [error, setError] = useState('')

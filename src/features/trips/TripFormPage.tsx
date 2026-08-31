@@ -59,7 +59,7 @@ function formToDraft(form: TripFormState): TripDraft {
 }
 
 export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
-  const { trips: tripApplication } = useApplicationServices()
+  const { trips: tripApplication } = useApplicationServices('trips')
   const { tripId } = useParams<{ tripId: string }>()
   const navigate = useNavigate()
   const [form, setForm] = useState<TripFormState>(emptyForm)

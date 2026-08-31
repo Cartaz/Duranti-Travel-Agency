@@ -13,7 +13,7 @@ const roleLabels: Record<TravelerRole, string> = {
 }
 
 export default function TripTravelersPanel({ tripId }: { tripId: string }) {
-  const { travelers: travelerApplication } = useApplicationServices()
+  const { travelers: travelerApplication } = useApplicationServices('travelers')
   const [participants, setParticipants] = useState<TripParticipant[]>([])
   const [travelers, setTravelers] = useState<Traveler[]>([])
   const [selectedTravelerId, setSelectedTravelerId] = useState('')

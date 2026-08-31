@@ -7,7 +7,7 @@ import './travelers.css'
 export default function TravelerFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const { travelerId } = useParams<{ travelerId: string }>()
   const navigate = useNavigate()
-  const { travelers } = useApplicationServices()
+  const { travelers } = useApplicationServices('travelers')
   const [draft, setDraft] = useState<TravelerDraft>(EMPTY_TRAVELER_DRAFT)
   const [loading, setLoading] = useState(mode === 'edit')
   const [saving, setSaving] = useState(false)

@@ -115,7 +115,7 @@ export default function ReservationBlockEditor({
   canMoveDown: boolean
   onChanged: () => Promise<void>
 }) {
-  const { planner, reservations } = useApplicationServices()
+  const { planner, reservations } = useApplicationServices('planner', 'reservations')
   const blockType = reservationBlockType(block)
   const config = blockConfigs[blockType]
   const [reservation, setReservation] = useState<Reservation>()

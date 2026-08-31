@@ -38,7 +38,7 @@ function placeDraftFromFormState(state: PlaceFormState): PlaceDraft {
 
 export default function DayPlannerPage() {
   const { tripId, dayId } = useParams<{ tripId: string; dayId: string }>()
-  const { trips, days, planner, itinerary } = useApplicationServices()
+  const { trips, days, planner, itinerary } = useApplicationServices('trips', 'days', 'planner', 'itinerary')
   const [trip, setTrip] = useState<Trip>()
   const [day, setDay] = useState<Day>()
   const [blocks, setBlocks] = useState<Block[]>([])
@@ -108,7 +108,7 @@ function PlannerBlockEditor(props: PlannerBlockEditorProps) {
 }
 
 function PlannerBasicBlockEditor({ block, tripId, dayId, readOnly, canMoveUp, canMoveDown, onChanged }: PlannerBlockEditorProps) {
-  const { planner } = useApplicationServices()
+  const { planner } = useApplicationServices('planner')
   const [draft, setDraft] = useState<PlannerBlockDraft>(() => planner.readPlannerBlockDraft(block))
   const [saving, setSaving] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
@@ -145,7 +145,7 @@ function PlannerBasicBlockEditor({ block, tripId, dayId, readOnly, canMoveUp, ca
 }
 
 function PlannerPlaceBlockEditor({ block, tripId, dayId, readOnly, canMoveUp, canMoveDown, onChanged }: PlannerBlockEditorProps) {
-  const { planner, places } = useApplicationServices()
+  const { planner, places } = useApplicationServices('planner', 'places')
   const [place, setPlace] = useState<Place>()
   const [state, setState] = useState<PlaceFormState>(() => placeFormStateFromDraft(EMPTY_PLACE_DRAFT))
   const [loading, setLoading] = useState(true)
