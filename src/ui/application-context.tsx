@@ -37,8 +37,14 @@ export function ApplicationProvider({ services, children }: PropsWithChildren<{ 
   return <ApplicationContext.Provider value={services}>{children}</ApplicationContext.Provider>
 }
 
-export function useApplicationServices(): ApplicationServices {
+export function useApplicationServices<K extends keyof ApplicationServices>(
+  first: K,
+  ...rest: K[]
+): Pick<ApplicationServices, K> {
   const services = useContext(ApplicationContext)
   if (!services) throw new Error('DTAgency application services are not available.')
-  return services
+
+  const selected = {} as Pick<ApplicationServices, K>
+  for (const key of [first, ...rest]) selected[key] = services[key]
+  return selected
 }

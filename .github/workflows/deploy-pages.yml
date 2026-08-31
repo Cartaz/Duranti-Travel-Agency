@@ -40,12 +40,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Install pinned browser test runner
-        run: npm install --no-save --package-lock=false --ignore-scripts @playwright/test@1.62.1
-
-      - name: Audit browser test dependencies
-        run: npm audit --audit-level=high
-
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
@@ -63,7 +57,7 @@ jobs:
           exit 1
 
       - name: Browser persistence integration tests
-        run: npx playwright test --config=playwright.config.cjs
+        run: npm run test:browser
 
       - name: Configure Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
