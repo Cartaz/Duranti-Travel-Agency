@@ -28,3 +28,5 @@ jobs:
           git add -A
           git commit -m "fix: index place references and preserve Vault v1"
           git push origin HEAD:chatgpt/pre-3d-close-all-findings
+
+# Temporary branch-only migration runner; removed after N8 is committed.
