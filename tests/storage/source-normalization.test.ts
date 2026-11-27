@@ -16,3 +16,9 @@ test('source normalization keeps object spreads and drops object trailing commas
   const source = normalizeSource('const updated: Place = {\n  ...current,\n  name,\n}')
   assert.match(source, /const updated: Place = \{ \.\.\.current, name \}/)
 })
+
+test('source contracts see through optional chains and interleaved line comments', () => {
+  assert.match(normalizeSource('deps.blocks // full scan\n  .list()'), /deps\.blocks\.list\(/)
+  assert.match(normalizeSource('deps.blocks\n  ?.list()'), /deps\.blocks\?\.list\(/)
+  assert.match(normalizeSource("const url = 'https://example.org/a'"), /'https:\/\/example\.org\/a'/)
+})

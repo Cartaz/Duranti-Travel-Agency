@@ -2,6 +2,8 @@
 
 Data: 2026-11-27 · Commit analizzato: `fb5b71d` (main, working tree pulito) · Nessun file di codice modificato.
 
+> **Nota**: i riferimenti `file:riga` si riferiscono al commit `fb5b71d`, cioè prima della formattazione Prettier. Lo stato di avanzamento delle correzioni è nella sezione 6 in fondo.
+
 Legenda: **[V]** = verificato (eseguito o letto nel codice) · **[S]** = sospetto, non verificato a runtime.
 
 ---
@@ -207,3 +209,13 @@ Per tutte le fasi: nessuna modifica a `DB_VERSION`, agli identificatori persisti
 ## 5. Domanda aperta
 
 Quali fasi vuoi che esegua? Il mio consiglio è di partire da **1 + 2 + 3** in quest'ordine, con un commit per fase.
+
+---
+
+## 6. Stato di avanzamento
+
+| Fase | Stato | PR |
+|---|---|---|
+| 1. Sbloccare CI e test | Completata | PR "audit: CI gate, formatting, layout-independent contracts" |
+| 5. Leggibilità (Prettier) | Completata (anticipata per facilitare le fasi successive) | stessa PR |
+| 2, 3, 4, 6, 7 | In corso | PR successiva |

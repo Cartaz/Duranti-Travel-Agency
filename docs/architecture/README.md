@@ -4,6 +4,8 @@
 
 - **Pre-3D closure:** [`pre-3d-closure-2026-08-31.md`](./pre-3d-closure-2026-08-31.md) is the canonical status of findings N1–N9 and the integration gate before introducing a 3D renderer.
 - Historical strategic audits remain decision context; they do not override the current closure record.
+- **Build gate:** `npm run build` runs, in order, the repository policy check, `check:format` (Prettier; LF line endings are enforced by `.gitattributes`), the Node unit/contract tests, `tsc -b` and the Vite build. CI additionally runs `npm audit --audit-level=high` and the Playwright browser suites.
+- **Source-text contracts:** tests that assert on source code (architecture boundaries, persisted identifiers) must read TypeScript/TSX through `tests/support/source.ts` (`readSource`) so formatter rewraps cannot silently defeat a `doesNotMatch` guard. Prefer an executable behavioural test whenever the invariant can be exercised directly.
 
 ## Decisions
 
