@@ -323,7 +323,13 @@ export function createReservationApplication(deps: ReservationApplicationDepende
   }
   async function deletePlannerReservationBlock(tripId: string, dayId: string, blockId: string): Promise<void> {
     await assertReservationDayContext(tripId, dayId, true)
-    await deps.transactions.softDeleteReservationBlock(blockId, tripId, dayId)
+    const detachedMediaId = await deps.transactions.softDeleteReservationBlock(blockId, tripId, dayId)
+    if (!detachedMediaId) return
+    try {
+      await deps.media.purge(detachedMediaId)
+    } catch {
+      // The block is already deleted; storage maintenance reclaims the bytes later.
+    }
   }
   return {
     reservationToDraft,

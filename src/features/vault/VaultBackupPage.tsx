@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { MIN_PASSPHRASE_LENGTH, passphrasePolicyError } from '../../lib/passphrase-policy'
+import type { MediaStorageReclaimResult, MediaStorageScan } from '../../application/archive/archive-application'
+import { useApplicationServices } from '../../ui/application-context'
 import { useArchiveStatus } from '../../ui/archive-status'
 import InlineConfirm from '../../ui/InlineConfirm'
 import {
@@ -77,6 +79,40 @@ export default function VaultBackupPage() {
   const [error, setError] = useState('')
   const [restoreReport, setRestoreReport] = useState<VaultRestoreResult>()
   const { status: archiveStatus, recordBackupSaved, requestPersistence } = useArchiveStatus()
+  const { archive } = useApplicationServices('archive')
+  const [storageScan, setStorageScan] = useState<MediaStorageScan>()
+  const [storageResult, setStorageResult] = useState<MediaStorageReclaimResult>()
+  const [storageBusy, setStorageBusy] = useState(false)
+  const [confirmReclaim, setConfirmReclaim] = useState(false)
+
+  const handleScanStorage = async (): Promise<void> => {
+    clearFeedback()
+    setStorageBusy(true)
+    setStorageResult(undefined)
+    setConfirmReclaim(false)
+    try {
+      setStorageScan(await archive.scanStorage())
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile analizzare lo spazio occupato.')
+    } finally {
+      setStorageBusy(false)
+    }
+  }
+
+  const handleReclaimStorage = async (): Promise<void> => {
+    if (!storageScan) return
+    clearFeedback()
+    setStorageBusy(true)
+    try {
+      setStorageResult(await archive.reclaimStorage(storageScan))
+      setStorageScan(undefined)
+      setConfirmReclaim(false)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile liberare lo spazio.')
+    } finally {
+      setStorageBusy(false)
+    }
+  }
 
   // Temporary Vault copies can be as large as every stored photo and video.
   // Release them when the user leaves this page instead of leaving them in OPFS.
@@ -462,6 +498,70 @@ export default function VaultBackupPage() {
               />
             )}
           </div>
+        )}
+      </article>
+
+      <article className="vault-card vault-storage-card">
+        <div>
+          <p className="eyebrow">3 · Spazio</p>
+          <h2>Libera spazio sul dispositivo</h2>
+          <p>
+            Foto, video e allegati eliminati possono occupare ancora spazio. Controlla quanto puoi recuperare: nulla
+            viene cancellato finché non confermi.
+          </p>
+        </div>
+        <div className="vault-actions">
+          <button type="button" disabled={storageBusy} onClick={() => void handleScanStorage()}>
+            {storageBusy && !confirmReclaim ? 'Controllo…' : 'Controlla spazio recuperabile'}
+          </button>
+        </div>
+        {storageScan && (
+          <div className="vault-result" role="status">
+            {storageScan.reclaimableMediaIds.length + storageScan.orphanDirectoryIds.length === 0 ? (
+              <strong>Non c’è spazio da recuperare.</strong>
+            ) : (
+              <>
+                <strong>{humanBytes(storageScan.reclaimableBytes)} recuperabili</strong>
+                <span>
+                  {storageScan.reclaimableMediaIds.length} file eliminati · {storageScan.orphanDirectoryIds.length} file
+                  senza riferimenti
+                </span>
+              </>
+            )}
+            {storageScan.unhealthyActiveCount > 0 && (
+              <span>
+                Attenzione: {storageScan.unhealthyActiveCount} media attivi risultano mancanti o incoerenti. Conserva i
+                tuoi backup .dtagency.
+              </span>
+            )}
+            {storageScan.reclaimableMediaIds.length + storageScan.orphanDirectoryIds.length > 0 &&
+              (!confirmReclaim ? (
+                <div className="vault-actions">
+                  <button type="button" disabled={storageBusy} onClick={() => setConfirmReclaim(true)}>
+                    Libera spazio
+                  </button>
+                </div>
+              ) : (
+                <InlineConfirm
+                  title="Eliminare definitivamente questi file?"
+                  message="I file di contenuti già eliminati verranno rimossi dal dispositivo e non potranno essere recuperati, salvo da un backup .dtagency precedente."
+                  confirmLabel="Elimina definitivamente"
+                  busy={storageBusy}
+                  onConfirm={() => void handleReclaimStorage()}
+                  onCancel={() => setConfirmReclaim(false)}
+                />
+              ))}
+          </div>
+        )}
+        {storageResult && (
+          <p className="vault-feedback" role="status">
+            Liberati {humanBytes(storageResult.freedBytes)} ·{' '}
+            {storageResult.purgedMediaCount + storageResult.removedOrphanCount} file rimossi
+            {storageResult.keptReferencedCount > 0
+              ? ` · ${storageResult.keptReferencedCount} conservati perché ancora collegati`
+              : ''}
+            .
+          </p>
         )}
       </article>
     </section>

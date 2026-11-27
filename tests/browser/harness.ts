@@ -4,8 +4,11 @@ import { readMediaFile, writeMediaFile } from '../../src/data/opfs/opfs-store'
 import { dayRepository } from '../../src/data/repositories/day-repository'
 import { plannerBlockRepository } from '../../src/data/repositories/block-repository'
 import { itineraryRepository } from '../../src/data/repositories/itinerary-repository'
+import { mediaFileRepository } from '../../src/data/repositories/media-repository'
+import { reservationBlockRepository } from '../../src/data/repositories/reservation-block-repository'
+import { reclaimMediaStorage, scanReclaimableMediaStorage } from '../../src/data/storage/media-integrity'
 import { prepareVaultExport, loadPreparedVaultFile } from '../../src/vault/export'
-import { stageVaultImport } from '../../src/vault/import'
+import { stageVaultImport } from '../../src/vault/validated-import'
 import {
   abandonInterruptedVaultRestore,
   commitStagedVaultImport,
@@ -484,6 +487,67 @@ await run('Interrupted files-mutating restore rolls OPFS back from journal backu
   )
 })
 
+async function seedReservationWithAttachment(): Promise<{ blockId: string; reservationId: string; mediaId: string }> {
+  const now = new Date().toISOString()
+  const tripId = 'purge-trip'
+  const dayId = 'purge-day'
+  const blockId = 'purge-block'
+  const reservationId = 'purge-reservation'
+  const mediaId = 'purge-attachment'
+  const opfsPath = await writeMediaFile(mediaId, new Blob(['ticket-bytes'], { type: 'application/pdf' }))
+  await db.trips.add({
+    id: tripId,
+    title: 'Purge trip',
+    status: 'planned',
+    startDate: '2026-12-01',
+    endDate: '2026-12-02',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.days.add({ id: dayId, tripId, date: '2026-12-01', sequence: 1, createdAt: now, updatedAt: now })
+  await db.blocks.add({
+    id: blockId,
+    tripId,
+    dayId,
+    type: 'activity',
+    position: 1,
+    content: { reservationId },
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.reservations.add({
+    id: reservationId,
+    tripId,
+    dayId,
+    type: 'activity',
+    title: 'Museo',
+    attachmentMediaId: mediaId,
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.media.add({
+    id: mediaId,
+    tripId,
+    dayId,
+    blockId,
+    kind: 'document',
+    mimeType: 'application/pdf',
+    originalName: 'ticket.pdf',
+    sizeBytes: utf8('ticket-bytes').byteLength,
+    opfsPath,
+    createdAt: now,
+    updatedAt: now,
+  })
+  return { blockId, reservationId, mediaId }
+}
+
+async function assertVaultStillValidates(): Promise<void> {
+  const passphrase = 'browser-integration-passphrase-2026'
+  const prepared = await prepareVaultExport(passphrase)
+  const staged = await stageVaultImport(await loadPreparedVaultFile(prepared), passphrase)
+  assert(staged.manifest.database.tables.length > 0, 'Vault staging returned no tables.')
+}
+
 async function opfsEntryExists(segments: string[]): Promise<boolean> {
   let current = await navigator.storage.getDirectory()
   for (const [index, segment] of segments.entries()) {
@@ -602,6 +666,82 @@ await run('Stale Vault staging is swept while fresh and journaled stages survive
   assert(stale.removedImportStages === 1, `Expected one stale import stage removed, got ${stale.removedImportStages}.`)
   assert(!(await opfsEntryExists(['dtagency', 'vault-import-staging', 'abandoned-stage'])), 'Abandoned stage survived.')
   assert(await opfsEntryExists(['dtagency', 'vault-import-staging', 'journaled-stage']), 'Journaled stage was swept.')
+})
+
+await run('Purge keeps tombstoned media that a record still references', async () => {
+  await resetEnvironment()
+  const { mediaId, reservationId } = await seedReservationWithAttachment()
+  const now = new Date().toISOString()
+  const media = await db.media.get(mediaId)
+  await db.media.put({ ...media!, deletedAt: now, updatedAt: now })
+  const reservation = await db.reservations.get(reservationId)
+  await db.reservations.put({ ...reservation!, deletedAt: now, updatedAt: now })
+
+  assert((await mediaFileRepository.purge(mediaId)) === 'referenced', 'Referenced media was purged.')
+  assert(Boolean(await db.media.get(mediaId)), 'Referenced media row disappeared.')
+  assert((await readText(await readMediaFile(mediaId))) === 'ticket-bytes', 'Referenced media bytes disappeared.')
+  await assertVaultStillValidates()
+})
+
+await run('Deleting a reservation block detaches its attachment so it can be purged safely', async () => {
+  await resetEnvironment()
+  const { blockId, reservationId, mediaId } = await seedReservationWithAttachment()
+  const detached = await reservationBlockRepository.softDeleteReservationBlock(blockId, 'purge-trip', 'purge-day')
+  assert(detached === mediaId, `Expected detached attachment ${mediaId}, got ${detached}.`)
+  const reservation = await db.reservations.get(reservationId)
+  assert(
+    Boolean(reservation?.deletedAt) && reservation?.attachmentMediaId === undefined,
+    'Tombstoned reservation still links the attachment.',
+  )
+
+  assert((await mediaFileRepository.purge(mediaId)) === 'purged', 'Detached attachment was not purged.')
+  assert(!(await db.media.get(mediaId)), 'Purged media row survived.')
+  let fileGone = false
+  try {
+    await readMediaFile(mediaId)
+  } catch {
+    fileGone = true
+  }
+  assert(fileGone, 'Purged media bytes survived.')
+  await assertVaultStillValidates()
+})
+
+await run('Storage reclamation frees deleted and orphan media but keeps active bytes', async () => {
+  await resetEnvironment()
+  const seeded = await seedRoundTripState()
+  const now = new Date().toISOString()
+  const deletedPath = await writeMediaFile('deleted-media', new Blob(['deleted-bytes']))
+  await db.media.add({
+    id: 'deleted-media',
+    tripId: seeded.tripId,
+    kind: 'document',
+    mimeType: 'text/plain',
+    sizeBytes: 13,
+    opfsPath: deletedPath,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: now,
+  })
+  await writeMediaFile('orphan-media', new Blob(['orphan']))
+
+  const scan = await scanReclaimableMediaStorage()
+  assert(
+    scan.reclaimableMediaIds.join() === 'deleted-media',
+    `Unexpected reclaimable ids ${scan.reclaimableMediaIds.join()}.`,
+  )
+  assert(scan.orphanDirectoryIds.join() === 'orphan-media', `Unexpected orphan ids ${scan.orphanDirectoryIds.join()}.`)
+  assert(scan.reclaimableBytes === 13 + 6, `Unexpected reclaimable bytes ${scan.reclaimableBytes}.`)
+
+  const result = await reclaimMediaStorage(scan)
+  assert(result.purgedMediaCount === 1 && result.removedOrphanCount === 1, 'Reclamation did not remove both items.')
+  assert(result.freedBytes === 19, `Unexpected freed bytes ${result.freedBytes}.`)
+  assert((await readText(await readMediaFile(seeded.mediaId))) === seeded.mediaText, 'Active media bytes were removed.')
+  const after = await scanReclaimableMediaStorage()
+  assert(
+    after.reclaimableMediaIds.length === 0 && after.orphanDirectoryIds.length === 0,
+    'Reclamation left items behind.',
+  )
+  await assertVaultStillValidates()
 })
 
 try {

@@ -216,17 +216,23 @@ export class ReservationBlockRepository {
       return updated
     })
   }
-  async softDeleteReservationBlock(blockId: string, tripId: string, dayId: string): Promise<void> {
-    await db.transaction('rw', [db.trips, db.days, db.blocks, db.reservations, db.itineraries, db.media], async () => {
+  /**
+   * Tombstones the block with its reservation, itinerary entry and attachment.
+   * The tombstoned reservation drops its attachment link so the attachment can
+   * be purged without leaving a dangling reference; returns that media id.
+   */
+  async softDeleteReservationBlock(blockId: string, tripId: string, dayId: string): Promise<string | undefined> {
+    return db.transaction('rw', [db.trips, db.days, db.blocks, db.reservations, db.itineraries, db.media], async () => {
       await requireEditableTripDay(tripId, dayId)
       const block = await db.blocks.get(blockId)
-      if (!block || block.deletedAt) return
+      if (!block || block.deletedAt) return undefined
       if (block.tripId !== tripId || block.dayId !== dayId)
         throw new Error('Il blocco prenotazione non appartiene a questa giornata.')
       const expectedType = reservationTypeForBlockType(block.type)
       if (!expectedType) throw new Error('Il blocco non è una prenotazione supportata.')
       const now = new Date().toISOString()
       const reservationId = reservationIdForBlock(block)
+      let detachedMediaId: string | undefined
       if (reservationId) {
         const reservation = await db.reservations.get(reservationId)
         if (reservation && !reservation.deletedAt) {
@@ -237,13 +243,20 @@ export class ReservationBlockRepository {
               assertMediaContext(media, tripId, dayId, blockId)
               await db.media.put({ ...media, deletedAt: now, updatedAt: now })
             }
+            if (media) detachedMediaId = media.id
           }
-          await db.reservations.put({ ...reservation, deletedAt: now, updatedAt: now })
+          await db.reservations.put({
+            ...reservation,
+            attachmentMediaId: detachedMediaId ? undefined : reservation.attachmentMediaId,
+            deletedAt: now,
+            updatedAt: now,
+          })
         }
         const itinerary = await findOwnedItinerary(tripId, dayId, blockId, reservationId)
         if (itinerary) await db.itineraries.put({ ...itinerary, deletedAt: now, updatedAt: now })
       }
       await db.blocks.put({ ...block, deletedAt: now, updatedAt: now })
+      return detachedMediaId
     })
   }
 }

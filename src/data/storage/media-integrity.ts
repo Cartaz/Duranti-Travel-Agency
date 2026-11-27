@@ -6,7 +6,7 @@ import {
   mediaFileExists,
   readMediaFile,
 } from '../opfs/opfs-store'
-import { mediaFileRepository, type PurgeMediaResult } from '../repositories/media-repository'
+import { mediaFileRepository } from '../repositories/media-repository'
 
 export interface MediaSizeMismatch {
   id: string
@@ -127,10 +127,6 @@ export async function scanMediaIntegrity(): Promise<MediaIntegrityReport> {
   }
 }
 
-export async function purgeTombstonedMedia(id: string): Promise<PurgeMediaResult> {
-  return mediaFileRepository.purge(id)
-}
-
 export async function removeOrphanMediaDirectory(id: string): Promise<void> {
   const metadata = await db.media.get(id)
   if (metadata) throw new Error(`Media directory ${id} is not orphaned because metadata still exists.`)
@@ -139,4 +135,76 @@ export async function removeOrphanMediaDirectory(id: string): Promise<void> {
   } catch (error) {
     if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error
   }
+}
+
+export interface MediaStorageScan {
+  reclaimableMediaIds: string[]
+  orphanDirectoryIds: string[]
+  reclaimableBytes: number
+  unhealthyActiveCount: number
+}
+
+export interface MediaStorageReclaimResult {
+  purgedMediaCount: number
+  removedOrphanCount: number
+  keptReferencedCount: number
+  freedBytes: number
+}
+
+async function storedBytes(id: string): Promise<number> {
+  try {
+    return (await readMediaFile(id)).size
+  } catch {
+    return 0
+  }
+}
+
+/** Read-only summary of space held by deleted media and orphan OPFS directories. */
+export async function scanReclaimableMediaStorage(): Promise<MediaStorageScan> {
+  const report = await scanMediaIntegrity()
+  let reclaimableBytes = 0
+  for (const id of [...report.tombstonesWithFileIds, ...report.orphanDirectoryIds])
+    reclaimableBytes += await storedBytes(id)
+  return {
+    reclaimableMediaIds: report.tombstonesWithFileIds,
+    orphanDirectoryIds: report.orphanDirectoryIds,
+    reclaimableBytes,
+    unhealthyActiveCount:
+      report.missingFileIds.length +
+      report.sizeMismatches.length +
+      report.pathMismatches.length +
+      report.unreadableEntries.length,
+  }
+}
+
+/**
+ * Explicit, user-confirmed reclamation. Every deletion re-checks the current
+ * state: purge refuses active or still-referenced rows, and orphan removal
+ * refuses any directory that has regained metadata since the scan.
+ */
+export async function reclaimMediaStorage(scan: MediaStorageScan): Promise<MediaStorageReclaimResult> {
+  const result: MediaStorageReclaimResult = {
+    purgedMediaCount: 0,
+    removedOrphanCount: 0,
+    keptReferencedCount: 0,
+    freedBytes: 0,
+  }
+  for (const id of scan.reclaimableMediaIds) {
+    const bytes = await storedBytes(id)
+    const outcome = await mediaFileRepository.purge(id)
+    if (outcome === 'purged') {
+      result.purgedMediaCount += 1
+      result.freedBytes += bytes
+    } else if (outcome === 'referenced') {
+      result.keptReferencedCount += 1
+    }
+  }
+  for (const id of scan.orphanDirectoryIds) {
+    if (await db.media.get(id)) continue // metadata reappeared since the scan: not an orphan any more
+    const bytes = await storedBytes(id)
+    await removeOrphanMediaDirectory(id)
+    result.removedOrphanCount += 1
+    result.freedBytes += bytes
+  }
+  return result
 }

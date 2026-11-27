@@ -1,6 +1,11 @@
-import type { ArchiveApplicationDependencies, StoragePersistenceState } from './ports'
+import type {
+  ArchiveApplicationDependencies,
+  MediaStorageReclaimResult,
+  MediaStorageScan,
+  StoragePersistenceState,
+} from './ports'
 
-export type { StoragePersistenceState }
+export type { MediaStorageReclaimResult, MediaStorageScan, StoragePersistenceState }
 
 /** A backup older than this is treated as stale for an archive that holds trips. */
 export const BACKUP_REMINDER_INTERVAL_DAYS = 30
@@ -17,6 +22,10 @@ export interface ArchiveApplication {
   getStatus(): Promise<ArchiveStatus>
   requestPersistence(): Promise<StoragePersistenceState>
   recordBackupSaved(): Promise<string>
+  /** Read-only: how much space deleted or orphaned media still occupies. */
+  scanStorage(): Promise<MediaStorageScan>
+  /** Irreversibly frees the space found by a scan, re-checking every item. */
+  reclaimStorage(scan: MediaStorageScan): Promise<MediaStorageReclaimResult>
 }
 
 export function isBackupDue(hasActiveTrips: boolean, lastBackupAt: string | undefined, now: string): boolean {
@@ -44,6 +53,15 @@ export function createArchiveApplication(deps: ArchiveApplicationDependencies): 
       const at = deps.now()
       await deps.ledger.recordSaved(at)
       return at
+    },
+    scanStorage() {
+      return deps.maintenance.scan()
+    },
+    async reclaimStorage(scan) {
+      if (scan.reclaimableMediaIds.length === 0 && scan.orphanDirectoryIds.length === 0) {
+        return { purgedMediaCount: 0, removedOrphanCount: 0, keptReferencedCount: 0, freedBytes: 0 }
+      }
+      return deps.maintenance.reclaim(scan)
     },
   }
 }

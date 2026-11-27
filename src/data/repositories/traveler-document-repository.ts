@@ -247,23 +247,23 @@ export class TravelerDocumentRepository {
   }
 
   async purge(id: string): Promise<TravelerDocumentPurgeResult> {
-    const record = await db.travelerDocuments.get(id)
-    if (!record) return 'not-found'
-    if (!record.deletedAt) throw new Error(`Traveler document ${id} must be tombstoned before it can be purged.`)
+    // Row first (re-checking the tombstone), bytes second: an interruption can
+    // leave a recoverable orphan directory, never an active record without bytes.
+    const outcome = await db.transaction('rw', db.travelerDocuments, async () => {
+      const current = await db.travelerDocuments.get(id)
+      if (!current) return 'not-found' as const
+      if (!current.deletedAt) throw new Error(`Traveler document ${id} must be tombstoned before it can be purged.`)
+      await db.travelerDocuments.delete(id)
+      return 'purged' as const
+    })
+    if (outcome !== 'purged') return outcome
 
     try {
       await deleteEncryptedDocumentDirectory(id)
     } catch (error) {
       if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error
     }
-
-    return db.transaction('rw', db.travelerDocuments, async () => {
-      const current = await db.travelerDocuments.get(id)
-      if (!current) return 'not-found'
-      if (!current.deletedAt) throw new Error(`Traveler document ${id} must be tombstoned before it can be purged.`)
-      await db.travelerDocuments.delete(id)
-      return 'purged'
-    })
+    return outcome
   }
 }
 

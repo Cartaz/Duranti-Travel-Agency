@@ -11,7 +11,25 @@ function harness(options: {
 }) {
   let lastSavedAt = options.lastSavedAt
   let persistence = options.persistence ?? 'best-effort'
+  const reclaimed: string[][] = []
   const application = createArchiveApplication({
+    maintenance: {
+      scan: async () => ({
+        reclaimableMediaIds: options.reclaimable ?? [],
+        orphanDirectoryIds: [],
+        reclaimableBytes: 0,
+        unhealthyActiveCount: 0,
+      }),
+      reclaim: async (scan) => {
+        reclaimed.push(scan.reclaimableMediaIds)
+        return {
+          purgedMediaCount: scan.reclaimableMediaIds.length,
+          removedOrphanCount: 0,
+          keptReferencedCount: 0,
+          freedBytes: 0,
+        }
+      },
+    },
     persistence: {
       inspect: async () => persistence,
       request: async () => {
@@ -28,7 +46,7 @@ function harness(options: {
     data: { hasActiveTrips: async () => options.trips ?? true },
     now: () => '2026-11-27T10:00:00.000Z',
   })
-  return { application, saved: () => lastSavedAt }
+  return { application, saved: () => lastSavedAt, reclaimed }
 }
 
 test('a backup is due only when trips exist and no recent external copy is recorded', () => {
@@ -53,4 +71,16 @@ test('recording a saved backup clears the reminder', async () => {
 test('persistence requests report what the browser actually granted', async () => {
   assert.equal(await harness({ granted: true }).application.requestPersistence(), 'persistent')
   assert.equal(await harness({ granted: false }).application.requestPersistence(), 'best-effort')
+})
+
+test('storage reclamation is skipped when the scan found nothing to free', async () => {
+  const empty = harness({})
+  const result = await empty.application.reclaimStorage(await empty.application.scanStorage())
+  assert.equal(result.purgedMediaCount, 0)
+  assert.deepEqual(empty.reclaimed, [])
+
+  const busy = harness({ reclaimable: ['media-1'] })
+  const reclaimed = await busy.application.reclaimStorage(await busy.application.scanStorage())
+  assert.equal(reclaimed.purgedMediaCount, 1)
+  assert.deepEqual(busy.reclaimed, [['media-1']])
 })

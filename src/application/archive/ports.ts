@@ -19,8 +19,29 @@ export interface ActiveDataPort {
 }
 
 export interface ArchiveApplicationDependencies {
+  maintenance: StorageMaintenancePort
   persistence: StoragePersistencePort
   ledger: BackupLedgerPort
   data: ActiveDataPort
   now: () => string
+}
+
+export interface MediaStorageScan {
+  reclaimableMediaIds: string[]
+  orphanDirectoryIds: string[]
+  reclaimableBytes: number
+  /** Active media whose bytes are missing, unreadable or inconsistent. */
+  unhealthyActiveCount: number
+}
+
+export interface MediaStorageReclaimResult {
+  purgedMediaCount: number
+  removedOrphanCount: number
+  keptReferencedCount: number
+  freedBytes: number
+}
+
+export interface StorageMaintenancePort {
+  scan(): Promise<MediaStorageScan>
+  reclaim(scan: MediaStorageScan): Promise<MediaStorageReclaimResult>
 }

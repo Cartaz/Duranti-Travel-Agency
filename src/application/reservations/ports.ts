@@ -46,7 +46,7 @@ export interface ReservationTransactionPort {
     dayId: string,
     reservationId: string,
   ): Promise<Reservation>
-  softDeleteReservationBlock(blockId: string, tripId: string, dayId: string): Promise<void>
+  softDeleteReservationBlock(blockId: string, tripId: string, dayId: string): Promise<string | undefined>
 }
 
 export interface ReservationTripPort {

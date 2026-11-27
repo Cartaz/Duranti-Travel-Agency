@@ -4,6 +4,17 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   base: '/Duranti-Travel-Agency/',
+  build: {
+    rollupOptions: {
+      output: {
+        // Stable vendor chunks change rarely, so app updates re-download less.
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          dexie: ['dexie'],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
