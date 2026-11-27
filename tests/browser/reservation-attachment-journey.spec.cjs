@@ -1,5 +1,21 @@
 const { test, expect } = require('@playwright/test')
 
+function readPersistedReservationTitles() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('dtagency')
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => {
+      const database = request.result
+      const read = database.transaction('reservations', 'readonly').objectStore('reservations').getAll()
+      read.onerror = () => { database.close(); reject(read.error) }
+      read.onsuccess = () => {
+        database.close()
+        resolve(read.result.filter((row) => !row.deletedAt).map((row) => row.title))
+      }
+    }
+  })
+}
+
 test('real app persists reservation changes and attachment removal across reloads', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('link', { name: 'Nuovo viaggio' }).click()
@@ -41,10 +57,10 @@ test('real app persists reservation changes and attachment removal across reload
 
   await reloadedActivity.getByLabel('Titolo *').fill('Museo Archeologico aggiornato')
   const saveButton = reloadedActivity.locator('.reservation-actions button[type="submit"]')
-  await Promise.all([
-    expect(saveButton).toHaveText('Salvataggio…'),
-    saveButton.click(),
-  ])
+  await saveButton.click()
+  // Assert the durable effect rather than the transient "Salvataggio…" label:
+  // a fast IndexedDB write can finish before the label is ever observable.
+  await expect.poll(() => page.evaluate(readPersistedReservationTitles)).toContain('Museo Archeologico aggiornato')
   await expect(saveButton).toHaveText('Salva prenotazione')
 
   await page.reload()
