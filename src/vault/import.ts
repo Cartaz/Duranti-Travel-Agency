@@ -1,3 +1,4 @@
+import { withVaultLock } from './lock'
 import { DB_NAME, DB_VERSION, db } from '../data/db/dtagency-db'
 import { normalizeVaultDatabaseSchemaVersion } from './database-schema-compatibility.ts'
 import { assertBlock, assertEntityBase, isRecord } from '../data/db/validate'
@@ -24,6 +25,7 @@ import {
 
 const ROOT_DIRECTORY = 'dtagency'
 const IMPORT_STAGING_DIRECTORY = 'vault-import-staging'
+const STAGE_CREATED_MARKER_FILE = 'created'
 const STAGED_FILES_DIRECTORY = 'files'
 const HEADER_LIMIT_BYTES = 64 * 1024
 const AES_GCM_TAG_BYTES = 16
@@ -405,6 +407,10 @@ async function createStageDirectory(stageId: string): Promise<{
 
   const stage = await root.getDirectoryHandle(stageId, { create: true })
   const files = await stage.getDirectoryHandle(STAGED_FILES_DIRECTORY, { create: true })
+  // Gives the stale-staging sweep a creation time even for archives without files.
+  const marker = await (await stage.getFileHandle(STAGE_CREATED_MARKER_FILE, { create: true })).createWritable()
+  await marker.write(new Uint8Array())
+  await marker.close()
   return { root, stage, files }
 }
 
@@ -555,10 +561,18 @@ async function stageOneFile(
   }
 }
 
-export async function stageVaultImport(
+export function stageVaultImport(
   file: File,
   passphrase: string,
   options: StageVaultImportOptions = {},
+): Promise<StagedVaultImport> {
+  return withVaultLock(() => stageVaultImportUnlocked(file, passphrase, options))
+}
+
+async function stageVaultImportUnlocked(
+  file: File,
+  passphrase: string,
+  options: StageVaultImportOptions,
 ): Promise<StagedVaultImport> {
   const reader = new VaultFileReader(file)
 

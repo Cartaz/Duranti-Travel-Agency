@@ -707,3 +707,32 @@ button.danger {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Bootstrap failure: rendered without the app shell, so it carries its own layout. */
+.bootstrap-failure {
+  box-sizing: border-box;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: max(24px, env(safe-area-inset-top)) 16px 32px;
+  display: grid;
+  gap: 12px;
+}
+
+.bootstrap-failure section {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.bootstrap-failure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bootstrap-failure p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

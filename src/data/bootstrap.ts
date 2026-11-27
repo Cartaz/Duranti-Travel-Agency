@@ -1,24 +1,13 @@
-import { recoverInterruptedVaultRestore, type VaultRestoreRecoveryResult } from '../vault/restore'
+import {
+  recoverInterruptedVaultRestore,
+  sweepStaleVaultStaging,
+  type VaultRestoreRecoveryResult,
+} from '../vault/restore'
 import { ensureInstallationMetadata, type InstallationMetadata } from './app-meta'
-
-export type StoragePersistenceState = 'persistent' | 'best-effort' | 'unsupported' | 'unknown'
 
 export interface ApplicationBootstrapState {
   installation: InstallationMetadata
-  storagePersistence: StoragePersistenceState
   restoreRecovery: VaultRestoreRecoveryResult
-}
-
-async function inspectStoragePersistence(): Promise<StoragePersistenceState> {
-  if (!('storage' in navigator) || typeof navigator.storage.persisted !== 'function') {
-    return 'unsupported'
-  }
-
-  try {
-    return (await navigator.storage.persisted()) ? 'persistent' : 'best-effort'
-  } catch {
-    return 'unknown'
-  }
 }
 
 export async function bootstrapApplication(): Promise<ApplicationBootstrapState> {
@@ -26,11 +15,15 @@ export async function bootstrapApplication(): Promise<ApplicationBootstrapState>
   // is touched. Updating lastOpenedAt first would invalidate restore fingerprint checks.
   const restoreRecovery = await recoverInterruptedVaultRestore()
   const installation = await ensureInstallationMetadata()
-  const storagePersistence = await inspectStoragePersistence()
+  try {
+    // Only temporary Vault copies are removed here; user data is never touched.
+    await sweepStaleVaultStaging()
+  } catch (error) {
+    console.warn('DTAgency could not remove stale temporary backup files; they will be retried next launch.', error)
+  }
 
   return {
     installation,
-    storagePersistence,
     restoreRecovery,
   }
 }

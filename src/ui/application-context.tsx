@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { PropsWithChildren } from 'react'
+import type { ArchiveApplication } from '../application/archive/archive-application'
 import type { DayApplication } from '../application/days/day-application'
 import type { ExpenseApplication } from '../application/expenses/expense-application'
 import type { ExpenseSummaryApplication } from '../application/expenses/expense-summary'
@@ -16,6 +17,7 @@ import type { TravelerApplication } from '../application/travelers/traveler-appl
 import type { TripApplication } from '../application/trips/trip-application'
 
 export interface ApplicationServices {
+  archive: ArchiveApplication
   trips: TripApplication
   days: DayApplication
   planner: PlannerApplication

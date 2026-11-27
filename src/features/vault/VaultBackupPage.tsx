@@ -1,5 +1,7 @@
-import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { MIN_PASSPHRASE_LENGTH, passphrasePolicyError } from '../../lib/passphrase-policy'
+import { useArchiveStatus } from '../../ui/archive-status'
 import InlineConfirm from '../../ui/InlineConfirm'
 import {
   discardPreparedVault,
@@ -14,9 +16,11 @@ import {
   type StagedVaultImport,
   type VaultImportProgress,
 } from '../../vault/validated-import'
-import { commitStagedVaultImport, type VaultRestoreProgress } from '../../vault/restore'
+import { commitStagedVaultImport, type VaultRestoreProgress, type VaultRestoreResult } from '../../vault/restore'
 import { canShareVaultFile, downloadVaultFile, isDTAgencyVaultFile, shareVaultFile } from '../../vault/share'
 import './vault-backup.css'
+
+const PREPARED_VAULT_GRACE_MS = 60_000
 
 function humanBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -71,6 +75,36 @@ export default function VaultBackupPage() {
 
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const [restoreReport, setRestoreReport] = useState<VaultRestoreResult>()
+  const { status: archiveStatus, recordBackupSaved, requestPersistence } = useArchiveStatus()
+
+  // Temporary Vault copies can be as large as every stored photo and video.
+  // Release them when the user leaves this page instead of leaving them in OPFS.
+  const pendingArtifactsRef = useRef<{ prepared?: PreparedVaultExport; staged?: StagedVaultImport }>({})
+  pendingArtifactsRef.current = { prepared, staged }
+  useEffect(
+    () => () => {
+      const pending = pendingArtifactsRef.current
+      // A download or share started just before leaving may still be reading the
+      // OPFS-backed file, so give it the same grace period as object URLs.
+      const prepared = pending.prepared
+      if (prepared) {
+        window.setTimeout(() => void discardPreparedVault(prepared).catch(() => undefined), PREPARED_VAULT_GRACE_MS)
+      }
+      if (pending.staged) void discardStagedVaultImport(pending.staged).catch(() => undefined)
+    },
+    [],
+  )
+
+  const markBackupSaved = async (): Promise<void> => {
+    try {
+      await recordBackupSaved()
+      // Moving data outside the browser is the moment the user cares most about durability.
+      if (archiveStatus?.persistence === 'best-effort') await requestPersistence()
+    } catch (cause) {
+      console.error('DTAgency could not record the backup date.', cause)
+    }
+  }
 
   const canShare = useMemo(() => Boolean(preparedFile && canShareVaultFile(preparedFile)), [preparedFile])
 
@@ -82,8 +116,9 @@ export default function VaultBackupPage() {
   const handlePrepare = async (event: FormEvent): Promise<void> => {
     event.preventDefault()
     clearFeedback()
-    if (exportPassword.length < 8) {
-      setError('Usa una password di almeno 8 caratteri per il backup.')
+    const policyError = passphrasePolicyError(exportPassword)
+    if (policyError) {
+      setError(policyError)
       return
     }
     if (exportPassword !== exportPasswordConfirm) {
@@ -129,6 +164,7 @@ export default function VaultBackupPage() {
     clearFeedback()
     try {
       await shareVaultFile(preparedFile)
+      await markBackupSaved()
       setNotice('Backup consegnato al foglio di condivisione del dispositivo.')
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
@@ -204,15 +240,15 @@ export default function VaultBackupPage() {
     setImportBusy(true)
     try {
       const result = await commitStagedVaultImport(staged, { mode: 'replace', onProgress: setRestoreProgress })
+      setStaged(undefined)
+      setConfirmRestore(false)
       if (!result.databaseVerified || !result.filesVerified || result.verificationErrors.length > 0) {
-        setNotice(
-          `Ripristino completato con ${result.verificationErrors.length} avvisi di verifica. Ricarico l’app per leggere i dati ripristinati.`,
-        )
+        // Keep the verification report on screen: an automatic reload would hide it.
+        setRestoreReport(result)
       } else {
         setNotice('Ripristino completato e verificato. Ricarico l’app con i dati ripristinati.')
+        window.setTimeout(() => window.location.reload(), 700)
       }
-      setConfirmRestore(false)
-      window.setTimeout(() => window.location.reload(), 700)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Il ripristino non è riuscito.')
     } finally {
@@ -258,7 +294,7 @@ export default function VaultBackupPage() {
             <input
               type="password"
               autoComplete="new-password"
-              minLength={8}
+              minLength={MIN_PASSPHRASE_LENGTH}
               required
               value={exportPassword}
               onChange={(event) => setExportPassword(event.target.value)}
@@ -269,7 +305,7 @@ export default function VaultBackupPage() {
             <input
               type="password"
               autoComplete="new-password"
-              minLength={8}
+              minLength={MIN_PASSPHRASE_LENGTH}
               required
               value={exportPasswordConfirm}
               onChange={(event) => setExportPasswordConfirm(event.target.value)}
@@ -298,7 +334,13 @@ export default function VaultBackupPage() {
                   Salva / Condividi
                 </button>
               )}
-              <button type="button" onClick={() => downloadVaultFile(preparedFile)}>
+              <button
+                type="button"
+                onClick={() => {
+                  downloadVaultFile(preparedFile)
+                  void markBackupSaved()
+                }}
+              >
                 Scarica file
               </button>
               <button type="button" className="vault-subtle" onClick={() => void handleDiscardPrepared()}>
@@ -350,6 +392,33 @@ export default function VaultBackupPage() {
           </p>
         )}
 
+        {restoreReport && (
+          <div className="vault-result vault-restore-report" role="alert">
+            <strong>Ripristino completato con avvisi di verifica</strong>
+            <span>
+              I dati del backup sono stati applicati, ma alcune verifiche successive non sono andate a buon fine.
+              Conserva il file .dtagency originale e controlla viaggi e media prima di continuare.
+            </span>
+            <ul>
+              {!restoreReport.databaseVerified && (
+                <li>L’impronta del database ripristinato non corrisponde al backup.</li>
+              )}
+              {!restoreReport.filesVerified && <li>L’inventario dei file ripristinati non corrisponde al backup.</li>}
+              {restoreReport.verificationErrors.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+              {!restoreReport.cleanupComplete && (
+                <li>Alcuni file temporanei del ripristino non sono stati rimossi; verranno ripuliti in seguito.</li>
+              )}
+            </ul>
+            <div className="vault-actions">
+              <button type="button" onClick={() => window.location.reload()}>
+                Ricarica l’app
+              </button>
+            </div>
+          </div>
+        )}
+
         {staged && (
           <div className="vault-result vault-staged">
             <strong>Backup verificato</strong>
@@ -385,7 +454,7 @@ export default function VaultBackupPage() {
             ) : (
               <InlineConfirm
                 title="Sostituire tutti i dati correnti?"
-                message="Viaggi, giornate, prenotazioni, media e altri dati locali verranno sostituiti con quelli contenuti nel backup. DTAgency crea prima un rollback tecnico, ma questa operazione va confermata consapevolmente."
+                message="Viaggi, giornate, prenotazioni, media e altri dati locali verranno sostituiti con quelli contenuti nel backup. DTAgency crea prima un rollback tecnico, ma questa operazione va confermata consapevolmente. Chiudi DTAgency nelle altre schede o finestre prima di continuare."
                 confirmLabel="Sostituisci e ripristina"
                 busy={importBusy}
                 onConfirm={() => void handleRestore()}

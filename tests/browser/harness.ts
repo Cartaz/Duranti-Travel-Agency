@@ -6,7 +6,15 @@ import { plannerBlockRepository } from '../../src/data/repositories/block-reposi
 import { itineraryRepository } from '../../src/data/repositories/itinerary-repository'
 import { prepareVaultExport, loadPreparedVaultFile } from '../../src/vault/export'
 import { stageVaultImport } from '../../src/vault/import'
-import { commitStagedVaultImport, recoverInterruptedVaultRestore } from '../../src/vault/restore'
+import {
+  abandonInterruptedVaultRestore,
+  commitStagedVaultImport,
+  fingerprintLiveDatabase,
+  hasInterruptedVaultRestore,
+  recoverInterruptedVaultRestore,
+  STALE_VAULT_STAGING_MS,
+  sweepStaleVaultStaging,
+} from '../../src/vault/restore'
 
 interface BrowserTestResult {
   name: string
@@ -39,6 +47,10 @@ async function run(name: string, test: () => Promise<void>): Promise<void> {
       error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
     })
   }
+}
+
+async function ensureInstallationRow(): Promise<void> {
+  await db.appMeta.put({ key: 'installationId', value: 'browser-harness' })
 }
 
 async function removeOpfsRoot(): Promise<void> {
@@ -130,14 +142,20 @@ async function tamperManifestCiphertext(file: File): Promise<File> {
   return new File([bytes], 'tampered.dtagency', { type: file.type })
 }
 
-async function createInterruptedRestoreFixture(): Promise<string> {
+interface InterruptedRestoreFixtureOptions {
+  phase?: 'files-mutating' | 'files-promoted'
+  targetDatabaseSha256?: string
+  liveText?: string
+}
+
+async function createInterruptedRestoreFixture(options: InterruptedRestoreFixtureOptions = {}): Promise<string> {
   const restoreId = 'browser-restore-1'
   const stageId = 'browser-stage-1'
   const archiveId = 'browser-archive-1'
   const mediaId = 'browser-recovery-media'
   const originalText = 'original-before-interrupted-restore'
 
-  await writeMediaFile(mediaId, new Blob(['mutated-during-restore'], { type: 'text/plain' }))
+  await writeMediaFile(mediaId, new Blob([options.liveText ?? 'mutated-during-restore'], { type: 'text/plain' }))
 
   const root = await navigator.storage.getDirectory()
   const dtagency = await root.getDirectoryHandle('dtagency', { create: true })
@@ -174,8 +192,8 @@ async function createInterruptedRestoreFixture(): Promise<string> {
       restoreId,
       stageId,
       archiveId,
-      targetDatabaseSha256: '0'.repeat(64),
-      phase: 'files-mutating',
+      targetDatabaseSha256: options.targetDatabaseSha256 ?? '0'.repeat(64),
+      phase: options.phase ?? 'files-mutating',
       createdAt: timestamp,
       updatedAt: timestamp,
     }),
@@ -464,6 +482,126 @@ await run('Interrupted files-mutating restore rolls OPFS back from journal backu
     (await readText(await readMediaFile(mediaId))) === 'original-before-interrupted-restore',
     'Recovery did not restore original OPFS bytes.',
   )
+})
+
+async function opfsEntryExists(segments: string[]): Promise<boolean> {
+  let current = await navigator.storage.getDirectory()
+  for (const [index, segment] of segments.entries()) {
+    try {
+      if (index === segments.length - 1) {
+        try {
+          await current.getFileHandle(segment)
+        } catch {
+          await current.getDirectoryHandle(segment)
+        }
+        return true
+      }
+      current = await current.getDirectoryHandle(segment)
+    } catch {
+      return false
+    }
+  }
+  return true
+}
+
+await run('files-promoted restore whose database commit won is finalized, not rolled back', async () => {
+  await resetEnvironment()
+  await ensureInstallationRow()
+  const mediaId = await createInterruptedRestoreFixture({
+    phase: 'files-promoted',
+    targetDatabaseSha256: await fingerprintLiveDatabase(),
+    liveText: 'restored-bytes-from-vault',
+  })
+  const result = await recoverInterruptedVaultRestore()
+  assert(result === 'finalized-committed', `Expected finalized-committed recovery, got ${result}.`)
+  assert(
+    (await readText(await readMediaFile(mediaId))) === 'restored-bytes-from-vault',
+    'Finalization replaced restored OPFS bytes with the rollback copy.',
+  )
+  assert(!(await hasInterruptedVaultRestore()), 'Finalized restore left its journal behind.')
+  assert(
+    !(await opfsEntryExists(['dtagency', 'vault-restore-backup', 'browser-restore-1'])),
+    'Rollback copy was not cleaned up.',
+  )
+})
+
+await run('files-promoted restore whose database commit lost rolls files back', async () => {
+  await resetEnvironment()
+  const mediaId = await createInterruptedRestoreFixture({
+    phase: 'files-promoted',
+    liveText: 'restored-bytes-from-vault',
+  })
+  const result = await recoverInterruptedVaultRestore()
+  assert(result === 'rolled-back', `Expected rolled-back recovery, got ${result}.`)
+  assert(
+    (await readText(await readMediaFile(mediaId))) === 'original-before-interrupted-restore',
+    'Rollback did not restore the original OPFS bytes.',
+  )
+})
+
+await run('Unrecoverable restore journal can be abandoned without deleting the rollback copy', async () => {
+  await resetEnvironment()
+  await createInterruptedRestoreFixture()
+  const root = await navigator.storage.getDirectory()
+  const backup = await (
+    await (await root.getDirectoryHandle('dtagency')).getDirectoryHandle('vault-restore-backup')
+  ).getDirectoryHandle('browser-restore-1')
+  await backup.removeEntry('manifest.json')
+
+  let failed = false
+  try {
+    await recoverInterruptedVaultRestore()
+  } catch {
+    failed = true
+  }
+  assert(failed, 'Recovery with a corrupt rollback copy unexpectedly succeeded.')
+  assert(await hasInterruptedVaultRestore(), 'Interrupted restore was not detected.')
+
+  await abandonInterruptedVaultRestore()
+  assert(!(await hasInterruptedVaultRestore()), 'Abandon left the journal in place.')
+  assert(
+    await opfsEntryExists(['dtagency', 'vault-restore-backup', 'browser-restore-1', 'files', '00000000.bin']),
+    'Abandon deleted the rollback copy.',
+  )
+  assert((await recoverInterruptedVaultRestore()) === 'none', 'Recovery still found a journal after abandon.')
+})
+
+await run('Stale Vault staging is swept while fresh and journaled stages survive', async () => {
+  await resetEnvironment()
+  const root = await navigator.storage.getDirectory()
+  const dtagency = await root.getDirectoryHandle('dtagency', { create: true })
+  const exports = await dtagency.getDirectoryHandle('vault-staging', { create: true })
+  await writeOpfsFile(exports, 'DTAgency-abandoned.dtagency', new Blob(['encrypted-export']))
+  const imports = await dtagency.getDirectoryHandle('vault-import-staging', { create: true })
+  for (const stageId of ['abandoned-stage', 'journaled-stage']) {
+    const stage = await imports.getDirectoryHandle(stageId, { create: true })
+    await writeOpfsFile(stage, 'created', new Blob([]))
+  }
+  const state = await dtagency.getDirectoryHandle('vault-restore-state', { create: true })
+  const timestamp = new Date().toISOString()
+  await writeOpfsFile(
+    state,
+    'current.json',
+    JSON.stringify({
+      version: 1,
+      restoreId: 'sweep-restore',
+      stageId: 'journaled-stage',
+      archiveId: 'sweep-archive',
+      targetDatabaseSha256: '0'.repeat(64),
+      phase: 'committed',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }),
+  )
+
+  const fresh = await sweepStaleVaultStaging(Date.now())
+  assert(fresh.removedExports === 0 && fresh.removedImportStages === 0, 'Fresh staging was swept.')
+
+  const stale = await sweepStaleVaultStaging(Date.now() + STALE_VAULT_STAGING_MS + 60_000)
+  assert(stale.removedExports === 1, `Expected one stale export removed, got ${stale.removedExports}.`)
+  assert(stale.removedImportStages === 1, `Expected one stale import stage removed, got ${stale.removedImportStages}.`)
+  assert(!(await opfsEntryExists(['dtagency', 'vault-import-staging', 'abandoned-stage'])), 'Abandoned stage survived.')
+  assert(await opfsEntryExists(['dtagency', 'vault-import-staging', 'journaled-stage']), 'Journaled stage was swept.')
 })
 
 try {

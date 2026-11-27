@@ -18,6 +18,15 @@ export class TripRepository extends Repository<Trip> {
     return groups.flat()
   }
 
+  async hasActiveTrips(): Promise<boolean> {
+    return (
+      (await db.trips
+        .filter((trip) => !trip.deletedAt)
+        .limit(1)
+        .count()) > 0
+    )
+  }
+
   listArchivedTrips(): Promise<Trip[]> {
     return this.listByStatus('archived')
   }

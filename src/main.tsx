@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { archiveApplication } from './composition/archive'
 import { dayApplication } from './composition/days'
 import { expenseApplication } from './composition/expenses'
 import { itineraryApplication } from './composition/itinerary'
@@ -16,6 +17,9 @@ import { travelerApplication } from './composition/travelers'
 import { tripApplication } from './composition/trips'
 import { bootstrapApplication } from './data/bootstrap'
 import { ApplicationProvider } from './ui/application-context'
+import BootstrapFailure from './ui/BootstrapFailure'
+import { onVaultRestoredElsewhere } from './vault/lock'
+import { abandonInterruptedVaultRestore, hasInterruptedVaultRestore } from './vault/restore'
 import type { AppShellReadiness } from './ui/layout/AppShell'
 import './styles.css'
 import './ui/guided-ux.css'
@@ -28,12 +32,6 @@ type BootstrapState = Awaited<ReturnType<typeof bootstrapApplication>>
 
 function readinessFromBootstrap(bootstrap: BootstrapState): AppShellReadiness {
   return {
-    storageWarning:
-      bootstrap.storagePersistence === 'best-effort'
-        ? 'best-effort'
-        : bootstrap.storagePersistence === 'persistent'
-          ? undefined
-          : 'unverified',
     recoveryNotice:
       bootstrap.restoreRecovery === 'rolled-back'
         ? 'rolled-back'
@@ -50,6 +48,7 @@ async function startApplication(): Promise<void> {
       <React.StrictMode>
         <ApplicationProvider
           services={{
+            archive: archiveApplication,
             trips: tripApplication,
             days: dayApplication,
             planner: plannerApplication,
@@ -71,13 +70,23 @@ async function startApplication(): Promise<void> {
     )
   } catch (error) {
     console.error('DTAgency local bootstrap failed.', error)
+    const interruptedRestore = await hasInterruptedVaultRestore().catch(() => false)
     root.render(
-      <main>
-        <h1>DTAgency</h1>
-        <p>Impossibile inizializzare l’archivio locale su questo dispositivo.</p>
-      </main>,
+      <BootstrapFailure
+        message={error instanceof Error ? error.message : String(error)}
+        interruptedRestore={interruptedRestore}
+        onRetry={() => void startApplication()}
+        onAbandonRestore={async () => {
+          await abandonInterruptedVaultRestore()
+          await startApplication()
+        }}
+      />,
     )
   }
 }
+
+// Another tab replaced the live archive with a backup: this tab's in-memory
+// state is stale, so reload instead of writing over the restored data.
+onVaultRestoredElsewhere(() => window.location.reload())
 
 void startApplication()
