@@ -5,6 +5,9 @@ import { dayRepository } from '../../src/data/repositories/day-repository'
 import { plannerBlockRepository } from '../../src/data/repositories/block-repository'
 import { itineraryRepository } from '../../src/data/repositories/itinerary-repository'
 import { mediaFileRepository } from '../../src/data/repositories/media-repository'
+import { dayApplication } from '../../src/composition/days'
+import { travelerApplication } from '../../src/composition/travelers'
+import { tripApplication } from '../../src/composition/trips'
 import { reservationBlockRepository } from '../../src/data/repositories/reservation-block-repository'
 import { reclaimMediaStorage, scanReclaimableMediaStorage } from '../../src/data/storage/media-integrity'
 import { prepareVaultExport, loadPreparedVaultFile } from '../../src/vault/export'
@@ -740,6 +743,142 @@ await run('Storage reclamation frees deleted and orphan media but keeps active b
   assert(
     after.reclaimableMediaIds.length === 0 && after.orphanDirectoryIds.length === 0,
     'Reclamation left items behind.',
+  )
+  await assertVaultStillValidates()
+})
+
+async function seedDayContent(): Promise<{ mediaIds: string[] }> {
+  const { mediaId: attachmentId } = await seedReservationWithAttachment()
+  const now = new Date().toISOString()
+  const photoPath = await writeMediaFile('purge-day-photo', new Blob(['photo-bytes'], { type: 'image/jpeg' }))
+  await db.media.add({
+    id: 'purge-day-photo',
+    tripId: 'purge-trip',
+    dayId: 'purge-day',
+    kind: 'image',
+    mimeType: 'image/jpeg',
+    sizeBytes: 11,
+    opfsPath: photoPath,
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.itineraries.add({
+    id: 'purge-itinerary',
+    tripId: 'purge-trip',
+    dayId: 'purge-day',
+    blockId: 'purge-block',
+    reservationId: 'purge-reservation',
+    title: 'Museo',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.expenses.add({
+    id: 'purge-expense',
+    tripId: 'purge-trip',
+    dayId: 'purge-day',
+    amountMinor: 1200,
+    currency: 'EUR',
+    paidByTravelerId: 'purge-traveler',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.travelers.add({
+    id: 'purge-traveler',
+    firstName: 'Anna',
+    lastName: 'Rossi',
+    displayName: 'Anna Rossi',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.tripTravelers.add({
+    id: 'purge-membership',
+    tripId: 'purge-trip',
+    travelerId: 'purge-traveler',
+    role: 'owner',
+    createdAt: now,
+    updatedAt: now,
+  })
+  return { mediaIds: [attachmentId, 'purge-day-photo'] }
+}
+
+async function assertAllTombstoned(
+  table: { get(id: string): Promise<{ deletedAt?: string } | undefined> },
+  ids: string[],
+  label: string,
+): Promise<void> {
+  for (const id of ids) assert(Boolean((await table.get(id))?.deletedAt), `${label} ${id} was not tombstoned.`)
+}
+
+await run('Deleting a day tombstones its content, purges its files and keeps the Vault valid', async () => {
+  await resetEnvironment()
+  const { mediaIds } = await seedDayContent()
+  const outcome = await dayApplication.deleteTripDay('purge-trip', 'purge-day')
+  assert(outcome.pendingFileCleanup === 0, `Unexpected pending cleanup ${outcome.pendingFileCleanup}.`)
+  await assertAllTombstoned(db.days, ['purge-day'], 'Day')
+  await assertAllTombstoned(db.blocks, ['purge-block'], 'Block')
+  await assertAllTombstoned(db.reservations, ['purge-reservation'], 'Reservation')
+  await assertAllTombstoned(db.itineraries, ['purge-itinerary'], 'Itinerary')
+  await assertAllTombstoned(db.expenses, ['purge-expense'], 'Expense')
+  assert(
+    (await db.reservations.get('purge-reservation'))?.attachmentMediaId === undefined,
+    'Deleted reservation kept its attachment link.',
+  )
+  for (const id of mediaIds) assert(!(await db.media.get(id)), `Media ${id} was not purged.`)
+  assert(!(await db.trips.get('purge-trip'))?.deletedAt, 'Deleting a day deleted its trip.')
+  assert((await dayApplication.listTripDays('purge-trip')).length === 0, 'Deleted day is still listed.')
+  await assertVaultStillValidates()
+})
+
+await run('Deleting an archived trip cascades to every row and keeps the Vault valid', async () => {
+  await resetEnvironment()
+  await seedDayContent()
+  let rejected = false
+  try {
+    await tripApplication.deleteArchivedTrip('purge-trip')
+  } catch {
+    rejected = true
+  }
+  assert(rejected, 'A non-archived trip was deleted.')
+  await tripApplication.archiveTrip('purge-trip')
+  await tripApplication.deleteArchivedTrip('purge-trip')
+  await assertAllTombstoned(db.trips, ['purge-trip'], 'Trip')
+  await assertAllTombstoned(db.days, ['purge-day'], 'Day')
+  await assertAllTombstoned(db.tripTravelers, ['purge-membership'], 'Membership')
+  await assertAllTombstoned(db.expenses, ['purge-expense'], 'Expense')
+  assert(!(await db.travelers.get('purge-traveler'))?.deletedAt, 'Deleting a trip deleted a traveler profile.')
+  assert((await tripApplication.listArchivedTrips()).length === 0, 'Deleted trip is still archived.')
+  await assertVaultStillValidates()
+})
+
+await run('Deleting a traveler removes memberships and documents but keeps expense history valid', async () => {
+  await resetEnvironment()
+  await seedDayContent()
+  const now = new Date().toISOString()
+  await db.travelerDocuments.add({
+    id: 'purge-document',
+    travelerId: 'purge-traveler',
+    type: 'passport',
+    encryptedPayload: {
+      version: 1,
+      algorithm: 'AES-GCM',
+      tagLength: 128,
+      ivB64: 'AAAAAAAAAAAAAAAA',
+      ciphertextB64: 'AAAA',
+    },
+    createdAt: now,
+    updatedAt: now,
+  })
+  const outcome = await travelerApplication.deleteTraveler('purge-traveler')
+  assert(outcome.pendingFileCleanup === 0, `Unexpected pending cleanup ${outcome.pendingFileCleanup}.`)
+  await assertAllTombstoned(db.travelers, ['purge-traveler'], 'Traveler')
+  await assertAllTombstoned(db.tripTravelers, ['purge-membership'], 'Membership')
+  assert(!(await db.travelerDocuments.get('purge-document')), 'Traveler document was not purged.')
+  const expense = await db.expenses.get('purge-expense')
+  assert(expense?.paidByTravelerId === 'purge-traveler' && !expense.deletedAt, 'Expense history was altered.')
+  assert((await travelerApplication.listTravelers()).length === 0, 'Deleted traveler is still listed.')
+  assert(
+    (await travelerApplication.listTripParticipants('purge-trip')).length === 0,
+    'Deleted traveler is still a participant.',
   )
   await assertVaultStillValidates()
 })

@@ -31,6 +31,7 @@ interface NominatimResult {
 type NominatimEndpointSource = string | (() => string | Promise<string>)
 const CACHE_PREFIX = 'dtagency:nominatim:v1:'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const MAX_CACHED_QUERIES = 50
 const MIN_REQUEST_INTERVAL_MS = 1_000
 const RATE_LIMIT_LOCK_NAME = 'dtagency:nominatim:request-slot:v1'
 const LAST_REQUEST_START_KEY = 'dtagency:nominatim:last-request-start:v1'
@@ -84,12 +85,75 @@ function readCache(query: string): NominatimPlaceCandidate[] | undefined {
     return undefined
   }
 }
+function cachedStoredAt(key: string): number {
+  try {
+    const value = (JSON.parse(localStorage.getItem(key) ?? '') as { storedAt?: unknown }).storedAt
+    return typeof value === 'number' && Number.isFinite(value) ? value : 0
+  } catch {
+    return 0
+  }
+}
+
+// Expired entries are otherwise only dropped when the same query is repeated,
+// so keep the cache bounded by evicting the oldest searches.
+function evictOldestCacheEntries(): void {
+  const keys: string[] = []
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index)
+    if (key?.startsWith(CACHE_PREFIX)) keys.push(key)
+  }
+  if (keys.length <= MAX_CACHED_QUERIES) return
+  keys
+    .map((key) => ({ key, storedAt: cachedStoredAt(key) }))
+    .sort((left, right) => left.storedAt - right.storedAt)
+    .slice(0, keys.length - MAX_CACHED_QUERIES)
+    .forEach(({ key }) => localStorage.removeItem(key))
+}
+
 function writeCache(query: string, candidates: NominatimPlaceCandidate[]): void {
   try {
     localStorage.setItem(cacheKey(query), JSON.stringify({ storedAt: Date.now(), candidates }))
+    evictOldestCacheEntries()
   } catch {
     /* reproducible provider cache only */
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function optionalStringMap(value: unknown): Record<string, string | undefined> | undefined {
+  if (!isRecord(value)) return undefined
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  )
+}
+
+/** External input: keep only results with the fields DTAgency relies on, with the expected types. */
+function parseNominatimResults(payload: unknown): NominatimResult[] {
+  if (!Array.isArray(payload)) throw new Error('OpenStreetMap ha restituito una risposta non valida.')
+  return payload.flatMap((raw): NominatimResult[] => {
+    if (!isRecord(raw) || typeof raw.display_name !== 'string' || !raw.display_name.trim()) return []
+    if (typeof raw.lat !== 'string' || typeof raw.lon !== 'string') return []
+    if (!Number.isFinite(Number(raw.lat)) || !Number.isFinite(Number(raw.lon))) return []
+    if (typeof raw.place_id !== 'number' || !Number.isFinite(raw.place_id)) return []
+    return [
+      {
+        place_id: raw.place_id,
+        osm_type: typeof raw.osm_type === 'string' ? raw.osm_type : undefined,
+        osm_id: typeof raw.osm_id === 'number' ? raw.osm_id : undefined,
+        display_name: raw.display_name,
+        lat: raw.lat,
+        lon: raw.lon,
+        name: typeof raw.name === 'string' ? raw.name : undefined,
+        type: typeof raw.type === 'string' ? raw.type : undefined,
+        address: optionalStringMap(raw.address),
+        extratags: optionalStringMap(raw.extratags),
+        namedetails: optionalStringMap(raw.namedetails),
+      },
+    ]
+  })
 }
 function readSharedLastRequestStart(): number {
   try {
@@ -112,6 +176,8 @@ async function endpointFrom(source: NominatimEndpointSource): Promise<string> {
   if (!normalized) throw new Error('Nominatim endpoint is not configured.')
   return normalized.endsWith('/') ? normalized : `${normalized}/`
 }
+export { parseNominatimResults }
+
 export function createNominatimPlaceDiscovery(endpointSource: NominatimEndpointSource = resolveNominatimEndpoint) {
   let nextRequestStartAt = 0
   const inFlightSearches = new Map<string, Promise<NominatimPlaceCandidate[]>>()
@@ -152,10 +218,13 @@ export function createNominatimPlaceDiscovery(endpointSource: NominatimEndpointS
       throw new Error('Non riesco a contattare OpenStreetMap. Controlla la connessione e riprova.')
     }
     if (!response.ok) throw new Error(`OpenStreetMap non è disponibile in questo momento (${response.status}).`)
-    const payload = (await response.json()) as NominatimResult[]
-    const candidates = payload
-      .filter((result) => Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lon)))
-      .map(candidateFromResult)
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      throw new Error('OpenStreetMap ha restituito una risposta non leggibile.')
+    }
+    const candidates = parseNominatimResults(payload).map(candidateFromResult)
     writeCache(query, candidates)
     return candidates
   }

@@ -55,3 +55,27 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.delete-section {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid rgba(151, 52, 43, 0.35);
+  border-radius: 16px;
+}
+
+.delete-section p {
+  margin: 0.25rem 0 0;
+}
+
+.delete-section-button {
+  justify-self: start;
+  border: 1px solid rgba(151, 52, 43, 0.6);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}

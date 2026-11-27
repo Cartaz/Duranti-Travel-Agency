@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import type { Template } from '../../domain/entities'
 import type { DayDraft } from '../../application/days/day-application'
 import { useApplicationServices } from '../../ui/application-context'
+import DeleteSection from '../../ui/DeleteSection'
 import DayTemplateManager from '../templates/DayTemplateManager'
 import './days.css'
 
@@ -257,6 +258,20 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
           </button>
         </div>
       </form>
+      {mode === 'edit' && contextReady && tripId && dayId && (
+        <DeleteSection
+          title="Elimina giornata"
+          description="Rimuove la giornata con blocchi, prenotazioni, itinerario, spese, foto e video collegati."
+          buttonLabel="Elimina giornata"
+          confirmTitle="Eliminare questa giornata?"
+          confirmMessage="Tutti i contenuti della giornata verranno eliminati da questo dispositivo. Potrai recuperarli solo da un backup .dtagency precedente."
+          confirmLabel="Elimina giornata e contenuti"
+          onDelete={async () => {
+            await dayApplication.deleteTripDay(tripId, dayId)
+            navigate(`/trips/${tripId}`, { replace: true })
+          }}
+        />
+      )}
     </section>
   )
 }

@@ -19,8 +19,18 @@ export interface TripTravelerPort {
   detachMembership(tripId: string, travelerId: string): Promise<unknown>
 }
 
+export interface TravelerDeletionPort {
+  softDeleteTravelerWithLinks(travelerId: string): Promise<{ documentIds: string[] }>
+}
+
+export interface TravelerDocumentPurgePort {
+  purge(id: string): Promise<unknown>
+}
+
 export interface TravelerApplicationDependencies {
   travelers: TravelerRepositoryPort
+  deletion: TravelerDeletionPort
+  documents: TravelerDocumentPurgePort
   trips: TravelerTripPort
   memberships: TripTravelerPort
   now(): string

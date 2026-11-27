@@ -3,6 +3,7 @@ import { normalizeOptionalDateOnly } from '../../domain/date-only'
 import { normalizeCurrencyCode } from '../../lib/currency'
 import { applyTripStatus, validateEditableTripStatus } from './trip-lifecycle'
 import type { EditableTripStatus } from './trip-lifecycle'
+import { purgeDeletedFiles, type DeletionOutcome } from '../shared/purge.ts'
 import type { TripApplicationDependencies } from './ports'
 
 export type { EditableTripStatus } from './trip-lifecycle'
@@ -27,6 +28,8 @@ export interface TripApplication {
   setTripStatus(tripId: string, status: EditableTripStatus): Promise<Trip>
   archiveTrip(tripId: string): Promise<Trip>
   restoreArchivedTrip(tripId: string): Promise<Trip>
+  /** Deletes an archived trip with every day, booking, expense, media and membership. */
+  deleteArchivedTrip(tripId: string): Promise<DeletionOutcome>
 }
 
 function cleanOptional(value: string | undefined): string | undefined {
@@ -89,7 +92,7 @@ function tripSortValue(trip: Trip): string {
 }
 
 export function createTripApplication(dependencies: TripApplicationDependencies): TripApplication {
-  const { trips, now, newId } = dependencies
+  const { trips, now, newId, deletion, media } = dependencies
 
   return {
     async listBookTrips(): Promise<Trip[]> {
@@ -176,6 +179,11 @@ export function createTripApplication(dependencies: TripApplicationDependencies)
       }
       await trips.put(restored)
       return restored
+    },
+
+    async deleteArchivedTrip(tripId: string): Promise<DeletionOutcome> {
+      const { mediaIds } = await deletion.softDeleteArchivedTripWithContent(tripId)
+      return purgeDeletedFiles(mediaIds, (id) => media.purge(id))
     },
   }
 }

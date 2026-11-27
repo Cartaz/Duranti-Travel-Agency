@@ -1,5 +1,6 @@
 import type { Day } from '../../domain/entities'
 import { normalizeDateOnly } from '../../domain/date-only'
+import { purgeDeletedFiles, type DeletionOutcome } from '../shared/purge.ts'
 import type { DayApplicationDependencies } from './ports'
 
 export interface DayDraft {
@@ -39,6 +40,8 @@ export interface DayApplication {
   getTripDay(tripId: string, dayId: string): Promise<Day | undefined>
   createTripDay(tripId: string, input: DayDraft): Promise<Day>
   updateTripDay(tripId: string, dayId: string, input: DayDraft): Promise<Day>
+  /** Deletes the day with its blocks, reservations, itinerary, expenses and media. */
+  deleteTripDay(tripId: string, dayId: string): Promise<DeletionOutcome>
 }
 
 export function createDayApplication(deps: DayApplicationDependencies): DayApplication {
@@ -77,5 +80,10 @@ export function createDayApplication(deps: DayApplicationDependencies): DayAppli
     return deps.days.updateForTrip(updated)
   }
 
-  return { listTripDays, getTripDay, createTripDay, updateTripDay }
+  async function deleteTripDay(tripId: string, dayId: string): Promise<DeletionOutcome> {
+    const { mediaIds } = await deps.deletion.softDeleteDayWithContent(tripId, dayId)
+    return purgeDeletedFiles(mediaIds, (id) => deps.media.purge(id))
+  }
+
+  return { listTripDays, getTripDay, createTripDay, updateTripDay, deleteTripDay }
 }

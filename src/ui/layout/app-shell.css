@@ -93,7 +93,10 @@
   padding: 8px 10px;
 }
 
-.app-bottom-nav-simple {
+/* Compound selector: styles.css loads after this file and would otherwise
+   restore the two-column grid, wrapping the bar onto a second row that covers
+   the last controls of every page. */
+.app-bottom-nav.app-bottom-nav-simple {
   width: min(330px, calc(100% - 32px));
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

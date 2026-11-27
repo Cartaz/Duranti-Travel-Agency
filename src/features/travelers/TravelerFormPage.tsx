@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { EMPTY_TRAVELER_DRAFT, type TravelerDraft } from '../../application/travelers/traveler-application'
 import { useApplicationServices } from '../../ui/application-context'
+import DeleteSection from '../../ui/DeleteSection'
 import './travelers.css'
 
 export default function TravelerFormPage({ mode }: { mode: 'create' | 'edit' }) {
@@ -194,6 +195,20 @@ export default function TravelerFormPage({ mode }: { mode: 'create' | 'edit' }) 
           </button>
         </div>
       </form>
+      {mode === 'edit' && travelerId && !error && (
+        <DeleteSection
+          title="Elimina viaggiatore"
+          description="Rimuove il profilo, la partecipazione ai viaggi e i documenti cifrati con i loro allegati. Le spese già registrate restano nello storico."
+          buttonLabel="Elimina viaggiatore"
+          confirmTitle="Eliminare questo viaggiatore?"
+          confirmMessage="Profilo, partecipazioni e documenti d’identità cifrati verranno eliminati da questo dispositivo. Potrai recuperarli solo da un backup .dtagency precedente."
+          confirmLabel="Elimina viaggiatore e documenti"
+          onDelete={async () => {
+            await travelers.deleteTraveler(travelerId)
+            navigate('/travelers', { replace: true })
+          }}
+        />
+      )}
     </section>
   )
 }

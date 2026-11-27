@@ -10,6 +10,7 @@
     "format": "prettier --write .",
     "test": "node --test tests/domain/*.test.ts tests/storage/*.test.ts tests/vault/*.test.ts",
     "test:browser": "playwright test --config=playwright.config.cjs",
+    "test:production": "playwright test --config=playwright.production.config.cjs",
     "build": "npm run check:policy && npm run check:format && npm test && tsc -b && vite build",
     "preview": "vite preview"
   },

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Trip } from '../../domain/entities'
 import { useApplicationServices } from '../../ui/application-context'
+import InlineConfirm from '../../ui/InlineConfirm'
 import './trips.css'
 import './trip-lifecycle.css'
 
@@ -29,6 +30,23 @@ export default function ArchivedTripsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [restoringId, setRestoringId] = useState<string>()
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string>()
+  const [deletingId, setDeletingId] = useState<string>()
+
+  const handleDelete = async (trip: Trip): Promise<void> => {
+    if (deletingId) return
+    setDeletingId(trip.id)
+    setError('')
+    try {
+      await tripApplication.deleteArchivedTrip(trip.id)
+      setTrips((current) => current.filter((item) => item.id !== trip.id))
+      setConfirmDeleteId(undefined)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile eliminare il viaggio.')
+    } finally {
+      setDeletingId(undefined)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -118,6 +136,25 @@ export default function ArchivedTripsPage() {
               >
                 {restoringId === trip.id ? 'Ripristino…' : 'Ripristina'}
               </button>
+              {confirmDeleteId === trip.id ? (
+                <InlineConfirm
+                  title={`Eliminare “${trip.title}”?`}
+                  message="Il viaggio verrà eliminato definitivamente da questo dispositivo con giornate, prenotazioni, spese, foto e video. Potrai recuperarlo solo da un backup .dtagency precedente."
+                  confirmLabel="Elimina definitivamente"
+                  busy={deletingId === trip.id}
+                  onConfirm={() => void handleDelete(trip)}
+                  onCancel={() => setConfirmDeleteId(undefined)}
+                />
+              ) : (
+                <button
+                  className="trip-secondary-action archive-delete-button"
+                  type="button"
+                  onClick={() => setConfirmDeleteId(trip.id)}
+                  disabled={Boolean(restoringId || deletingId)}
+                >
+                  Elimina definitivamente
+                </button>
+              )}
             </article>
           ))}
         </div>

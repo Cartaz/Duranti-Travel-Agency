@@ -7,8 +7,18 @@ export interface DayRepositoryPort {
   updateForTrip(value: Day): Promise<Day>
 }
 
+export interface DayDeletionPort {
+  softDeleteDayWithContent(tripId: string, dayId: string): Promise<{ mediaIds: string[] }>
+}
+
+export interface DayMediaPurgePort {
+  purge(id: string): Promise<unknown>
+}
+
 export interface DayApplicationDependencies {
   days: DayRepositoryPort
+  deletion: DayDeletionPort
+  media: DayMediaPurgePort
   now(): string
   newId(): string
 }
