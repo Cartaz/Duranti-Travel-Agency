@@ -1,12 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 
 const pagePath = new URL('../../src/features/travel-book/TravelBookPage.tsx', import.meta.url)
 const cssPath = new URL('../../src/features/travel-book/travel-book.css', import.meta.url)
 
 test('travel book reader keeps accessible navigation independent from a 3D renderer', async () => {
-  const source = await readFile(pagePath, 'utf8')
+  const source = await readSource(pagePath)
   assert.ok(source.includes('ArrowLeft'))
   assert.ok(source.includes('ArrowRight'))
   assert.ok(source.includes('role="progressbar"'))

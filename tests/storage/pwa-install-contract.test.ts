@@ -1,9 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 
 async function source(path: string): Promise<string> {
-  return readFile(new URL(path, import.meta.url), 'utf8')
+  return readSource(new URL(path, import.meta.url))
 }
 
 test('PWA manifest declares install icons with maskable purpose', async () => {

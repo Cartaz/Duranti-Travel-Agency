@@ -1,11 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 
 const sourceUrl = new URL('../../src/application/places/place-application.ts', import.meta.url)
 
 test('catalog place editing preserves canonical identity and creation timestamp', async () => {
-  const source = await readFile(sourceUrl, 'utf8')
+  const source = await readSource(sourceUrl)
   const updateStart = source.indexOf('async function updateCatalogPlace')
   const updateEnd = source.indexOf('async function getPlannerPlace', updateStart)
   const updateSource = source.slice(updateStart, updateEnd)

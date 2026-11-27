@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 import test from 'node:test'
 
-const mediaStore = await readFile(new URL('../../src/data/opfs/opfs-store.ts', import.meta.url), 'utf8')
-const privateStore = await readFile(new URL('../../src/data/opfs/private-document-store.ts', import.meta.url), 'utf8')
-const encryption = await readFile(new URL('../../src/security/local-encryption.ts', import.meta.url), 'utf8')
+const mediaStore = await readSource(new URL('../../src/data/opfs/opfs-store.ts', import.meta.url))
+const privateStore = await readSource(new URL('../../src/data/opfs/private-document-store.ts', import.meta.url))
+const encryption = await readSource(new URL('../../src/security/local-encryption.ts', import.meta.url))
 
 test('managed OPFS trees live under the DTAgency root', () => {
   assert.match(mediaStore, /const ROOT_DIRECTORY = 'dtagency'/)

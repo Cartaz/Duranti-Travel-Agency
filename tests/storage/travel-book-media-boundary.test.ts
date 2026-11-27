@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 
 const applicationUrl = new URL('../../src/application/travel-book/travel-book-application.ts', import.meta.url)
 const portsUrl = new URL('../../src/application/travel-book/ports.ts', import.meta.url)
@@ -8,9 +8,9 @@ const galleryUrl = new URL('../../src/features/travel-book/TravelBookMediaGaller
 
 test('travel book media stays behind application ports', async () => {
   const [application, ports, gallery] = await Promise.all([
-    readFile(applicationUrl, 'utf8'),
-    readFile(portsUrl, 'utf8'),
-    readFile(galleryUrl, 'utf8'),
+    readSource(applicationUrl),
+    readSource(portsUrl),
+    readSource(galleryUrl),
   ])
 
   assert.match(ports, /interface TravelBookMediaReader/)
@@ -20,7 +20,7 @@ test('travel book media stays behind application ports', async () => {
 })
 
 test('travel book media gallery owns and releases object URLs', async () => {
-  const gallery = await readFile(galleryUrl, 'utf8')
+  const gallery = await readSource(galleryUrl)
   assert.match(gallery, /URL\.createObjectURL\(file\)/)
   assert.match(gallery, /URL\.revokeObjectURL\(url\)/)
   assert.match(gallery, /return \(\) => \{[\s\S]*cancelled = true[\s\S]*revokeObjectURL/)

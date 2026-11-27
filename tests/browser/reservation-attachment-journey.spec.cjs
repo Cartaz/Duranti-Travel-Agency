@@ -3,17 +3,24 @@ const { test, expect } = require('@playwright/test')
 function readPersistedReservationTitles() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('dtagency')
-    request.onerror = () => reject(request.error)
+    // Never let the probe create an empty database the app would later open.
+    request.onupgradeneeded = () => request.transaction.abort()
+    request.onerror = () => reject(request.error ?? new Error('DTAgency database is not available.'))
     request.onsuccess = () => {
       const database = request.result
-      const read = database.transaction('reservations', 'readonly').objectStore('reservations').getAll()
-      read.onerror = () => {
+      try {
+        const read = database.transaction('reservations', 'readonly').objectStore('reservations').getAll()
+        read.onerror = () => {
+          database.close()
+          reject(read.error)
+        }
+        read.onsuccess = () => {
+          database.close()
+          resolve(read.result.filter((row) => !row.deletedAt).map((row) => row.title))
+        }
+      } catch (error) {
         database.close()
-        reject(read.error)
-      }
-      read.onsuccess = () => {
-        database.close()
-        resolve(read.result.filter((row) => !row.deletedAt).map((row) => row.title))
+        reject(error)
       }
     }
   })

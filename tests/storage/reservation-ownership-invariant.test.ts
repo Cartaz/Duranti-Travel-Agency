@@ -1,10 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 
-const repositorySource = await readFile(
+const repositorySource = await readSource(
   new URL('../../src/data/repositories/reservation-block-repository.ts', import.meta.url),
-  'utf8',
 )
 
 test('reservation delete validates its parent context and cascades only to owned records', () => {

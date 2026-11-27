@@ -3,7 +3,7 @@ import { extname, join, relative } from 'node:path'
 import { collectArchitectureViolations } from './architecture-policy.mjs'
 
 const root = process.cwd()
-const ignoredDirectories = new Set(['.git', 'node_modules', 'dist', 'coverage'])
+const ignoredDirectories = new Set(['.git', 'node_modules', 'dist', 'coverage', 'test-results', 'playwright-report'])
 const textExtensions = new Set([
   '.css',
   '.html',

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 import { validateDatabaseV1Semantics } from '../../src/vault/database-v1-validator.ts'
 import type { VaultTableSnapshot } from '../../src/vault/format.ts'
 
@@ -56,7 +56,7 @@ test('Vault v1 semantic validation rejects dangling traveler document ownership'
 })
 
 test('validated Vault staging cleans temporary data when semantic validation fails', async () => {
-  const wrapper = await readFile(new URL('../../src/vault/validated-import.ts', import.meta.url), 'utf8')
+  const wrapper = await readSource(new URL('../../src/vault/validated-import.ts', import.meta.url))
 
   assert.match(wrapper, /validateDatabaseV1Semantics\(staged\.manifest\.database\.tables\)/)
   assert.match(wrapper, /validateActiveMediaFiles\(staged\.manifest\.database\.tables, staged\.manifest\.files\)/)
