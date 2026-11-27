@@ -24,7 +24,7 @@ DTAgency Vault v1 identity is intentionally explicit:
 
 - file magic: `DTAVLT01`;
 - manifest identity: `dtagency-vault`;
-- database baseline: `dtagency`, schema v1;
+- database name `dtagency`; snapshots of schema v1 and v2 are accepted and normalized to the current schema;
 - AAD namespace: `dtagency|vault|v1|...`.
 
 Encryption rules:
@@ -57,7 +57,7 @@ The passphrase is never persisted.
 dtagency/vault-import-staging/<stageId>/files/<fileIndex>.bin
 ```
 
-Production v1 accepts database snapshot schema v1. Before database schema v2 can be introduced, Vault import must gain explicit snapshot migration support and regression coverage as required by ADR-004.
+Production Vault v1 accepts database snapshots of schema v1 and v2 (v2 only added indexes). Any further schema change requires an explicit snapshot migration and regression coverage as required by ADR-004.
 
 ## Live restore protocol
 
@@ -135,4 +135,12 @@ After Dexie commits, imported structured data is authoritative. Staging and roll
 
 Never parse directly into live data. Never log plaintext Vault contents, passwords, keys or sensitive document data.
 
-The Storage Lab Vault remains a diagnostic PoC only and is not compatible with production format v1.
+## Concurrency and temporary artifacts
+
+Export, import staging, restore commit, interrupted-restore recovery, the staging sweep and storage reclamation run under one cross-tab Web Lock (`withVaultLock`, `src/vault/lock.ts`). Locked entry points never call each other. After a committed restore, other open tabs are told over `BroadcastChannel('dtagency:vault')` and reload.
+
+The backup page discards its prepared export (after a 60-second grace period for an in-flight download) and its staged import when the user leaves. At bootstrap, after recovery, `sweepStaleVaultStaging()` removes export and import staging entries older than 6 hours, never the stage referenced by a restore journal. If recovery itself keeps failing, the bootstrap failure screen offers an explicit `abandonInterruptedVaultRestore()`, which deletes only the journal and keeps the rollback copy.
+
+Verification warnings after a committed restore stay on screen with an explicit reload action.
+
+The Storage Lab Vault is a development-only diagnostic PoC, not shipped in production builds and not compatible with production format v1.

@@ -9,12 +9,14 @@
 
 ## Decisions
 
+- **Deletion and reclamation:** see [ADR-005](./decisions/ADR-005-deletion-purge-and-archive-health.md) for tombstone cascades, purge ordering, storage reclamation, the cross-tab Vault lock and `vault.lastSavedAt`.
+
 - **Offline-first:** local data is the source of truth. Network access is optional and only used for explicitly online features.
 - **IndexedDB:** structured domain data, indexes, metadata, settings, references and transactional state.
 - **OPFS:** large binary assets such as photos, videos, document scans and generated exports.
 - **Cache Storage / Service Worker:** application shell and network resources; never the canonical copy of user data.
 - **Vault:** encrypted, portable backup independent of the origin storage. AES-256-GCM with a password-derived key; vault format is versioned.
-- **Storage persistence:** request `navigator.storage.persist()` where available and expose storage diagnostics, but never treat quota estimates as exact capacity.
+- **Storage persistence:** request `navigator.storage.persist()` on user action or after a saved backup, show the live state and a backup reminder in the shell, and never treat quota estimates as exact capacity (ADR-005).
 - **No cloud LLM:** AI features must remain local-first. Any future model integration must be an explicit local capability and must never upload private trip data.
 - **Single origin:** the production PWA must keep one stable origin because browser storage and service-worker registrations are origin-scoped.
 

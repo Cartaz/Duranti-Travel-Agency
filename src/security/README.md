@@ -26,5 +26,6 @@ Rules:
 - Replacement writes a new random attachment file before updating encrypted metadata. After the metadata switch, the old file is removed best-effort; an interrupted cleanup can therefore leave a recoverable orphan, never a metadata reference to intentionally deleted bytes.
 - Purge deletes the tombstoned IndexedDB record inside a transaction that re-checks the tombstone, then removes the private OPFS directory. An interrupted purge can leave a recoverable orphan directory, never an active record whose bytes were deleted.
 - AES-GCM authentication of a private attachment is verified whenever it is decrypted/read. There is currently no relational private-document integrity scanner: an unused prototype was removed during the 2026-11 audit because it was never wired into any workflow. Reintroduce one only together with a user-facing maintenance flow and tests.
-- Encryption at rest does not defend against malicious script executing while the app is unlocked. CSP/XSS hardening remains required.
+- Encryption at rest does not defend against malicious script executing while the app is unlocked. Production builds carry a Content-Security-Policy meta tag (`vite.config.ts`, same-origin scripts only); `frame-ancestors` cannot be set from a meta tag on GitHub Pages.
+- Every passphrase the user creates (local encryption and Vault) follows `src/lib/passphrase-policy.ts` (minimum 12 characters).
 - Losing the passphrase without a valid encrypted Vault/recovery design can make sensitive data unrecoverable.

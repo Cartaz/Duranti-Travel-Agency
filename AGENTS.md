@@ -6,7 +6,7 @@ These rules apply to every code, documentation and architecture change in this r
 
 - The application is called **DTAgency** in UI, documentation, comments, errors, generated filenames and new code.
 - Production Vault files use the **`.dtagency`** extension.
-- The current persistence baseline is DTAgency v1. Do not introduce predecessor storage names, OPFS namespaces, cryptographic markers, MIME identities or authenticated format identifiers.
+- The current persistence baseline is IndexedDB schema v2 (index-only change over v1) with Vault format v1, which accepts v1 and v2 database snapshots. Do not introduce predecessor storage names, OPFS namespaces, cryptographic markers, MIME identities or authenticated format identifiers.
 - From the first release containing meaningful user data onward, persisted identifiers become compatibility contracts and may change only through an explicit, tested migration.
 
 ## Engineering philosophy

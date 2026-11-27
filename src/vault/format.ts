@@ -1,9 +1,9 @@
-import { VAULT_FORMAT_VERSION } from '../lib/versions'
+import { MIN_PASSPHRASE_LENGTH } from '../lib/passphrase-policy.ts'
+import { VAULT_FORMAT_VERSION } from '../lib/versions.ts'
 
 const VAULT_MAGIC = new TextEncoder().encode('DTAVLT01')
 const AES_GCM_IV_BYTES = 12
 const AES_GCM_TAG_BITS = 128
-const MIN_VAULT_PASSPHRASE_LENGTH = 12
 
 export { VAULT_FORMAT_VERSION }
 export const VAULT_MIME_TYPE = 'application/vnd.dtagency.vault'
@@ -151,8 +151,8 @@ export async function deriveVaultKey(
   salt: Uint8Array<ArrayBuffer>,
   iterations = VAULT_PBKDF2_ITERATIONS,
 ): Promise<CryptoKey> {
-  if (passphrase.length < MIN_VAULT_PASSPHRASE_LENGTH) {
-    throw new Error(`Vault passphrase must be at least ${MIN_VAULT_PASSPHRASE_LENGTH} characters.`)
+  if (passphrase.length < MIN_PASSPHRASE_LENGTH) {
+    throw new Error(`Vault passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters.`)
   }
   if (!Number.isSafeInteger(iterations) || iterations < 100_000) {
     throw new Error('Vault PBKDF2 iterations are invalid.')

@@ -339,7 +339,7 @@ The plaintext payload contains:
 - media descriptors
 - optional embedded media blobs
 
-For large trips, media should be streamed/chunked in a future Vault v2 rather than constructing one enormous JS object. v1 can remain a reliable small/medium-data backup format.
+Production Vault v1 already streams media in 4 MiB authenticated chunks (see `src/vault/README.md`); this note predates that implementation.
 
 Passwords are never stored. Encryption keys exist only in memory for the duration of an operation.
 
