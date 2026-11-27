@@ -70,8 +70,11 @@ test('real app persists reservation changes and attachment removal across reload
   await saveButton.click()
   // Assert the durable effect rather than the transient "Salvataggio…" label:
   // a fast IndexedDB write can finish before the label is ever observable.
+  // The in-flight label itself is intentionally not asserted (not reliably observable);
+  // this only checks that the editor leaves the busy state after the durable write.
   await expect.poll(() => page.evaluate(readPersistedReservationTitles)).toContain('Museo Archeologico aggiornato')
   await expect(saveButton).toHaveText('Salva prenotazione')
+  await expect(saveButton).toBeEnabled()
 
   await page.reload()
   const updatedActivity = page.locator('.reservation-block-activity')

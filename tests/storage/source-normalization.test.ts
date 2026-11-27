@@ -12,7 +12,7 @@ test('source contracts see through wrapped argument lists and trailing commas', 
   assert.match(wrapped, /db\.transaction\('rw', db\.trips, db\.days\)/)
 })
 
-test('source normalization keeps object spreads and string spacing intact', () => {
+test('source normalization keeps object spreads and drops object trailing commas', () => {
   const source = normalizeSource('const updated: Place = {\n  ...current,\n  name,\n}')
-  assert.match(source, /const updated: Place = \{ \.\.\.current, name, \}/)
+  assert.match(source, /const updated: Place = \{ \.\.\.current, name \}/)
 })
