@@ -3,11 +3,7 @@ import type { Block } from './entities'
 type BlockWithContent = Pick<Block, 'content'>
 type BlockReferenceKey = 'reservationId' | 'placeId'
 
-function referenceId(
-  block: BlockWithContent | undefined,
-  key: BlockReferenceKey,
-  label: string,
-): string | undefined {
+function referenceId(block: BlockWithContent | undefined, key: BlockReferenceKey, label: string): string | undefined {
   if (!block) return undefined
   const value = block.content[key]
   if (value === undefined) return undefined

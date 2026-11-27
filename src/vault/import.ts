@@ -97,10 +97,7 @@ class VaultFileReader {
   }
 }
 
-function emitProgress(
-  callback: StageVaultImportOptions['onProgress'],
-  progress: VaultImportProgress,
-): void {
+function emitProgress(callback: StageVaultImportOptions['onProgress'], progress: VaultImportProgress): void {
   try {
     callback?.(progress)
   } catch {
@@ -108,11 +105,7 @@ function emitProgress(
   }
 }
 
-function assertString(
-  value: unknown,
-  label: string,
-  maximumLength = 512,
-): asserts value is string {
+function assertString(value: unknown, label: string, maximumLength = 512): asserts value is string {
   if (typeof value !== 'string' || value.length === 0 || value.length > maximumLength) {
     throw new Error(`${label} is invalid.`)
   }
@@ -206,14 +199,9 @@ function validateManagedPath(namespace: VaultManagedNamespace, path: unknown): a
     throw new Error(`Vault path ${path} contains unsafe path segments.`)
   }
 
-  const prefix = namespace === 'media'
-    ? ['dtagency', 'media']
-    : ['dtagency', 'private', 'traveler-documents']
+  const prefix = namespace === 'media' ? ['dtagency', 'media'] : ['dtagency', 'private', 'traveler-documents']
 
-  if (
-    segments.length <= prefix.length ||
-    prefix.some((segment, index) => segments[index] !== segment)
-  ) {
+  if (segments.length <= prefix.length || prefix.some((segment, index) => segments[index] !== segment)) {
     throw new Error(`Vault path ${path} does not belong to its managed namespace.`)
   }
 }
@@ -311,9 +299,7 @@ function validateFiles(value: unknown): {
 
     validateManagedPath(raw.namespace, raw.path)
 
-    const expectedChunkCount = raw.sizeBytes === 0
-      ? 0
-      : Math.ceil(raw.sizeBytes / VAULT_CHUNK_BYTES)
+    const expectedChunkCount = raw.sizeBytes === 0 ? 0 : Math.ceil(raw.sizeBytes / VAULT_CHUNK_BYTES)
     if (raw.chunkCount !== expectedChunkCount) {
       throw new Error(`Vault file entry ${index} has an inconsistent chunk count.`)
     }
@@ -339,7 +325,10 @@ function validateFiles(value: unknown): {
   return { files, sourceBytes }
 }
 
-function validateManifest(value: unknown, header: VaultHeaderV1): {
+function validateManifest(
+  value: unknown,
+  header: VaultHeaderV1,
+): {
   manifest: VaultManifestV1
   sourceBytes: number
 } {
@@ -433,10 +422,7 @@ async function deleteStageDirectory(stageId: string): Promise<void> {
 
 function assertMagic(actual: Uint8Array<ArrayBuffer>): void {
   const expected = vaultMagicBytes()
-  if (
-    actual.byteLength !== expected.byteLength ||
-    actual.some((byte, index) => byte !== expected[index])
-  ) {
+  if (actual.byteLength !== expected.byteLength || actual.some((byte, index) => byte !== expected[index])) {
     throw new Error('File is not a DTAgency Vault v1 archive.')
   }
 }
@@ -466,10 +452,7 @@ async function readAndDecryptManifest(
 
   const iv = await reader.readBytes(header.encryption.ivBytes, 'manifest IV')
   const ciphertextLength = await reader.readUint32('manifest ciphertext length')
-  if (
-    ciphertextLength < AES_GCM_TAG_BYTES ||
-    ciphertextLength > MAX_VAULT_MANIFEST_BYTES + AES_GCM_TAG_BYTES
-  ) {
+  if (ciphertextLength < AES_GCM_TAG_BYTES || ciphertextLength > MAX_VAULT_MANIFEST_BYTES + AES_GCM_TAG_BYTES) {
     throw new Error('Vault manifest ciphertext length is invalid.')
   }
 
@@ -477,12 +460,7 @@ async function readAndDecryptManifest(
   let plaintext: Uint8Array<ArrayBuffer>
 
   try {
-    plaintext = await decryptVaultPayload(
-      key,
-      manifestAdditionalData(header.archiveId),
-      iv,
-      ciphertext,
-    )
+    plaintext = await decryptVaultPayload(key, manifestAdditionalData(header.archiveId), iv, ciphertext)
   } catch {
     throw new Error('Vault password is incorrect or the archive manifest is corrupted.')
   } finally {
@@ -523,11 +501,7 @@ async function stageOneFile(
 
       const remainingBytes = entry.sizeBytes - chunkIndex * VAULT_CHUNK_BYTES
       const expectedPlaintextLength = Math.min(VAULT_CHUNK_BYTES, remainingBytes)
-      if (
-        fileIndex !== entry.index ||
-        actualChunkIndex !== chunkIndex ||
-        plaintextLength !== expectedPlaintextLength
-      ) {
+      if (fileIndex !== entry.index || actualChunkIndex !== chunkIndex || plaintextLength !== expectedPlaintextLength) {
         throw new Error(`Vault file ${entry.index} chunk ${chunkIndex} metadata is inconsistent.`)
       }
 
@@ -637,23 +611,16 @@ export async function stageVaultImport(
     })
 
     for (const entry of manifest.files) {
-      await stageOneFile(
-        reader,
-        key,
-        manifest.archiveId,
-        entry,
-        filesDirectory,
-        (bytes) => {
-          bytesCompleted += bytes
-          emitProgress(options.onProgress, {
-            phase: 'staging',
-            filesCompleted,
-            filesTotal: manifest.files.length,
-            bytesCompleted,
-            bytesTotal: sourceBytes,
-          })
-        },
-      )
+      await stageOneFile(reader, key, manifest.archiveId, entry, filesDirectory, (bytes) => {
+        bytesCompleted += bytes
+        emitProgress(options.onProgress, {
+          phase: 'staging',
+          filesCompleted,
+          filesTotal: manifest.files.length,
+          bytesCompleted,
+          bytesTotal: sourceBytes,
+        })
+      })
 
       filesCompleted += 1
       emitProgress(options.onProgress, {

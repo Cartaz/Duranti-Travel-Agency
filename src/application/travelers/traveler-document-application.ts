@@ -1,5 +1,9 @@
 import type { TravelerDocument, TravelerDocumentSecret } from '../../domain/entities'
-import type { TravelerDocumentApplicationDependencies, TravelerDocumentMetadata, TravelerDocumentView } from './document-ports'
+import type {
+  TravelerDocumentApplicationDependencies,
+  TravelerDocumentMetadata,
+  TravelerDocumentView,
+} from './document-ports'
 
 export interface TravelerDocumentSecurityState {
   configured: boolean
@@ -33,13 +37,15 @@ export class TravelerDocumentApplication {
   }
 
   async listForTraveler(travelerId: string): Promise<TravelerDocumentMetadata[]> {
-    return (await this.dependencies.documents.listMetadataByTraveler(travelerId))
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    return (await this.dependencies.documents.listMetadataByTraveler(travelerId)).sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt),
+    )
   }
 
   async listUnlockedForTraveler(travelerId: string): Promise<TravelerDocumentView[]> {
-    return (await this.dependencies.documents.listByTraveler(travelerId))
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    return (await this.dependencies.documents.listByTraveler(travelerId)).sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt),
+    )
   }
 
   async create(input: {

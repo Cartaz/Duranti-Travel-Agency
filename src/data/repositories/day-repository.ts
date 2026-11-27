@@ -6,9 +6,9 @@ import { Repository } from './base-repository'
 export type NewTripDay = Omit<Day, 'sequence'>
 
 function compareTripDays(left: Day, right: Day): number {
-  return left.sequence - right.sequence
-    || left.createdAt.localeCompare(right.createdAt)
-    || left.id.localeCompare(right.id)
+  return (
+    left.sequence - right.sequence || left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id)
+  )
 }
 
 async function normalizeTripDaySequences(days: Day[]): Promise<Day[]> {
@@ -38,8 +38,7 @@ export class DayRepository extends Repository<Day> {
   }
 
   async listByTrip(tripId: string): Promise<Day[]> {
-    return (await db.days.where('tripId').equals(tripId).toArray())
-      .filter((day) => !day.deletedAt)
+    return (await db.days.where('tripId').equals(tripId).toArray()).filter((day) => !day.deletedAt)
   }
 
   async createForTrip(day: NewTripDay, initialBlocks: Block[] = []): Promise<Day> {
@@ -49,8 +48,7 @@ export class DayRepository extends Repository<Day> {
 
       if (await db.days.get(day.id)) throw new Error('Esiste già una giornata con questo identificatore.')
       const siblings = await normalizeTripDaySequences(
-        (await db.days.where('tripId').equals(day.tripId).toArray())
-          .filter((candidate) => !candidate.deletedAt),
+        (await db.days.where('tripId').equals(day.tripId).toArray()).filter((candidate) => !candidate.deletedAt),
       )
       const entity: Day = { ...day, sequence: siblings.length + 1 }
 

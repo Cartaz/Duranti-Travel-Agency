@@ -20,13 +20,12 @@ export class TripTravelerRepository {
       const traveler = await db.travelers.get(travelerId)
       if (!traveler || traveler.deletedAt) throw new Error('Il profilo viaggiatore non esiste più.')
 
-      const matches = await db.tripTravelers
-        .where('[tripId+travelerId]')
-        .equals([tripId, travelerId])
-        .toArray()
+      const matches = await db.tripTravelers.where('[tripId+travelerId]').equals([tripId, travelerId]).toArray()
       const active = matches.filter((membership) => !membership.deletedAt)
       if (active.length > 1) {
-        throw new Error('Esistono partecipazioni duplicate per questo viaggiatore. Correggi i dati prima di continuare.')
+        throw new Error(
+          'Esistono partecipazioni duplicate per questo viaggiatore. Correggi i dati prima di continuare.',
+        )
       }
 
       const now = new Date().toISOString()
@@ -42,7 +41,9 @@ export class TripTravelerRepository {
 
       const tombstones = matches.filter((membership) => Boolean(membership.deletedAt))
       if (tombstones.length > 1) {
-        throw new Error('Esistono vecchie partecipazioni duplicate per questo viaggiatore. È necessaria una riconciliazione prima del ripristino.')
+        throw new Error(
+          'Esistono vecchie partecipazioni duplicate per questo viaggiatore. È necessaria una riconciliazione prima del ripristino.',
+        )
       }
 
       if (tombstones.length === 1) {
@@ -75,13 +76,12 @@ export class TripTravelerRepository {
       if (!trip || trip.deletedAt) throw new Error('Il viaggio non esiste o è stato eliminato.')
       if (trip.status === 'archived') throw new Error('Ripristina il viaggio prima di modificarne i partecipanti.')
 
-      const matches = await db.tripTravelers
-        .where('[tripId+travelerId]')
-        .equals([tripId, travelerId])
-        .toArray()
+      const matches = await db.tripTravelers.where('[tripId+travelerId]').equals([tripId, travelerId]).toArray()
       const active = matches.filter((membership) => !membership.deletedAt)
       if (active.length > 1) {
-        throw new Error('Esistono partecipazioni duplicate per questo viaggiatore. Correggi i dati prima di continuare.')
+        throw new Error(
+          'Esistono partecipazioni duplicate per questo viaggiatore. Correggi i dati prima di continuare.',
+        )
       }
       if (active.length === 0) return 'not-found'
 

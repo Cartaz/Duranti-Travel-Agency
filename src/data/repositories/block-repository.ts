@@ -7,9 +7,9 @@ export type BlockMoveResult = 'moved' | 'boundary' | 'not-found' | 'invalid-cont
 export type NewPlannerBlock = Omit<Block, 'position'>
 
 function compareDayBlocks(left: Block, right: Block): number {
-  return left.position - right.position
-    || left.createdAt.localeCompare(right.createdAt)
-    || left.id.localeCompare(right.id)
+  return (
+    left.position - right.position || left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id)
+  )
 }
 
 async function normalizeDayBlockPositions(blocks: Block[]): Promise<Block[]> {
@@ -36,13 +36,11 @@ export class BlockRepository extends Repository<Block> {
   }
 
   async listByDay(dayId: string): Promise<Block[]> {
-    return (await db.blocks.where('dayId').equals(dayId).toArray())
-      .filter((block) => !block.deletedAt)
+    return (await db.blocks.where('dayId').equals(dayId).toArray()).filter((block) => !block.deletedAt)
   }
 
   async listByTrip(tripId: string): Promise<Block[]> {
-    return (await db.blocks.where('tripId').equals(tripId).toArray())
-      .filter((block) => !block.deletedAt)
+    return (await db.blocks.where('tripId').equals(tripId).toArray()).filter((block) => !block.deletedAt)
   }
 
   async createAtEnd(block: NewPlannerBlock): Promise<Block> {
@@ -52,8 +50,9 @@ export class BlockRepository extends Repository<Block> {
       if (await db.blocks.get(block.id)) throw new Error('Esiste già un blocco con questo identificatore.')
 
       const siblings = await normalizeDayBlockPositions(
-        (await db.blocks.where('dayId').equals(block.dayId).toArray())
-          .filter((candidate) => !candidate.deletedAt && candidate.tripId === block.tripId),
+        (await db.blocks.where('dayId').equals(block.dayId).toArray()).filter(
+          (candidate) => !candidate.deletedAt && candidate.tripId === block.tripId,
+        ),
       )
       const entity: Block = { ...block, position: siblings.length + 1 }
       await db.blocks.add(entity)
@@ -83,7 +82,8 @@ export class BlockRepository extends Repository<Block> {
       await requireEditableDay(tripId, dayId)
       const block = await db.blocks.get(blockId)
       if (!block || block.deletedAt) return 'not-found'
-      if (block.tripId !== tripId || block.dayId !== dayId) throw new Error('Il blocco non appartiene a questa giornata.')
+      if (block.tripId !== tripId || block.dayId !== dayId)
+        throw new Error('Il blocco non appartiene a questa giornata.')
       const now = new Date().toISOString()
       await db.blocks.put({ ...block, deletedAt: now, updatedAt: now })
       return 'tombstoned'
@@ -103,8 +103,9 @@ export class BlockRepository extends Repository<Block> {
       if (block.tripId !== tripId || block.dayId !== dayId) return 'invalid-context'
 
       const siblings = await normalizeDayBlockPositions(
-        (await db.blocks.where('dayId').equals(dayId).toArray())
-          .filter((candidate) => !candidate.deletedAt && candidate.tripId === tripId),
+        (await db.blocks.where('dayId').equals(dayId).toArray()).filter(
+          (candidate) => !candidate.deletedAt && candidate.tripId === tripId,
+        ),
       )
 
       const currentIndex = siblings.findIndex((candidate) => candidate.id === blockId)

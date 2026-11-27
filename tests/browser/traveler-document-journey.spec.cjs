@@ -45,7 +45,9 @@ test('real app keeps traveler document secrets locked across reload and session 
 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Sblocca i documenti' })).toBeVisible()
-  await expect(page.getByText('1 documento protetto presente. I dettagli restano nascosti finché la cassaforte è bloccata.')).toBeVisible()
+  await expect(
+    page.getByText('1 documento protetto presente. I dettagli restano nascosti finché la cassaforte è bloccata.'),
+  ).toBeVisible()
   await expect(page.getByText(documentNumber, { exact: true })).toHaveCount(0)
   await expect(page.getByText(new RegExp(attachmentName))).toHaveCount(0)
 
@@ -58,7 +60,9 @@ test('real app keeps traveler document secrets locked across reload and session 
 
   await page.getByRole('button', { name: 'Blocca cassaforte' }).click()
   await expect(page.getByText('Archivio documenti bloccato. La chiave è stata rimossa dalla sessione.')).toBeVisible()
-  await expect(page.getByText('1 documento protetto presente. I dettagli restano nascosti finché la cassaforte è bloccata.')).toBeVisible()
+  await expect(
+    page.getByText('1 documento protetto presente. I dettagli restano nascosti finché la cassaforte è bloccata.'),
+  ).toBeVisible()
   await expect(page.getByText(documentNumber, { exact: true })).toHaveCount(0)
   await expect(page.getByText(new RegExp(attachmentName))).toHaveCount(0)
 })

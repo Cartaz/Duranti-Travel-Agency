@@ -20,14 +20,66 @@ const forbiddenBridgeFiles = new Set([
   'src/features/itinerary/trip-itinerary-service.ts',
 ])
 const forbiddenBridgeImportTokens = [
-  '/trips/trip-service', '/days/day-service', '/planner/block-service', '/reservations/reservation-service', '/media/day-media-service', '/templates/day-template-service', '/templates/personal-day-template-service', '/expenses/expense-service', '/expenses/expense-summary-service', '/travelers/traveler-service', '/places/place-service', '/itinerary/itinerary-service', '/itinerary/itinerary-order-service', '/itinerary/itinerary-orphan-service', '/itinerary/trip-itinerary-service',
-  '../trips/trip-service', '../days/day-service', '../planner/block-service', '../reservations/reservation-service', '../media/day-media-service', '../templates/day-template-service', '../templates/personal-day-template-service', '../expenses/expense-service', '../expenses/expense-summary-service', '../travelers/traveler-service', '../places/place-service', '../itinerary/itinerary-service', '../itinerary/itinerary-order-service', '../itinerary/itinerary-orphan-service', '../itinerary/trip-itinerary-service',
-  './block-service', './reservation-service', './day-media-service', './day-template-service', './personal-day-template-service', './expense-service', './expense-summary-service', './traveler-service', './place-service', './itinerary-service', './itinerary-order-service', './itinerary-orphan-service', './trip-itinerary-service',
+  '/trips/trip-service',
+  '/days/day-service',
+  '/planner/block-service',
+  '/reservations/reservation-service',
+  '/media/day-media-service',
+  '/templates/day-template-service',
+  '/templates/personal-day-template-service',
+  '/expenses/expense-service',
+  '/expenses/expense-summary-service',
+  '/travelers/traveler-service',
+  '/places/place-service',
+  '/itinerary/itinerary-service',
+  '/itinerary/itinerary-order-service',
+  '/itinerary/itinerary-orphan-service',
+  '/itinerary/trip-itinerary-service',
+  '../trips/trip-service',
+  '../days/day-service',
+  '../planner/block-service',
+  '../reservations/reservation-service',
+  '../media/day-media-service',
+  '../templates/day-template-service',
+  '../templates/personal-day-template-service',
+  '../expenses/expense-service',
+  '../expenses/expense-summary-service',
+  '../travelers/traveler-service',
+  '../places/place-service',
+  '../itinerary/itinerary-service',
+  '../itinerary/itinerary-order-service',
+  '../itinerary/itinerary-orphan-service',
+  '../itinerary/trip-itinerary-service',
+  './block-service',
+  './reservation-service',
+  './day-media-service',
+  './day-template-service',
+  './personal-day-template-service',
+  './expense-service',
+  './expense-summary-service',
+  './traveler-service',
+  './place-service',
+  './itinerary-service',
+  './itinerary-order-service',
+  './itinerary-orphan-service',
+  './trip-itinerary-service',
 ]
 const applicationBackedFeatureRoots = [
-  'src/features/trips/', 'src/features/days/', 'src/features/planner/', 'src/features/reservations/', 'src/features/media/', 'src/features/templates/', 'src/features/expenses/', 'src/features/travelers/', 'src/features/places/', 'src/features/itinerary/',
+  'src/features/trips/',
+  'src/features/days/',
+  'src/features/planner/',
+  'src/features/reservations/',
+  'src/features/media/',
+  'src/features/templates/',
+  'src/features/expenses/',
+  'src/features/travelers/',
+  'src/features/places/',
+  'src/features/itinerary/',
 ]
-const plannerPagePaths = new Set(['src/features/planner/DayPlannerPage.tsx', 'src/features/planner/GuidedDayPlannerPage.tsx'])
+const plannerPagePaths = new Set([
+  'src/features/planner/DayPlannerPage.tsx',
+  'src/features/planner/GuidedDayPlannerPage.tsx',
+])
 
 // Cross-feature presentation composition is deliberate only at these page boundaries.
 // Keeping the allowlist at file granularity prevents a whole feature directory from
@@ -44,7 +96,7 @@ async function collectFiles(directory) {
   const files = []
   for (const entry of entries) {
     const child = join(directory, entry.name)
-    if (entry.isDirectory()) files.push(...await collectFiles(child))
+    if (entry.isDirectory()) files.push(...(await collectFiles(child)))
     else if (entry.isFile() && sourceExtensions.has(extname(entry.name))) files.push(child)
   }
   return files
@@ -80,7 +132,9 @@ function enforcePresentationDependencies(root, path, content, violations) {
     const target = importedFeature(root, path, specifier)
     if (!target || target === owner) continue
     if (!allowedTargets?.has(target)) {
-      violations.push(`${path}: feature ${owner} must not import presentation from feature ${target} outside an explicit page composition contract`)
+      violations.push(
+        `${path}: feature ${owner} must not import presentation from feature ${target} outside an explicit page composition contract`,
+      )
     }
   }
 }
@@ -106,7 +160,10 @@ function enforceDependencyDirection(root, path, content, violations) {
 
   if (applicationBackedFeatureRoots.some((prefix) => path.startsWith(prefix))) {
     if (has('data')) violations.push(`${path}: application-backed feature must never import data adapters directly`)
-    if (has('composition')) violations.push(`${path}: application-backed feature must depend on application/UI boundaries, never composition directly`)
+    if (has('composition'))
+      violations.push(
+        `${path}: application-backed feature must depend on application/UI boundaries, never composition directly`,
+      )
   }
 
   if (plannerPagePaths.has(path) && !content.includes('useApplicationServices')) {
@@ -117,7 +174,8 @@ function enforceDependencyDirection(root, path, content, violations) {
     violations.push(`${path}: removed feature-service bridge must not be recreated`)
   }
   for (const token of forbiddenBridgeImportTokens) {
-    if (content.includes(token)) violations.push(`${path}: removed feature-service bridge import is forbidden (${token})`)
+    if (content.includes(token))
+      violations.push(`${path}: removed feature-service bridge import is forbidden (${token})`)
   }
 
   enforcePresentationDependencies(root, path, content, violations)

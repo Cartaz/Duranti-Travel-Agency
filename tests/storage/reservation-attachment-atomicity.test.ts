@@ -1,14 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 
-const applicationSource = await readFile(
+const applicationSource = await readSource(
   new URL('../../src/application/reservations/reservation-application.ts', import.meta.url),
-  'utf8',
 )
-const repositorySource = await readFile(
+const repositorySource = await readSource(
   new URL('../../src/data/repositories/reservation-block-repository.ts', import.meta.url),
-  'utf8',
 )
 
 test('reservation application delegates attachment ownership as one semantic mutation', () => {

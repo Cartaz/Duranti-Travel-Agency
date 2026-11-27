@@ -79,15 +79,23 @@ function readableValidationMessage(control: ValidatableControl): string {
 function readinessMessages(readiness: AppShellReadiness): string[] {
   const messages: string[] = []
   if (readiness.storageWarning === 'best-effort') {
-    messages.push('Il browser conserva questi dati in modalità best-effort: in condizioni di spazio ridotto potrebbe rimuoverli. Mantieni un backup .dtagency aggiornato fuori dal browser.')
+    messages.push(
+      'Il browser conserva questi dati in modalità best-effort: in condizioni di spazio ridotto potrebbe rimuoverli. Mantieni un backup .dtagency aggiornato fuori dal browser.',
+    )
   } else if (readiness.storageWarning === 'unverified') {
-    messages.push('Non è stato possibile verificare se questo browser protegge stabilmente l’archivio locale. Mantieni un backup .dtagency aggiornato fuori dal browser.')
+    messages.push(
+      'Non è stato possibile verificare se questo browser protegge stabilmente l’archivio locale. Mantieni un backup .dtagency aggiornato fuori dal browser.',
+    )
   }
 
   if (readiness.recoveryNotice === 'rolled-back') {
-    messages.push('DTAgency ha rilevato un ripristino interrotto e ha ripristinato automaticamente lo stato precedente.')
+    messages.push(
+      'DTAgency ha rilevato un ripristino interrotto e ha ripristinato automaticamente lo stato precedente.',
+    )
   } else if (readiness.recoveryNotice === 'finalized') {
-    messages.push('DTAgency ha rilevato un ripristino interrotto già applicato e ne ha completato automaticamente la finalizzazione.')
+    messages.push(
+      'DTAgency ha rilevato un ripristino interrotto già applicato e ne ha completato automaticamente la finalizzazione.',
+    )
   }
   return messages
 }
@@ -101,9 +109,12 @@ export default function AppShell({ readiness = {} }: { readiness?: AppShellReadi
   const handleInvalid = (event: FormEvent<HTMLElement>): void => {
     event.preventDefault()
     const target = event.target
-    if (!(target instanceof HTMLInputElement)
-      && !(target instanceof HTMLTextAreaElement)
-      && !(target instanceof HTMLSelectElement)) return
+    if (
+      !(target instanceof HTMLInputElement) &&
+      !(target instanceof HTMLTextAreaElement) &&
+      !(target instanceof HTMLSelectElement)
+    )
+      return
 
     if (validationLockRef.current) return
     validationLockRef.current = true
@@ -126,7 +137,9 @@ export default function AppShell({ readiness = {} }: { readiness?: AppShellReadi
     >
       <header className="app-topbar">
         <NavLink to="/" className="app-brand" aria-label="DTAgency — viaggi">
-          <span className="app-brand-mark" aria-hidden="true">DT</span>
+          <span className="app-brand-mark" aria-hidden="true">
+            DT
+          </span>
           <span>
             <strong>DTAgency</strong>
             <small>viaggia con noi, viaggio, con i topi</small>
@@ -139,11 +152,15 @@ export default function AppShell({ readiness = {} }: { readiness?: AppShellReadi
         <aside className="app-readiness-notice" aria-label="Stato archivio locale" role="status">
           <div>
             <strong>Stato archivio locale</strong>
-            {statusMessages.map((message) => <p key={message}>{message}</p>)}
+            {statusMessages.map((message) => (
+              <p key={message}>{message}</p>
+            ))}
           </div>
           <div className="app-readiness-actions">
             {readiness.storageWarning && <NavLink to="/backup">Apri backup</NavLink>}
-            <button type="button" onClick={() => setReadinessVisible(false)}>Chiudi</button>
+            <button type="button" onClick={() => setReadinessVisible(false)}>
+              Chiudi
+            </button>
           </div>
         </aside>
       )}
@@ -158,7 +175,9 @@ export default function AppShell({ readiness = {} }: { readiness?: AppShellReadi
             <strong>Controlla i dati</strong>
             <p>{validationNotice}</p>
           </div>
-          <button type="button" onClick={() => setValidationNotice('')}>Chiudi</button>
+          <button type="button" onClick={() => setValidationNotice('')}>
+            Chiudi
+          </button>
         </div>
       )}
 
@@ -168,11 +187,15 @@ export default function AppShell({ readiness = {} }: { readiness?: AppShellReadi
           <span>Viaggi</span>
         </NavLink>
         <NavLink to="/places" className={navClassName}>
-          <span className="nav-glyph" aria-hidden="true">⌖</span>
+          <span className="nav-glyph" aria-hidden="true">
+            ⌖
+          </span>
           <span>Luoghi</span>
         </NavLink>
         <NavLink to="/backup" className={navClassName}>
-          <span className="nav-glyph" aria-hidden="true">↥</span>
+          <span className="nav-glyph" aria-hidden="true">
+            ↥
+          </span>
           <span>Backup</span>
         </NavLink>
       </nav>

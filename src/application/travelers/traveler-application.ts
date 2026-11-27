@@ -17,7 +17,10 @@ export interface TravelerDraft {
   notes?: string
 }
 
-export interface TripParticipant { membership: TripTraveler; traveler: Traveler }
+export interface TripParticipant {
+  membership: TripTraveler
+  traveler: Traveler
+}
 export const EMPTY_TRAVELER_DRAFT: TravelerDraft = { firstName: '', lastName: '', displayName: '' }
 
 export interface TravelerApplication {
@@ -32,7 +35,10 @@ export interface TravelerApplication {
 }
 
 const roles = new Set<TravelerRole>(['owner', 'companion', 'child', 'other'])
-function cleanOptional(value: string | undefined): string | undefined { const cleaned = value?.trim(); return cleaned ? cleaned : undefined }
+function cleanOptional(value: string | undefined): string | undefined {
+  const cleaned = value?.trim()
+  return cleaned ? cleaned : undefined
+}
 function validateOptionalText(value: string | undefined, label: string, maxLength: number): string | undefined {
   const cleaned = cleanOptional(value)
   if (cleaned && cleaned.length > maxLength) throw new Error(`${label}: valore troppo lungo.`)
@@ -52,14 +58,17 @@ export function createTravelerApplication(deps: TravelerApplicationDependencies)
     return cleaned
   }
   function normalizeTravelerDraft(input: TravelerDraft): TravelerDraft {
-    const firstName = input.firstName.trim(); const lastName = input.lastName.trim()
+    const firstName = input.firstName.trim()
+    const lastName = input.lastName.trim()
     if (!firstName) throw new Error('Il nome è obbligatorio.')
     if (!lastName) throw new Error('Il cognome è obbligatorio.')
     if (firstName.length > 100 || lastName.length > 100) throw new Error('Nome o cognome troppo lunghi.')
     const displayName = input.displayName.trim() || `${firstName} ${lastName}`
     if (displayName.length > 160) throw new Error('Il nome visualizzato è troppo lungo.')
     return {
-      firstName, lastName, displayName,
+      firstName,
+      lastName,
+      displayName,
       birthDate: validateBirthDate(input.birthDate),
       birthPlace: validateOptionalText(input.birthPlace, 'Luogo di nascita', 200),
       nationality: validateOptionalText(input.nationality, 'Nazionalità', 100),
@@ -70,22 +79,43 @@ export function createTravelerApplication(deps: TravelerApplicationDependencies)
     }
   }
   function travelerToDraft(traveler: Traveler): TravelerDraft {
-    return { firstName: traveler.firstName, lastName: traveler.lastName, displayName: traveler.displayName, birthDate: traveler.birthDate, birthPlace: traveler.birthPlace, nationality: traveler.nationality, gender: traveler.gender, email: traveler.email, phone: traveler.phone, notes: traveler.notes }
+    return {
+      firstName: traveler.firstName,
+      lastName: traveler.lastName,
+      displayName: traveler.displayName,
+      birthDate: traveler.birthDate,
+      birthPlace: traveler.birthPlace,
+      nationality: traveler.nationality,
+      gender: traveler.gender,
+      email: traveler.email,
+      phone: traveler.phone,
+      notes: traveler.notes,
+    }
   }
   async function listTravelers(): Promise<Traveler[]> {
-    return (await deps.travelers.list()).sort((left, right) => left.displayName.localeCompare(right.displayName, 'it') || left.lastName.localeCompare(right.lastName, 'it') || left.id.localeCompare(right.id))
+    return (await deps.travelers.list()).sort(
+      (left, right) =>
+        left.displayName.localeCompare(right.displayName, 'it') ||
+        left.lastName.localeCompare(right.lastName, 'it') ||
+        left.id.localeCompare(right.id),
+    )
   }
-  async function getTraveler(travelerId: string): Promise<Traveler | undefined> { return deps.travelers.get(travelerId) }
+  async function getTraveler(travelerId: string): Promise<Traveler | undefined> {
+    return deps.travelers.get(travelerId)
+  }
   async function createTraveler(input: TravelerDraft): Promise<Traveler> {
-    const draft = normalizeTravelerDraft(input); const now = deps.now()
+    const draft = normalizeTravelerDraft(input)
+    const now = deps.now()
     const traveler: Traveler = { id: deps.newId(), ...draft, createdAt: now, updatedAt: now }
-    await deps.travelers.put(traveler); return traveler
+    await deps.travelers.put(traveler)
+    return traveler
   }
   async function updateTraveler(travelerId: string, input: TravelerDraft): Promise<Traveler> {
     const existing = await deps.travelers.get(travelerId)
     if (!existing) throw new Error('Il profilo viaggiatore non esiste più.')
     const updated: Traveler = { ...existing, ...normalizeTravelerDraft(input), updatedAt: deps.now() }
-    await deps.travelers.put(updated); return updated
+    await deps.travelers.put(updated)
+    return updated
   }
   async function listTripParticipants(tripId: string): Promise<TripParticipant[]> {
     const trip = await deps.trips.get(tripId)
@@ -108,5 +138,14 @@ export function createTravelerApplication(deps: TravelerApplicationDependencies)
     const result = await deps.memberships.detachMembership(tripId, travelerId)
     if (result === 'not-found') throw new Error('Il viaggiatore non risulta associato a questo viaggio.')
   }
-  return { travelerToDraft, listTravelers, getTraveler, createTraveler, updateTraveler, listTripParticipants, attachTravelerToTrip, detachTravelerFromTrip }
+  return {
+    travelerToDraft,
+    listTravelers,
+    getTraveler,
+    createTraveler,
+    updateTraveler,
+    listTripParticipants,
+    attachTravelerToTrip,
+    detachTravelerFromTrip,
+  }
 }

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 import test from 'node:test'
 
-const formatSource = await readFile(new URL('../../src/vault/format.ts', import.meta.url), 'utf8')
-const exportSource = await readFile(new URL('../../src/vault/export.ts', import.meta.url), 'utf8')
-const importSource = await readFile(new URL('../../src/vault/import.ts', import.meta.url), 'utf8')
+const formatSource = await readSource(new URL('../../src/vault/format.ts', import.meta.url))
+const exportSource = await readSource(new URL('../../src/vault/export.ts', import.meta.url))
+const importSource = await readSource(new URL('../../src/vault/import.ts', import.meta.url))
 
 test('Vault v1 exposes only DTAgency file identity', () => {
   assert.match(formatSource, /VAULT_FILE_EXTENSION = '\.dtagency'/)

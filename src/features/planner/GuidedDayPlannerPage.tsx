@@ -52,7 +52,8 @@ export default function GuidedDayPlannerPage() {
     }
 
     let cancelled = false
-    void tripApplication.getTrip(tripId)
+    void tripApplication
+      .getTrip(tripId)
       .then((trip) => {
         if (!cancelled) setCanEdit(Boolean(trip && trip.status !== 'archived'))
       })
@@ -122,9 +123,7 @@ export default function GuidedDayPlannerPage() {
     <div className="guided-day-planner" ref={wrapperRef}>
       <DayPlannerPage key={revision} />
 
-      {tripId && dayId && (
-        <DayMediaGallery tripId={tripId} dayId={dayId} readOnly={!canEdit} />
-      )}
+      {tripId && dayId && <DayMediaGallery tripId={tripId} dayId={dayId} readOnly={!canEdit} />}
 
       {canEdit && (
         <details className="planner-quick-add" ref={detailsRef}>
@@ -135,7 +134,11 @@ export default function GuidedDayPlannerPage() {
               <span>Scegli per intenzione. I dettagli si compilano dopo.</span>
             </div>
 
-            {error && <p className="planner-quick-add-error" role="alert">{error}</p>}
+            {error && (
+              <p className="planner-quick-add-error" role="alert">
+                {error}
+              </p>
+            )}
 
             <div className="planner-quick-add-primary">
               {primaryChoices.map((choice) => (
@@ -171,11 +174,13 @@ export default function GuidedDayPlannerPage() {
         </details>
       )}
 
-      {canEdit && tripId && dayId && (
-        <DayTemplateSaver tripId={tripId} dayId={dayId} />
-      )}
+      {canEdit && tripId && dayId && <DayTemplateSaver tripId={tripId} dayId={dayId} />}
 
-      {status && <p className="planner-quick-add-status" role="status">{status}</p>}
+      {status && (
+        <p className="planner-quick-add-status" role="status">
+          {status}
+        </p>
+      )}
     </div>
   )
 }

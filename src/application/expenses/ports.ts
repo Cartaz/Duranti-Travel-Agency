@@ -1,9 +1,17 @@
 import type { Block, Day, Expense, Traveler, Trip } from '../../domain/entities'
 
-export interface ExpenseTripPort { get(id: string): Promise<Trip | undefined> }
-export interface ExpenseDayPort { get(id: string): Promise<Day | undefined> }
-export interface ExpenseBlockPort { get(id: string): Promise<Block | undefined> }
-export interface ExpenseRepositoryPort { get(id: string): Promise<Expense | undefined> }
+export interface ExpenseTripPort {
+  get(id: string): Promise<Trip | undefined>
+}
+export interface ExpenseDayPort {
+  get(id: string): Promise<Day | undefined>
+}
+export interface ExpenseBlockPort {
+  get(id: string): Promise<Block | undefined>
+}
+export interface ExpenseRepositoryPort {
+  get(id: string): Promise<Expense | undefined>
+}
 export interface ExpenseTravelerPort {
   getTraveler(id: string): Promise<Traveler | undefined>
   listActiveTripTravelers(tripId: string): Promise<Traveler[]>

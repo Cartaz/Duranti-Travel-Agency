@@ -1,10 +1,38 @@
 import type { Day, Expense, Traveler, Trip } from '../../domain/entities'
 
-export interface ExpenseSummarySlice { key: string; label: string; totalMinor: number; count: number }
-export interface ExpenseCurrencySummary { currency: string; totalMinor: number; count: number; categories: ExpenseSummarySlice[]; payers: ExpenseSummarySlice[]; days: ExpenseSummarySlice[] }
-export interface TripBudgetSummary { currency: string; budgetMinor: number; spentMinor: number; remainingMinor: number; exceededMinor: number; includedExpenseCount: number; directExpenseCount: number; convertedExpenseCount: number; excludedExpenseCount: number }
-export interface TripExpenseSummary { expenseCount: number; currencies: ExpenseCurrencySummary[]; budget?: TripBudgetSummary }
-export interface ExpenseSummaryApplication { getTripExpenseSummary(tripId: string): Promise<TripExpenseSummary> }
+export interface ExpenseSummarySlice {
+  key: string
+  label: string
+  totalMinor: number
+  count: number
+}
+export interface ExpenseCurrencySummary {
+  currency: string
+  totalMinor: number
+  count: number
+  categories: ExpenseSummarySlice[]
+  payers: ExpenseSummarySlice[]
+  days: ExpenseSummarySlice[]
+}
+export interface TripBudgetSummary {
+  currency: string
+  budgetMinor: number
+  spentMinor: number
+  remainingMinor: number
+  exceededMinor: number
+  includedExpenseCount: number
+  directExpenseCount: number
+  convertedExpenseCount: number
+  excludedExpenseCount: number
+}
+export interface TripExpenseSummary {
+  expenseCount: number
+  currencies: ExpenseCurrencySummary[]
+  budget?: TripBudgetSummary
+}
+export interface ExpenseSummaryApplication {
+  getTripExpenseSummary(tripId: string): Promise<TripExpenseSummary>
+}
 export interface ExpenseSummaryDependencies {
   trips: { get(id: string): Promise<Trip | undefined> }
   days: { listByTrip(tripId: string): Promise<Day[]> }
@@ -12,45 +40,84 @@ export interface ExpenseSummaryDependencies {
   travelers: { getMany(ids: string[]): Promise<Traveler[]> }
 }
 
-interface MutableSlice { label: string; totalMinor: number; count: number }
-interface MutableCurrencySummary { totalMinor: number; count: number; categories: Map<string, MutableSlice>; payers: Map<string, MutableSlice>; days: Map<string, MutableSlice> }
+interface MutableSlice {
+  label: string
+  totalMinor: number
+  count: number
+}
+interface MutableCurrencySummary {
+  totalMinor: number
+  count: number
+  categories: Map<string, MutableSlice>
+  payers: Map<string, MutableSlice>
+  days: Map<string, MutableSlice>
+}
 const UNASSIGNED_DAY_KEY = '__unassigned__'
 const MISSING_DAY_PREFIX = '__missing__:'
 
 function addMinor(left: number, right: number): number {
-  if (!Number.isSafeInteger(left) || !Number.isSafeInteger(right) || right < 0) throw new Error('Il riepilogo contiene un importo persistito non valido.')
+  if (!Number.isSafeInteger(left) || !Number.isSafeInteger(right) || right < 0)
+    throw new Error('Il riepilogo contiene un importo persistito non valido.')
   const total = left + right
   if (!Number.isSafeInteger(total)) throw new Error('Il totale delle spese supera il limite numerico sicuro.')
   return total
 }
 function addSlice(map: Map<string, MutableSlice>, key: string, label: string, amountMinor: number): void {
   const current = map.get(key)
-  if (current) { current.totalMinor = addMinor(current.totalMinor, amountMinor); current.count += 1; return }
+  if (current) {
+    current.totalMinor = addMinor(current.totalMinor, amountMinor)
+    current.count += 1
+    return
+  }
   map.set(key, { label, totalMinor: amountMinor, count: 1 })
 }
 function finalizeSlices(map: Map<string, MutableSlice>): ExpenseSummarySlice[] {
-  return Array.from(map.entries()).map(([key, value]) => ({ key, ...value })).sort((left, right) => right.totalMinor - left.totalMinor || left.label.localeCompare(right.label, 'it'))
+  return Array.from(map.entries())
+    .map(([key, value]) => ({ key, ...value }))
+    .sort((left, right) => right.totalMinor - left.totalMinor || left.label.localeCompare(right.label, 'it'))
 }
-function formatDayLabel(day: Day): string { return `Giorno ${day.sequence} · ${day.title?.trim() || day.date}` }
+function formatDayLabel(day: Day): string {
+  return `Giorno ${day.sequence} · ${day.title?.trim() || day.date}`
+}
 function finalizeDaySlices(map: Map<string, MutableSlice>, dayById: Map<string, Day>): ExpenseSummarySlice[] {
-  return Array.from(map.entries()).map(([key, value]) => ({ key, ...value })).sort((left, right) => {
-    const leftDay = dayById.get(left.key); const rightDay = dayById.get(right.key)
-    if (leftDay && rightDay) return leftDay.sequence - rightDay.sequence || leftDay.date.localeCompare(rightDay.date) || left.label.localeCompare(right.label, 'it')
-    if (leftDay) return -1
-    if (rightDay) return 1
-    const leftUnassigned = left.key === UNASSIGNED_DAY_KEY; const rightUnassigned = right.key === UNASSIGNED_DAY_KEY
-    if (leftUnassigned !== rightUnassigned) return leftUnassigned ? 1 : -1
-    return left.label.localeCompare(right.label, 'it')
-  })
+  return Array.from(map.entries())
+    .map(([key, value]) => ({ key, ...value }))
+    .sort((left, right) => {
+      const leftDay = dayById.get(left.key)
+      const rightDay = dayById.get(right.key)
+      if (leftDay && rightDay)
+        return (
+          leftDay.sequence - rightDay.sequence ||
+          leftDay.date.localeCompare(rightDay.date) ||
+          left.label.localeCompare(right.label, 'it')
+        )
+      if (leftDay) return -1
+      if (rightDay) return 1
+      const leftUnassigned = left.key === UNASSIGNED_DAY_KEY
+      const rightUnassigned = right.key === UNASSIGNED_DAY_KEY
+      if (leftUnassigned !== rightUnassigned) return leftUnassigned ? 1 : -1
+      return left.label.localeCompare(right.label, 'it')
+    })
 }
 function summarizeBudgetExpenses(expenses: Expense[], currency: string) {
-  let spentMinor = 0; let directExpenseCount = 0; let convertedExpenseCount = 0; let excludedExpenseCount = 0
+  let spentMinor = 0
+  let directExpenseCount = 0
+  let convertedExpenseCount = 0
+  let excludedExpenseCount = 0
   for (const expense of expenses) {
-    if (expense.currency === currency) { spentMinor = addMinor(spentMinor, expense.amountMinor); directExpenseCount += 1; continue }
+    if (expense.currency === currency) {
+      spentMinor = addMinor(spentMinor, expense.amountMinor)
+      directExpenseCount += 1
+      continue
+    }
     if (expense.fx?.targetCurrency === currency) {
-      if (!Number.isSafeInteger(expense.fx.convertedAmountMinor) || expense.fx.convertedAmountMinor <= 0) throw new Error('Una conversione FX persistita contiene un importo non valido.')
-      if (!expense.fx.rate || typeof expense.fx.rate !== 'string') throw new Error('Una conversione FX persistita non contiene un tasso valido.')
-      spentMinor = addMinor(spentMinor, expense.fx.convertedAmountMinor); convertedExpenseCount += 1; continue
+      if (!Number.isSafeInteger(expense.fx.convertedAmountMinor) || expense.fx.convertedAmountMinor <= 0)
+        throw new Error('Una conversione FX persistita contiene un importo non valido.')
+      if (!expense.fx.rate || typeof expense.fx.rate !== 'string')
+        throw new Error('Una conversione FX persistita non contiene un tasso valido.')
+      spentMinor = addMinor(spentMinor, expense.fx.convertedAmountMinor)
+      convertedExpenseCount += 1
+      continue
     }
     excludedExpenseCount += 1
   }
@@ -65,32 +132,71 @@ export function createExpenseSummaryApplication(deps: ExpenseSummaryDependencies
       deps.days.listByTrip(tripId),
     ])
     if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
-    const payerIds = Array.from(new Set(expenses.map((expense) => expense.paidByTravelerId).filter((id): id is string => Boolean(id))))
+    const payerIds = Array.from(
+      new Set(expenses.map((expense) => expense.paidByTravelerId).filter((id): id is string => Boolean(id))),
+    )
     const dayById = new Map(tripDays.map((day) => [day.id, day]))
     const payerProfiles = await deps.travelers.getMany(payerIds)
     const payerNames = new Map(payerProfiles.map((traveler) => [traveler.id, traveler.displayName]))
     const grouped = new Map<string, MutableCurrencySummary>()
     for (const expense of expenses) {
-      if (!Number.isSafeInteger(expense.amountMinor) || expense.amountMinor < 0) throw new Error('Il riepilogo contiene una spesa con importo non valido.')
+      if (!Number.isSafeInteger(expense.amountMinor) || expense.amountMinor < 0)
+        throw new Error('Il riepilogo contiene una spesa con importo non valido.')
       let currency = grouped.get(expense.currency)
-      if (!currency) { currency = { totalMinor: 0, count: 0, categories: new Map(), payers: new Map(), days: new Map() }; grouped.set(expense.currency, currency) }
-      currency.totalMinor = addMinor(currency.totalMinor, expense.amountMinor); currency.count += 1
-      const category = expense.category?.trim() || 'Senza categoria'; addSlice(currency.categories, category.toLocaleLowerCase('it'), category, expense.amountMinor)
-      if (expense.paidByTravelerId) addSlice(currency.payers, expense.paidByTravelerId, payerNames.get(expense.paidByTravelerId) ?? 'Profilo non disponibile', expense.amountMinor)
+      if (!currency) {
+        currency = { totalMinor: 0, count: 0, categories: new Map(), payers: new Map(), days: new Map() }
+        grouped.set(expense.currency, currency)
+      }
+      currency.totalMinor = addMinor(currency.totalMinor, expense.amountMinor)
+      currency.count += 1
+      const category = expense.category?.trim() || 'Senza categoria'
+      addSlice(currency.categories, category.toLocaleLowerCase('it'), category, expense.amountMinor)
+      if (expense.paidByTravelerId)
+        addSlice(
+          currency.payers,
+          expense.paidByTravelerId,
+          payerNames.get(expense.paidByTravelerId) ?? 'Profilo non disponibile',
+          expense.amountMinor,
+        )
       else addSlice(currency.payers, '__unspecified__', 'Non specificato', expense.amountMinor)
       if (expense.dayId) {
         const day = dayById.get(expense.dayId)
-        addSlice(currency.days, day ? day.id : `${MISSING_DAY_PREFIX}${expense.dayId}`, day ? formatDayLabel(day) : 'Giorno non disponibile', expense.amountMinor)
+        addSlice(
+          currency.days,
+          day ? day.id : `${MISSING_DAY_PREFIX}${expense.dayId}`,
+          day ? formatDayLabel(day) : 'Giorno non disponibile',
+          expense.amountMinor,
+        )
       } else addSlice(currency.days, UNASSIGNED_DAY_KEY, 'Senza giorno', expense.amountMinor)
     }
-    const currencies = Array.from(grouped.entries()).map(([currency, value]) => ({ currency, totalMinor: value.totalMinor, count: value.count, categories: finalizeSlices(value.categories), payers: finalizeSlices(value.payers), days: finalizeDaySlices(value.days, dayById) })).sort((left, right) => left.currency.localeCompare(right.currency))
+    const currencies = Array.from(grouped.entries())
+      .map(([currency, value]) => ({
+        currency,
+        totalMinor: value.totalMinor,
+        count: value.count,
+        categories: finalizeSlices(value.categories),
+        payers: finalizeSlices(value.payers),
+        days: finalizeDaySlices(value.days, dayById),
+      }))
+      .sort((left, right) => left.currency.localeCompare(right.currency))
     let budget: TripBudgetSummary | undefined
     if (trip.budgetMinor !== undefined) {
-      if (!Number.isSafeInteger(trip.budgetMinor) || trip.budgetMinor <= 0) throw new Error('Il viaggio contiene un budget persistito non valido.')
+      if (!Number.isSafeInteger(trip.budgetMinor) || trip.budgetMinor <= 0)
+        throw new Error('Il viaggio contiene un budget persistito non valido.')
       const currency = trip.currency?.trim().toUpperCase()
       if (!currency) throw new Error('Il viaggio ha un budget ma non una valuta associata.')
       const b = summarizeBudgetExpenses(expenses, currency)
-      budget = { currency, budgetMinor: trip.budgetMinor, spentMinor: b.spentMinor, remainingMinor: b.spentMinor < trip.budgetMinor ? trip.budgetMinor - b.spentMinor : 0, exceededMinor: b.spentMinor > trip.budgetMinor ? b.spentMinor - trip.budgetMinor : 0, includedExpenseCount: b.directExpenseCount + b.convertedExpenseCount, directExpenseCount: b.directExpenseCount, convertedExpenseCount: b.convertedExpenseCount, excludedExpenseCount: b.excludedExpenseCount }
+      budget = {
+        currency,
+        budgetMinor: trip.budgetMinor,
+        spentMinor: b.spentMinor,
+        remainingMinor: b.spentMinor < trip.budgetMinor ? trip.budgetMinor - b.spentMinor : 0,
+        exceededMinor: b.spentMinor > trip.budgetMinor ? b.spentMinor - trip.budgetMinor : 0,
+        includedExpenseCount: b.directExpenseCount + b.convertedExpenseCount,
+        directExpenseCount: b.directExpenseCount,
+        convertedExpenseCount: b.convertedExpenseCount,
+        excludedExpenseCount: b.excludedExpenseCount,
+      }
     }
     return { expenseCount: expenses.length, currencies, budget }
   }

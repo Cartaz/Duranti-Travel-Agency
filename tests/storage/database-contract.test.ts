@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 import test from 'node:test'
 
-const source = await readFile(new URL('../../src/data/db/dtagency-db.ts', import.meta.url), 'utf8')
+const source = await readSource(new URL('../../src/data/db/dtagency-db.ts', import.meta.url))
 
 test('database keeps v1 and declares the index-only v2 schema', () => {
   assert.match(source, /export const DB_NAME = 'dtagency'/)

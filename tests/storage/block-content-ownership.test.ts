@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 
 const guardedPaths = [
   '../../src/application/media/day-media-application.ts',
@@ -13,7 +13,7 @@ const guardedPaths = [
 
 test('block reference representation has one owner', async () => {
   for (const path of guardedPaths) {
-    const source = await readFile(new URL(path, import.meta.url), 'utf8')
+    const source = await readSource(new URL(path, import.meta.url))
     assert.doesNotMatch(source, /\.content\.reservationId\b/, `${path} reads reservationId representation directly`)
     assert.doesNotMatch(source, /\.content\.placeId\b/, `${path} reads placeId representation directly`)
   }

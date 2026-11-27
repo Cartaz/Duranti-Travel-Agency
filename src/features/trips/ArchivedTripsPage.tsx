@@ -32,7 +32,8 @@ export default function ArchivedTripsPage() {
 
   useEffect(() => {
     let cancelled = false
-    void tripApplication.listArchivedTrips()
+    void tripApplication
+      .listArchivedTrips()
       .then((items) => {
         if (!cancelled) setTrips(items)
       })
@@ -69,13 +70,25 @@ export default function ArchivedTripsPage() {
         <div>
           <p className="eyebrow">Biblioteca</p>
           <h1 id="archive-title">Archivio viaggi</h1>
-          <p className="trip-detail-subtitle">Capitoli messi da parte, ma ancora completamente locali e recuperabili.</p>
+          <p className="trip-detail-subtitle">
+            Capitoli messi da parte, ma ancora completamente locali e recuperabili.
+          </p>
         </div>
-        <Link className="trip-secondary-action" to="/">Indice</Link>
+        <Link className="trip-secondary-action" to="/">
+          Indice
+        </Link>
       </div>
 
-      {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
-      {loading && <p className="trip-feedback" role="status">Apro l’archivio locale…</p>}
+      {error && (
+        <p className="trip-feedback trip-feedback-error" role="alert">
+          {error}
+        </p>
+      )}
+      {loading && (
+        <p className="trip-feedback" role="status">
+          Apro l’archivio locale…
+        </p>
+      )}
 
       {!loading && trips.length === 0 && (
         <section className="archive-empty">
@@ -110,7 +123,9 @@ export default function ArchivedTripsPage() {
         </div>
       )}
 
-      <Link className="trip-text-link" to="/">← Torna al libro</Link>
+      <Link className="trip-text-link" to="/">
+        ← Torna al libro
+      </Link>
     </section>
   )
 }

@@ -11,11 +11,7 @@ test('DTAgency persistence and Vault browser contracts', async ({ page }) => {
   expect(response, 'Browser harness did not return an HTTP response.').not.toBeNull()
   expect(response.status(), `Browser harness returned HTTP ${response.status()}.`).toBeLessThan(400)
 
-  await page.waitForFunction(
-    () => window.__DTAGENCY_BROWSER_DONE__ === true,
-    null,
-    { timeout: 120_000 },
-  )
+  await page.waitForFunction(() => window.__DTAGENCY_BROWSER_DONE__ === true, null, { timeout: 120_000 })
 
   const results = await page.evaluate(() => window.__DTAGENCY_BROWSER_RESULTS__)
   expect(consoleErrors, `Browser console errors:\n${consoleErrors.join('\n')}`).toEqual([])

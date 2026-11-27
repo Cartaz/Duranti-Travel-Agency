@@ -31,7 +31,7 @@
 
 .reservation-grid input:disabled,
 .reservation-grid select:disabled {
-  opacity: .55;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -60,14 +60,14 @@
   padding: 10px 11px;
   border: 1px solid #46513d;
   border-radius: 11px;
-  background: rgba(43, 55, 35, .35);
+  background: rgba(43, 55, 35, 0.35);
 }
 
 .reservation-fixed-start-date > span {
   color: #a8b790;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -90,7 +90,7 @@
   padding: 13px;
   border: 1px solid #4a593d;
   border-radius: 14px;
-  background: rgba(38, 49, 31, .34);
+  background: rgba(38, 49, 31, 0.34);
 }
 
 .reservation-place-preview-heading {
@@ -110,7 +110,7 @@
   color: #9faf88;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -151,15 +151,15 @@
   display: grid;
   gap: 3px;
   padding: 8px 9px;
-  border: 1px solid rgba(83, 98, 69, .7);
+  border: 1px solid rgba(83, 98, 69, 0.7);
   border-radius: 10px;
-  background: rgba(17, 21, 14, .28);
+  background: rgba(17, 21, 14, 0.28);
 }
 
 .reservation-place-preview dt {
   color: #8f9d7d;
   font-size: 9px;
-  letter-spacing: .07em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
@@ -175,7 +175,7 @@
   overflow: hidden;
   border: 1px solid #40372e;
   border-radius: 14px;
-  background: rgba(18, 15, 12, .42);
+  background: rgba(18, 15, 12, 0.42);
 }
 
 .reservation-optional > summary {
@@ -212,7 +212,7 @@
   padding: 4px 7px;
   color: #b8c7a0;
   font-size: 10px;
-  letter-spacing: .06em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -234,7 +234,7 @@
   padding: 13px;
   border: 1px solid #40372e;
   border-radius: 14px;
-  background: rgba(18, 15, 12, .42);
+  background: rgba(18, 15, 12, 0.42);
 }
 
 .reservation-attachment-heading,
@@ -290,7 +290,7 @@
 
 .reservation-attachment-actions button:disabled {
   cursor: default;
-  opacity: .55;
+  opacity: 0.55;
 }
 
 .reservation-attachment-empty {
@@ -318,7 +318,7 @@
 
 .reservation-attachment-picker-disabled {
   cursor: default;
-  opacity: .55;
+  opacity: 0.55;
 }
 
 .reservation-attachment-picker input {

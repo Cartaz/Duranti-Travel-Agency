@@ -1,12 +1,7 @@
 import type { Media } from '../../domain/entities'
 import { db } from '../db/dtagency-db'
 import { assertEntityBase } from '../db/validate'
-import {
-  deleteMediaFile,
-  mediaFileExists,
-  readMediaFile,
-  writeMediaFile,
-} from '../opfs/opfs-store'
+import { deleteMediaFile, mediaFileExists, readMediaFile, writeMediaFile } from '../opfs/opfs-store'
 
 export interface CreateMediaInput {
   tripId?: string
@@ -55,7 +50,8 @@ async function requireEditableMediaContext(media: Pick<Media, 'tripId' | 'dayId'
   if (media.blockId) {
     const block = await db.blocks.get(media.blockId)
     if (
-      !block || block.deletedAt ||
+      !block ||
+      block.deletedAt ||
       block.tripId !== media.tripId ||
       (media.dayId !== undefined && block.dayId !== media.dayId)
     ) {
@@ -97,10 +93,7 @@ export class MediaRepository {
     }
   }
 
-  async get(
-    id: string,
-    options: { includeDeleted?: boolean } = {},
-  ): Promise<Media | undefined> {
+  async get(id: string, options: { includeDeleted?: boolean } = {}): Promise<Media | undefined> {
     const media = await db.media.get(id)
     if (!media || (!options.includeDeleted && media.deletedAt)) return undefined
     return media
@@ -109,12 +102,13 @@ export class MediaRepository {
   async listForDay(tripId: string, dayId: string): Promise<Media[]> {
     const media = await db.media.where('dayId').equals(dayId).toArray()
     return media
-      .filter((item) => (
-        !item.deletedAt
-        && item.tripId === tripId
-        && !item.blockId
-        && (item.kind === 'image' || item.kind === 'video')
-      ))
+      .filter(
+        (item) =>
+          !item.deletedAt &&
+          item.tripId === tripId &&
+          !item.blockId &&
+          (item.kind === 'image' || item.kind === 'video'),
+      )
       .sort((left, right) => {
         if (left.position !== undefined || right.position !== undefined) {
           if (left.position === undefined) return 1
@@ -129,11 +123,10 @@ export class MediaRepository {
     const media = await this.get(id)
     if (!media) throw new Error(`Active media ${id} was not found.`)
     const stored = await readMediaFile(id)
-    return new File(
-      [stored],
-      media.originalName || stored.name,
-      { type: media.mimeType, lastModified: stored.lastModified },
-    )
+    return new File([stored], media.originalName || stored.name, {
+      type: media.mimeType,
+      lastModified: stored.lastModified,
+    })
   }
 
   async updateDayMetadata(id: string, input: DayMediaMetadataUpdate): Promise<Media> {
@@ -168,10 +161,13 @@ export class MediaRepository {
   async setDayOrder(tripId: string, dayId: string, orderedIds: string[]): Promise<void> {
     await db.transaction('rw', db.trips, db.days, db.media, async () => {
       await requireEditableMediaContext({ tripId, dayId })
-      const current = (await db.media.where('dayId').equals(dayId).toArray())
-        .filter((item) => (
-          !item.deletedAt && item.tripId === tripId && !item.blockId && (item.kind === 'image' || item.kind === 'video')
-        ))
+      const current = (await db.media.where('dayId').equals(dayId).toArray()).filter(
+        (item) =>
+          !item.deletedAt &&
+          item.tripId === tripId &&
+          !item.blockId &&
+          (item.kind === 'image' || item.kind === 'video'),
+      )
       if (current.length !== orderedIds.length) throw new Error('The day media order is incomplete.')
 
       const currentIds = new Set(current.map((item) => item.id))

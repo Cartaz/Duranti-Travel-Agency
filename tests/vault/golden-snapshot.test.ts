@@ -34,7 +34,10 @@ test('golden snapshot represents DTAgency database v1', () => {
 })
 
 test('golden snapshot freezes the v1 table inventory', () => {
-  assert.deepEqual(fixture.tables.map((table) => table.name), expectedTables)
+  assert.deepEqual(
+    fixture.tables.map((table) => table.name),
+    expectedTables,
+  )
   assert.equal(new Set(fixture.tables.map((table) => table.name)).size, expectedTables.length)
 })
 

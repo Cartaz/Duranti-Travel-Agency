@@ -27,19 +27,13 @@ test('Nominatim discovery reserves concurrent request slots and deduplicates ide
     await discovery.search('prima')
 
     now += 500
-    await Promise.all([
-      discovery.search('seconda'),
-      discovery.search('terza'),
-    ])
+    await Promise.all([discovery.search('seconda'), discovery.search('terza')])
 
     assert.deepEqual(waits, [500, 1_500])
     assert.deepEqual(requestedQueries, ['prima', 'seconda', 'terza'])
 
     const deduplicated = createNominatimPlaceDiscovery('https://example.test')
-    await Promise.all([
-      deduplicated.search('stesso luogo'),
-      deduplicated.search('  stesso luogo  '),
-    ])
+    await Promise.all([deduplicated.search('stesso luogo'), deduplicated.search('  stesso luogo  ')])
     assert.equal(requestedQueries.filter((query) => query === 'stesso luogo').length, 1)
   } finally {
     Date.now = originalNow

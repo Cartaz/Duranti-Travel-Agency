@@ -52,7 +52,8 @@ export default function DayMediaLightbox({
     let url = ''
     setObjectUrl('')
     setError('')
-    void mediaApplication.readDayMedia(media, tripId, dayId)
+    void mediaApplication
+      .readDayMedia(media, tripId, dayId)
       .then((file) => {
         if (cancelled) return
         url = URL.createObjectURL(file)
@@ -82,8 +83,12 @@ export default function DayMediaLightbox({
     >
       <div className="day-media-lightbox-panel">
         <header className="day-media-lightbox-header">
-          <span>{index + 1} di {items.length}</span>
-          <button type="button" onClick={onClose} aria-label="Chiudi visualizzazione">Chiudi ×</button>
+          <span>
+            {index + 1} di {items.length}
+          </span>
+          <button type="button" onClick={onClose} aria-label="Chiudi visualizzazione">
+            Chiudi ×
+          </button>
         </header>
 
         <div className="day-media-lightbox-stage">
@@ -98,8 +103,22 @@ export default function DayMediaLightbox({
 
           {items.length > 1 && (
             <>
-              <button className="day-media-lightbox-nav day-media-lightbox-prev" type="button" onClick={showPrevious} aria-label="Ricordo precedente">‹</button>
-              <button className="day-media-lightbox-nav day-media-lightbox-next" type="button" onClick={showNext} aria-label="Ricordo successivo">›</button>
+              <button
+                className="day-media-lightbox-nav day-media-lightbox-prev"
+                type="button"
+                onClick={showPrevious}
+                aria-label="Ricordo precedente"
+              >
+                ‹
+              </button>
+              <button
+                className="day-media-lightbox-nav day-media-lightbox-next"
+                type="button"
+                onClick={showNext}
+                aria-label="Ricordo successivo"
+              >
+                ›
+              </button>
             </>
           )}
         </div>

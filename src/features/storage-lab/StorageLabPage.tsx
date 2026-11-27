@@ -83,46 +83,51 @@ export default function StorageLabPage() {
     }
   }
 
-  const createTestData = () => run(async () => {
-    const now = new Date().toISOString()
-    await addRecord({
-      id: crypto.randomUUID(),
-      createdAt: now,
-      label: 'DTAgency persistence test',
-      payload: JSON.stringify({
+  const createTestData = () =>
+    run(async () => {
+      const now = new Date().toISOString()
+      await addRecord({
+        id: crypto.randomUUID(),
         createdAt: now,
-        random: crypto.randomUUID(),
-        note: 'If this survives a browser restart, IndexedDB is working.',
-      }),
+        label: 'DTAgency persistence test',
+        payload: JSON.stringify({
+          createdAt: now,
+          random: crypto.randomUUID(),
+          note: 'If this survives a browser restart, IndexedDB is working.',
+        }),
+      })
+      setMessage('Test record written to IndexedDB.')
     })
-    setMessage('Test record written to IndexedDB.')
-  })
 
-  const add100Mb = () => run(async () => {
-    const result = await appendOpfsProbe()
-    setMessage(`Wrote 100 MB. OPFS files: ${result.files}; exact bytes: ${formatBytes(result.bytes)}.`)
-  })
+  const add100Mb = () =>
+    run(async () => {
+      const result = await appendOpfsProbe()
+      setMessage(`Wrote 100 MB. OPFS files: ${result.files}; exact bytes: ${formatBytes(result.bytes)}.`)
+    })
 
-  const requestPersist = () => run(async () => {
-    const result = await requestPersistentStorage()
-    setMessage(result ? 'Persistent storage granted.' : 'Persistent storage was not granted.')
-  })
+  const requestPersist = () =>
+    run(async () => {
+      const result = await requestPersistentStorage()
+      setMessage(result ? 'Persistent storage granted.' : 'Persistent storage was not granted.')
+    })
 
-  const clear = () => run(async () => {
-    await clearLab()
-    setMessage('Lab storage cleared. OPFS diagnostic files and IndexedDB records removed.')
-  })
+  const clear = () =>
+    run(async () => {
+      await clearLab()
+      setMessage('Lab storage cleared. OPFS diagnostic files and IndexedDB records removed.')
+    })
 
-  const exportTestVault = () => run(async () => {
-    const blob = await exportVault(password)
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `DTAgency-StorageLab-${new Date().toISOString().replaceAll(':', '-')}.dtagency-test`
-    anchor.click()
-    setTimeout(() => URL.revokeObjectURL(url), 10_000)
-    setMessage('Vault generated. Save the downloaded file in Files.')
-  })
+  const exportTestVault = () =>
+    run(async () => {
+      const blob = await exportVault(password)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `DTAgency-StorageLab-${new Date().toISOString().replaceAll(':', '-')}.dtagency-test`
+      anchor.click()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      setMessage('Vault generated. Save the downloaded file in Files.')
+    })
 
   const importTestVault = () => {
     if (busy) return
@@ -162,22 +167,24 @@ export default function StorageLabPage() {
     input.click()
   }
 
-  const usagePercent = status.quota ? Math.min(100, status.usage / status.quota * 100) : 0
+  const usagePercent = status.quota ? Math.min(100, (status.usage / status.quota) * 100) : 0
 
   return (
     <section className="lab-shell" aria-labelledby="storage-lab-title">
       <header className="lab-hero">
         <p className="eyebrow">DIAGNOSTICA LOCALE</p>
         <h1 id="storage-lab-title">Storage Lab</h1>
-        <p>
-          Strumenti di regressione per persistenza, OPFS, storage persistente e Vault PoC.
-        </p>
+        <p>Strumenti di regressione per persistenza, OPFS, storage persistente e Vault PoC.</p>
       </header>
 
       <section className="status-grid">
         <StatusCard label="IndexedDB" ok={status.indexedDb} value={status.indexedDb ? 'AVAILABLE' : 'UNAVAILABLE'} />
         <StatusCard label="OPFS" ok={status.opfs} value={status.opfs ? 'AVAILABLE' : 'UNAVAILABLE'} />
-        <StatusCard label="Persistent API" ok={status.persistApi} value={status.persistApi ? 'AVAILABLE' : 'UNAVAILABLE'} />
+        <StatusCard
+          label="Persistent API"
+          ok={status.persistApi}
+          value={status.persistApi ? 'AVAILABLE' : 'UNAVAILABLE'}
+        />
         <StatusCard
           label="Persistent grant"
           ok={status.persisted === true}
@@ -189,14 +196,27 @@ export default function StorageLabPage() {
       <section className="panel storage-panel">
         <div>
           <span className="label">Browser storage estimate</span>
-          <strong>{formatBytes(status.usage)} / {formatBytes(status.quota)}</strong>
+          <strong>
+            {formatBytes(status.usage)} / {formatBytes(status.quota)}
+          </strong>
           <small>Stima di StorageManager; non è la dimensione fisica dell'OPFS.</small>
         </div>
-        <div className="meter"><span style={{ width: `${usagePercent}%` }} /></div>
+        <div className="meter">
+          <span style={{ width: `${usagePercent}%` }} />
+        </div>
         <div className="diagnostics-grid">
-          <div><span>OPFS diagnostic files</span><strong>{opfs.files}</strong></div>
-          <div><span>Exact OPFS bytes</span><strong>{formatBytes(opfs.bytes)}</strong></div>
-          <div><span>Expected bytes</span><strong>{formatBytes(opfs.expectedBytes)}</strong></div>
+          <div>
+            <span>OPFS diagnostic files</span>
+            <strong>{opfs.files}</strong>
+          </div>
+          <div>
+            <span>Exact OPFS bytes</span>
+            <strong>{formatBytes(opfs.bytes)}</strong>
+          </div>
+          <div>
+            <span>Expected bytes</span>
+            <strong>{formatBytes(opfs.expectedBytes)}</strong>
+          </div>
           <div>
             <span>Size check</span>
             <strong className={opfs.bytes === opfs.expectedBytes ? 'ok' : 'warn'}>
@@ -215,10 +235,18 @@ export default function StorageLabPage() {
           <span className="badge">{records.length} record</span>
         </div>
         <div className="actions">
-          <button onClick={createTestData} disabled={busy}>Create test data</button>
-          <button onClick={add100Mb} disabled={busy || !status.opfs}>Add 100 MB to OPFS</button>
-          <button onClick={requestPersist} disabled={busy || !status.persistApi}>Request persistent storage</button>
-          <button className="danger" onClick={clear} disabled={busy}>Clear lab storage</button>
+          <button onClick={createTestData} disabled={busy}>
+            Create test data
+          </button>
+          <button onClick={add100Mb} disabled={busy || !status.opfs}>
+            Add 100 MB to OPFS
+          </button>
+          <button onClick={requestPersist} disabled={busy || !status.persistApi}>
+            Request persistent storage
+          </button>
+          <button className="danger" onClick={clear} disabled={busy}>
+            Clear lab storage
+          </button>
         </div>
       </section>
 
@@ -241,25 +269,25 @@ export default function StorageLabPage() {
           />
         </label>
         <div className="actions">
-          <button onClick={exportTestVault} disabled={busy || !password}>Export test vault</button>
-          <button onClick={importTestVault} disabled={busy || !password}>Import test vault</button>
+          <button onClick={exportTestVault} disabled={busy || !password}>
+            Export test vault
+          </button>
+          <button onClick={importTestVault} disabled={busy || !password}>
+            Import test vault
+          </button>
         </div>
       </section>
 
-      {message && <div className="toast" role="status">{message}</div>}
+      {message && (
+        <div className="toast" role="status">
+          {message}
+        </div>
+      )}
     </section>
   )
 }
 
-function StatusCard({
-  label,
-  value,
-  ok,
-}: {
-  label: string
-  value: string
-  ok: boolean
-}) {
+function StatusCard({ label, value, ok }: { label: string; value: string; ok: boolean }) {
   return (
     <div className="status-card">
       <span>{label}</span>

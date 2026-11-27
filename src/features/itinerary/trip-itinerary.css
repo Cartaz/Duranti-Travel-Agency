@@ -197,7 +197,7 @@
 }
 
 .trip-itinerary-stop-cancelled {
-  opacity: .58;
+  opacity: 0.58;
 }
 
 .trip-itinerary-stop-cancelled .trip-itinerary-stop-copy > strong {

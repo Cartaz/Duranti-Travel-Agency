@@ -16,7 +16,10 @@ export function validateLocalDateTimeInput(value: string | undefined, label: str
     parsed.getFullYear() !== year ||
     parsed.getMonth() !== month - 1 ||
     parsed.getDate() !== day ||
-    hour < 0 || hour > 23 || minute < 0 || minute > 59
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
   ) {
     throw new Error(`${label}: data e ora non esistono nel calendario.`)
   }

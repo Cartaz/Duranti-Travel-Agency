@@ -70,10 +70,7 @@ export interface VaultEncryptedPayload {
 }
 
 type JsonPrimitive = null | boolean | number | string
-type CanonicalJsonValue =
-  | JsonPrimitive
-  | CanonicalJsonValue[]
-  | { [key: string]: CanonicalJsonValue }
+type CanonicalJsonValue = JsonPrimitive | CanonicalJsonValue[] | { [key: string]: CanonicalJsonValue }
 
 function normalizeJson(value: unknown, inArray = false): CanonicalJsonValue | undefined {
   if (value === undefined) return inArray ? null : undefined

@@ -1,10 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readSource } from '../support/source.ts'
 
-const repositorySource = await readFile(
+const repositorySource = await readSource(
   new URL('../../src/data/repositories/trip-traveler-repository.ts', import.meta.url),
-  'utf8',
 )
 
 test('membership detach validates the parent trip inside the write transaction', () => {

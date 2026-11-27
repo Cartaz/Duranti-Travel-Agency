@@ -13,9 +13,15 @@ function createApplication(calls: string[]) {
         updatedAt: '2026-08-26T00:00:00Z',
       }
     },
-    async get() { return undefined },
-    async listMetadata() { return [] },
-    async list() { return [] },
+    async get() {
+      return undefined
+    },
+    async listMetadata() {
+      return []
+    },
+    async list() {
+      return []
+    },
     async updateSecret(id, secret) {
       calls.push(`secret:${id}:${secret.documentNumber ?? ''}`)
     },
@@ -28,19 +34,27 @@ function createApplication(calls: string[]) {
         sizeBytes: file.size,
       }
     },
-    async getAttachment() { return undefined },
+    async getAttachment() {
+      return undefined
+    },
     async removeAttachment(id) {
       calls.push(`remove-attachment:${id}`)
       return 'removed'
     },
-    async softDelete() { return 'tombstoned' },
+    async softDelete() {
+      return 'tombstoned'
+    },
   }
 
   return new TravelerDocumentApplication({
     documents: repository,
     security: {
-      async isConfigured() { return true },
-      isUnlocked() { return true },
+      async isConfigured() {
+        return true
+      },
+      isUnlocked() {
+        return true
+      },
       async configure() {},
       async unlock() {},
       lock() {},
@@ -56,9 +70,5 @@ test('traveler document editing stays behind the application boundary', async ()
   await application.replaceAttachment('doc-1', new File(['scan'], 'passport.pdf', { type: 'application/pdf' }))
   await application.removeAttachment('doc-1')
 
-  assert.deepEqual(calls, [
-    'secret:doc-1:YA1234567',
-    'attach:doc-1:passport.pdf',
-    'remove-attachment:doc-1',
-  ])
+  assert.deepEqual(calls, ['secret:doc-1:YA1234567', 'attach:doc-1:passport.pdf', 'remove-attachment:doc-1'])
 })

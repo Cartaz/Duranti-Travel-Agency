@@ -28,16 +28,18 @@ type BootstrapState = Awaited<ReturnType<typeof bootstrapApplication>>
 
 function readinessFromBootstrap(bootstrap: BootstrapState): AppShellReadiness {
   return {
-    storageWarning: bootstrap.storagePersistence === 'best-effort'
-      ? 'best-effort'
-      : bootstrap.storagePersistence === 'persistent'
-        ? undefined
-        : 'unverified',
-    recoveryNotice: bootstrap.restoreRecovery === 'rolled-back'
-      ? 'rolled-back'
-      : bootstrap.restoreRecovery === 'finalized-committed'
-        ? 'finalized'
-        : undefined,
+    storageWarning:
+      bootstrap.storagePersistence === 'best-effort'
+        ? 'best-effort'
+        : bootstrap.storagePersistence === 'persistent'
+          ? undefined
+          : 'unverified',
+    recoveryNotice:
+      bootstrap.restoreRecovery === 'rolled-back'
+        ? 'rolled-back'
+        : bootstrap.restoreRecovery === 'finalized-committed'
+          ? 'finalized'
+          : undefined,
   }
 }
 
@@ -46,28 +48,35 @@ async function startApplication(): Promise<void> {
     const bootstrap = await bootstrapApplication()
     root.render(
       <React.StrictMode>
-        <ApplicationProvider services={{
-          trips: tripApplication,
-          days: dayApplication,
-          planner: plannerApplication,
-          reservations: reservationApplication,
-          media: dayMediaApplication,
-          templates: dayTemplateApplication,
-          expenses: expenseApplication,
-          travelers: travelerApplication,
-          travelerDocuments: travelerDocumentApplication,
-          places: placeApplication,
-          placeImport: placeImportApplication,
-          itinerary: itineraryApplication,
-          travelBook: travelBookApplication,
-        }}>
+        <ApplicationProvider
+          services={{
+            trips: tripApplication,
+            days: dayApplication,
+            planner: plannerApplication,
+            reservations: reservationApplication,
+            media: dayMediaApplication,
+            templates: dayTemplateApplication,
+            expenses: expenseApplication,
+            travelers: travelerApplication,
+            travelerDocuments: travelerDocumentApplication,
+            places: placeApplication,
+            placeImport: placeImportApplication,
+            itinerary: itineraryApplication,
+            travelBook: travelBookApplication,
+          }}
+        >
           <App readiness={readinessFromBootstrap(bootstrap)} />
         </ApplicationProvider>
       </React.StrictMode>,
     )
   } catch (error) {
     console.error('DTAgency local bootstrap failed.', error)
-    root.render(<main><h1>DTAgency</h1><p>Impossibile inizializzare l’archivio locale su questo dispositivo.</p></main>)
+    root.render(
+      <main>
+        <h1>DTAgency</h1>
+        <p>Impossibile inizializzare l’archivio locale su questo dispositivo.</p>
+      </main>,
+    )
   }
 }
 

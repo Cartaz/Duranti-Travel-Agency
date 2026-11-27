@@ -22,8 +22,9 @@ function formatDate(value: string | undefined): string {
   if (!value) return 'Da definire'
   const [year, month, day] = value.split('-').map(Number)
   if (!year || !month || !day) return value
-  return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
-    .format(new Date(year, month - 1, day))
+  return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).format(
+    new Date(year, month - 1, day),
+  )
 }
 
 function lifecycleAction(status: EditableTripStatus): { target: EditableTripStatus; label: string } | undefined {
@@ -52,7 +53,8 @@ export default function TripDetailPage() {
     }
 
     let cancelled = false
-    void tripApplication.getTrip(tripId)
+    void tripApplication
+      .getTrip(tripId)
       .then((item) => {
         if (cancelled) return
         if (!item || item.status === 'archived') {
@@ -102,13 +104,22 @@ export default function TripDetailPage() {
     }
   }
 
-  if (loading) return <p className="trip-feedback" role="status">Apro il viaggio…</p>
+  if (loading)
+    return (
+      <p className="trip-feedback" role="status">
+        Apro il viaggio…
+      </p>
+    )
 
   if (!trip || trip.status === 'archived') {
     return (
       <section className="trip-detail-page">
-        <p className="trip-feedback trip-feedback-error" role="alert">{error || 'Viaggio non trovato.'}</p>
-        <Link className="trip-text-link" to="/">Torna ai viaggi</Link>
+        <p className="trip-feedback trip-feedback-error" role="alert">
+          {error || 'Viaggio non trovato.'}
+        </p>
+        <Link className="trip-text-link" to="/">
+          Torna ai viaggi
+        </Link>
       </section>
     )
   }
@@ -124,9 +135,18 @@ export default function TripDetailPage() {
           {trip.subtitle && <p className="trip-detail-subtitle">{trip.subtitle}</p>}
         </div>
         <div className="trip-page-actions">
-          <Link className="trip-secondary-action" to={`/trips/${trip.id}/book`}>Apri libro</Link>
-          <Link className="trip-secondary-action" to={`/trips/${trip.id}/edit`}>Modifica</Link>
-          <button className="trip-archive-action" type="button" onClick={() => setConfirmArchive(true)} disabled={archiving || statusBusy}>
+          <Link className="trip-secondary-action" to={`/trips/${trip.id}/book`}>
+            Apri libro
+          </Link>
+          <Link className="trip-secondary-action" to={`/trips/${trip.id}/edit`}>
+            Modifica
+          </Link>
+          <button
+            className="trip-archive-action"
+            type="button"
+            onClick={() => setConfirmArchive(true)}
+            disabled={archiving || statusBusy}
+          >
             {archiving ? 'Archivio…' : 'Archivia'}
           </button>
         </div>
@@ -143,7 +163,11 @@ export default function TripDetailPage() {
         />
       )}
 
-      {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
+      {error && (
+        <p className="trip-feedback trip-feedback-error" role="alert">
+          {error}
+        </p>
+      )}
 
       <div className="trip-detail-grid trip-detail-grid-essential">
         <section className="trip-detail-panel">
@@ -203,7 +227,9 @@ export default function TripDetailPage() {
         </div>
       </details>
 
-      <Link className="trip-text-link" to="/">← Torna ai viaggi</Link>
+      <Link className="trip-text-link" to="/">
+        ← Torna ai viaggi
+      </Link>
     </article>
   )
 }

@@ -76,7 +76,8 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
     }
 
     let cancelled = false
-    void tripApplication.getTrip(tripId)
+    void tripApplication
+      .getTrip(tripId)
       .then((trip) => {
         if (cancelled) return
         if (!trip) {
@@ -117,9 +118,10 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
     setError('')
 
     try {
-      const trip = mode === 'create'
-        ? await tripApplication.createTrip(formToDraft(form))
-        : await tripApplication.updateTrip(tripId ?? '', formToDraft(form))
+      const trip =
+        mode === 'create'
+          ? await tripApplication.createTrip(formToDraft(form))
+          : await tripApplication.updateTrip(tripId ?? '', formToDraft(form))
       navigate(`/trips/${trip.id}`, { replace: mode === 'create' })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile salvare il viaggio.')
@@ -130,11 +132,11 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   const cancelTo = mode === 'edit' && tripId ? `/trips/${tripId}` : '/'
   const hasOptionalDetails = Boolean(
-    form.subtitle.trim()
-      || form.summary.trim()
-      || form.budget.trim()
-      || form.status !== 'planned'
-      || form.currency.trim().toUpperCase() !== 'EUR',
+    form.subtitle.trim() ||
+    form.summary.trim() ||
+    form.budget.trim() ||
+    form.status !== 'planned' ||
+    form.currency.trim().toUpperCase() !== 'EUR',
   )
 
   return (
@@ -144,14 +146,22 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
           <p className="eyebrow">{mode === 'create' ? 'Nuovo viaggio' : 'Modifica viaggio'}</p>
           <h1 id="trip-editor-title">{mode === 'create' ? 'Crea un viaggio' : 'Dettagli del viaggio'}</h1>
         </div>
-        <Link className="trip-text-link" to={cancelTo}>Annulla</Link>
+        <Link className="trip-text-link" to={cancelTo}>
+          Annulla
+        </Link>
       </div>
 
       {loading ? (
-        <p className="trip-feedback" role="status">Apro il viaggio…</p>
+        <p className="trip-feedback" role="status">
+          Apro il viaggio…
+        </p>
       ) : (
         <form className="trip-form" onSubmit={submit}>
-          {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
+          {error && (
+            <p className="trip-feedback trip-feedback-error" role="alert">
+              {error}
+            </p>
+          )}
 
           <label className="trip-field trip-field-wide">
             <span>Titolo *</span>
@@ -182,7 +192,12 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
               min={form.startDate || undefined}
               onChange={(event: ChangeEvent<HTMLInputElement>) => setField('endDate', event.target.value)}
             />
-            {form.startDate && <small>Non può precedere la partenza. Se sposti in avanti la partenza, il ritorno viene riallineato automaticamente.</small>}
+            {form.startDate && (
+              <small>
+                Non può precedere la partenza. Se sposti in avanti la partenza, il ritorno viene riallineato
+                automaticamente.
+              </small>
+            )}
           </label>
 
           <details className="trip-form-optional">
@@ -207,7 +222,12 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
               <label className="trip-field">
                 <span>Stato</span>
-                <select value={form.status} onChange={(event: ChangeEvent<HTMLSelectElement>) => setField('status', event.target.value as EditableTripStatus)}>
+                <select
+                  value={form.status}
+                  onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                    setField('status', event.target.value as EditableTripStatus)
+                  }
+                >
                   <option value="planned">Pianificato</option>
                   <option value="ongoing">In corso</option>
                   <option value="completed">Concluso</option>
@@ -218,7 +238,9 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 <span>Valuta</span>
                 <input
                   value={form.currency}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => setField('currency', event.target.value.toUpperCase())}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                    setField('currency', event.target.value.toUpperCase())
+                  }
                   maxLength={3}
                   placeholder="EUR"
                   autoCapitalize="characters"
@@ -250,7 +272,9 @@ export default function TripFormPage({ mode }: { mode: 'create' | 'edit' }) {
           </details>
 
           <div className="trip-form-actions">
-            <Link className="trip-secondary-action" to={cancelTo}>Annulla</Link>
+            <Link className="trip-secondary-action" to={cancelTo}>
+              Annulla
+            </Link>
             <button className="trip-primary-action" type="submit" disabled={saving}>
               {saving ? 'Salvataggio…' : mode === 'create' ? 'Crea viaggio' : 'Salva modifiche'}
             </button>

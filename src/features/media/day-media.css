@@ -6,7 +6,7 @@
   padding: 18px;
   border: 1px solid #43372c;
   border-radius: 20px;
-  background: rgba(24, 19, 14, .72);
+  background: rgba(24, 19, 14, 0.72);
 }
 
 .day-media-heading {
@@ -56,7 +56,7 @@
 }
 
 .day-media-picker-busy {
-  opacity: .55;
+  opacity: 0.55;
   cursor: default;
 }
 
@@ -71,7 +71,7 @@
 
 .day-media-error {
   border: 1px solid #6a3f38;
-  background: rgba(106, 63, 56, .16);
+  background: rgba(106, 63, 56, 0.16);
   color: #e0a093;
 }
 
@@ -103,7 +103,7 @@
   overflow: hidden;
   border: 1px solid #44382e;
   border-radius: 16px;
-  background: rgba(15, 12, 10, .74);
+  background: rgba(15, 12, 10, 0.74);
 }
 
 .day-media-preview {
@@ -219,7 +219,7 @@
 .day-media-links-editor {
   border: 1px solid #3f352c;
   border-radius: 12px;
-  background: rgba(17, 14, 12, .45);
+  background: rgba(17, 14, 12, 0.45);
   overflow: hidden;
 }
 
@@ -262,7 +262,7 @@
   flex: 0 0 auto;
   padding: 3px 6px;
   font-size: 8px;
-  letter-spacing: .05em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
@@ -312,7 +312,7 @@
 }
 
 .day-media-card-actions button:disabled {
-  opacity: .42;
+  opacity: 0.42;
   cursor: default;
 }
 
@@ -329,7 +329,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(5, 4, 3, .94);
+  background: rgba(5, 4, 3, 0.94);
 }
 
 .day-media-lightbox-panel {
@@ -402,7 +402,7 @@
   height: 54px;
   border: 1px solid #4d4034;
   border-radius: 12px;
-  background: rgba(17, 14, 11, .82);
+  background: rgba(17, 14, 11, 0.82);
   color: #ead8bf;
   font-size: 32px;
   cursor: pointer;

@@ -5,7 +5,7 @@
   padding: 18px;
   border: 1px solid #43372c;
   border-radius: 20px;
-  background: rgba(24, 19, 14, .72);
+  background: rgba(24, 19, 14, 0.72);
 }
 
 .day-itinerary-heading {
@@ -54,7 +54,7 @@
 .day-itinerary-item-actions button:disabled,
 .day-itinerary-form-actions button:disabled,
 .day-itinerary-confirm-actions button:disabled {
-  opacity: .48;
+  opacity: 0.48;
   cursor: default;
 }
 
@@ -143,7 +143,7 @@
   flex: 0 0 auto;
   color: #9c8c77;
   font-size: 10px;
-  letter-spacing: .08em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -197,13 +197,13 @@
 
 .day-itinerary-warning {
   border: 1px solid #675431;
-  background: rgba(103, 84, 49, .16);
+  background: rgba(103, 84, 49, 0.16);
   color: #d1b879;
 }
 
 .day-itinerary-error {
   border: 1px solid #6a3f38;
-  background: rgba(106, 63, 56, .16);
+  background: rgba(106, 63, 56, 0.16);
   color: #e0a093;
 }
 
@@ -213,7 +213,7 @@
   border: 1px solid #6a5530;
   border-radius: 14px;
   padding: 13px;
-  background: rgba(77, 57, 29, .20);
+  background: rgba(77, 57, 29, 0.2);
   color: #dbc49c;
 }
 
@@ -326,7 +326,7 @@
 }
 
 .day-itinerary-cancelled {
-  opacity: .56;
+  opacity: 0.56;
 }
 
 .day-itinerary-cancelled .day-itinerary-title-row strong {

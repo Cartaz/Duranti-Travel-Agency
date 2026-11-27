@@ -5,11 +5,7 @@ import type {
   TravelerDocumentPrivateData,
   TravelerDocumentSecret,
 } from '../../domain/entities'
-import {
-  decryptJson,
-  encryptJson,
-  isEncryptedPayloadV1,
-} from '../../security/local-encryption'
+import { decryptJson, encryptJson, isEncryptedPayloadV1 } from '../../security/local-encryption'
 import { db } from '../db/dtagency-db'
 import {
   deleteEncryptedDocumentAttachment,
@@ -131,10 +127,7 @@ export class TravelerDocumentRepository {
       .map((record) => metadataFrom(requireSecureRecord(record, record.id)))
   }
 
-  async listByTraveler(
-    travelerId: string,
-    options: TravelerDocumentReadOptions = {},
-  ): Promise<TravelerDocumentView[]> {
+  async listByTraveler(travelerId: string, options: TravelerDocumentReadOptions = {}): Promise<TravelerDocumentView[]> {
     const records = await db.travelerDocuments.where('travelerId').equals(travelerId).toArray()
     const result: TravelerDocumentView[] = []
     for (const raw of records) {
@@ -177,7 +170,10 @@ export class TravelerDocumentRepository {
     }
 
     try {
-      const encryptedPayload = await encryptJson<TravelerDocumentPrivateData>(ENCRYPTION_PURPOSE, id, { ...current, attachment })
+      const encryptedPayload = await encryptJson<TravelerDocumentPrivateData>(ENCRYPTION_PURPOSE, id, {
+        ...current,
+        attachment,
+      })
       const updated = await db.travelerDocuments.update(id, { encryptedPayload, updatedAt: new Date().toISOString() })
       if (updated !== 1) throw new Error(`Traveler document ${id} attachment could not be linked.`)
     } catch (error) {

@@ -21,15 +21,18 @@ const statusLabels: Record<ReservationDraft['status'], string> = {
   cancelled: 'Annullato',
 }
 
-const blockConfigs: Record<ReservationBlockType, {
-  label: string
-  titlePlaceholder: string
-  providerPlaceholder: string
-  notesPlaceholder: string
-  startTimeLabel: string
-  endDateLabel: string
-  endTimeLabel: string
-}> = {
+const blockConfigs: Record<
+  ReservationBlockType,
+  {
+    label: string
+    titlePlaceholder: string
+    providerPlaceholder: string
+    notesPlaceholder: string
+    startTimeLabel: string
+    endDateLabel: string
+    endTimeLabel: string
+  }
+> = {
   transport: {
     label: 'Trasporto',
     titlePlaceholder: 'Volo Roma → Parigi',
@@ -69,7 +72,13 @@ const blockConfigs: Record<ReservationBlockType, {
 }
 
 function reservationBlockType(block: Block): ReservationBlockType {
-  if (block.type === 'transport' || block.type === 'accommodation' || block.type === 'restaurant' || block.type === 'activity') return block.type
+  if (
+    block.type === 'transport' ||
+    block.type === 'accommodation' ||
+    block.type === 'restaurant' ||
+    block.type === 'activity'
+  )
+    return block.type
   throw new Error('Tipo di blocco prenotazione non supportato.')
 }
 
@@ -139,10 +148,7 @@ export default function ReservationBlockEditor({
     let cancelled = false
     setLoading(true)
     setError('')
-    void Promise.all([
-      reservations.getPlannerReservation(tripId, dayId, block.id),
-      reservations.listSavedPlaces(),
-    ])
+    void Promise.all([reservations.getPlannerReservation(tripId, dayId, block.id), reservations.listSavedPlaces()])
       .then(async ([loadedReservation, loadedPlaces]) => {
         const loadedAttachment = loadedReservation
           ? await reservations.getPlannerReservationAttachment(tripId, dayId, block.id, loadedReservation)
@@ -314,30 +320,70 @@ export default function ReservationBlockEditor({
   }
 
   const hasOptionalDetails = Boolean(
-    draft.provider?.trim() || draft.confirmationCode?.trim() || draft.timezone?.trim() || draft.url?.trim() || draft.notes?.trim(),
+    draft.provider?.trim() ||
+    draft.confirmationCode?.trim() ||
+    draft.timezone?.trim() ||
+    draft.url?.trim() ||
+    draft.notes?.trim(),
   )
 
   return (
-    <form className={`planner-block reservation-block reservation-block-${blockType}`} onSubmit={(event) => void save(event)}>
+    <form
+      className={`planner-block reservation-block reservation-block-${blockType}`}
+      onSubmit={(event) => void save(event)}
+    >
       <div className="planner-block-topline">
         <span>{config.label}</span>
         {!readOnly && (
           <div className="planner-block-tools">
-            <button type="button" disabled={busy || !canMoveUp} aria-label="Sposta blocco su" title="Sposta su" onClick={() => void move('up')}>↑</button>
-            <button type="button" disabled={busy || !canMoveDown} aria-label="Sposta blocco giù" title="Sposta giù" onClick={() => void move('down')}>↓</button>
-            <button className="planner-delete" type="button" disabled={busy} onClick={() => setRemoveTarget('reservation')}>Elimina</button>
+            <button
+              type="button"
+              disabled={busy || !canMoveUp}
+              aria-label="Sposta blocco su"
+              title="Sposta su"
+              onClick={() => void move('up')}
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              disabled={busy || !canMoveDown}
+              aria-label="Sposta blocco giù"
+              title="Sposta giù"
+              onClick={() => void move('down')}
+            >
+              ↓
+            </button>
+            <button
+              className="planner-delete"
+              type="button"
+              disabled={busy}
+              onClick={() => setRemoveTarget('reservation')}
+            >
+              Elimina
+            </button>
           </div>
         )}
       </div>
 
       {loading ? (
-        <span className="reservation-loading" role="status">Carico la prenotazione…</span>
+        <span className="reservation-loading" role="status">
+          Carico la prenotazione…
+        </span>
       ) : (
         <>
           <div className="reservation-grid reservation-grid-essential">
             <label className="reservation-wide">
               <span>Titolo *</span>
-              <input type="text" required maxLength={200} readOnly={readOnly} placeholder={config.titlePlaceholder} value={draft.title} onChange={(event) => patch({ title: event.target.value })} />
+              <input
+                type="text"
+                required
+                maxLength={200}
+                readOnly={readOnly}
+                placeholder={config.titlePlaceholder}
+                value={draft.title}
+                onChange={(event) => patch({ title: event.target.value })}
+              />
             </label>
 
             <div className="reservation-fixed-start-date">
@@ -348,32 +394,70 @@ export default function ReservationBlockEditor({
 
             <label>
               <span>{config.startTimeLabel}</span>
-              <input type="time" readOnly={readOnly} value={startTime} onChange={(event) => updateStartTime(event.target.value)} />
+              <input
+                type="time"
+                readOnly={readOnly}
+                value={startTime}
+                onChange={(event) => updateStartTime(event.target.value)}
+              />
             </label>
 
             <label>
               <span>{config.endDateLabel}</span>
-              <input type="date" min={dayDate} max={tripEndDate} disabled={readOnly || !startTime} value={endDateInput} onChange={(event) => updateEndDate(event.target.value)} />
-              {!startTime && <small className="reservation-field-hint">Inserisci prima {config.startTimeLabel.toLowerCase()}.</small>}
+              <input
+                type="date"
+                min={dayDate}
+                max={tripEndDate}
+                disabled={readOnly || !startTime}
+                value={endDateInput}
+                onChange={(event) => updateEndDate(event.target.value)}
+              />
+              {!startTime && (
+                <small className="reservation-field-hint">Inserisci prima {config.startTimeLabel.toLowerCase()}.</small>
+              )}
             </label>
 
             <label>
               <span>{config.endTimeLabel}</span>
-              <input type="time" min={sameDayEnd ? startTime || undefined : undefined} disabled={readOnly || !startTime} value={endTime} onChange={(event) => updateEndTime(event.target.value)} />
-              {sameDayEnd && startTime && <small className="reservation-field-hint">Non prima delle {startTime}.</small>}
+              <input
+                type="time"
+                min={sameDayEnd ? startTime || undefined : undefined}
+                disabled={readOnly || !startTime}
+                value={endTime}
+                onChange={(event) => updateEndTime(event.target.value)}
+              />
+              {sameDayEnd && startTime && (
+                <small className="reservation-field-hint">Non prima delle {startTime}.</small>
+              )}
             </label>
 
             <label>
               <span>Stato</span>
-              <select disabled={readOnly} value={draft.status} onChange={(event) => patch({ status: event.target.value as ReservationDraft['status'] })}>
-                {(Object.keys(statusLabels) as ReservationDraft['status'][]).map((status) => <option value={status} key={status}>{statusLabels[status]}</option>)}
+              <select
+                disabled={readOnly}
+                value={draft.status}
+                onChange={(event) => patch({ status: event.target.value as ReservationDraft['status'] })}
+              >
+                {(Object.keys(statusLabels) as ReservationDraft['status'][]).map((status) => (
+                  <option value={status} key={status}>
+                    {statusLabels[status]}
+                  </option>
+                ))}
               </select>
             </label>
             <label>
               <span>{blockType === 'restaurant' ? 'Ristorante dal catalogo' : 'Luogo salvato'}</span>
-              <select disabled={readOnly} value={draft.placeId ?? ''} onChange={(event) => updateSavedPlace(event.target.value)}>
+              <select
+                disabled={readOnly}
+                value={draft.placeId ?? ''}
+                onChange={(event) => updateSavedPlace(event.target.value)}
+              >
                 <option value="">Nessun luogo</option>
-                {places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
+                {places.map((place) => (
+                  <option key={place.id} value={place.id}>
+                    {place.name}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
@@ -385,52 +469,139 @@ export default function ReservationBlockEditor({
                   <span>Dal catalogo Luoghi</span>
                   <strong>{selectedPlace.name}</strong>
                 </div>
-                {selectedPlace.mapsUrl && <a href={selectedPlace.mapsUrl} target="_blank" rel="noreferrer">Apri in Maps ↗</a>}
+                {selectedPlace.mapsUrl && (
+                  <a href={selectedPlace.mapsUrl} target="_blank" rel="noreferrer">
+                    Apri in Maps ↗
+                  </a>
+                )}
               </div>
               <p>{placeDetail(selectedPlace.formattedAddress)}</p>
               <dl>
-                <div><dt>Telefono</dt><dd>{placeDetail(selectedPlace.phone)}</dd></div>
-                <div><dt>Orari</dt><dd>{placeDetail(selectedPlace.openingHours)}</dd></div>
+                <div>
+                  <dt>Telefono</dt>
+                  <dd>{placeDetail(selectedPlace.phone)}</dd>
+                </div>
+                <div>
+                  <dt>Orari</dt>
+                  <dd>{placeDetail(selectedPlace.openingHours)}</dd>
+                </div>
               </dl>
-              <small>Questi dati restano nel luogo canonico: la prenotazione conserva solo il collegamento, così non vengono create copie divergenti.</small>
+              <small>
+                Questi dati restano nel luogo canonico: la prenotazione conserva solo il collegamento, così non vengono
+                create copie divergenti.
+              </small>
             </aside>
           )}
 
           <details className="reservation-optional">
             <summary>
-              <span><strong>Dettagli prenotazione</strong><small>Fornitore, codice, fuso, link e note</small></span>
+              <span>
+                <strong>Dettagli prenotazione</strong>
+                <small>Fornitore, codice, fuso, link e note</small>
+              </span>
               {hasOptionalDetails && <span className="reservation-optional-state">Configurati</span>}
             </summary>
             <div className="reservation-grid reservation-optional-grid">
-              <label><span>Fornitore</span><input type="text" maxLength={200} readOnly={readOnly} placeholder={config.providerPlaceholder} value={draft.provider ?? ''} onChange={(event) => patch({ provider: event.target.value })} /></label>
-              <label><span>Codice prenotazione</span><input type="text" maxLength={200} readOnly={readOnly} placeholder="ABC123" value={draft.confirmationCode ?? ''} onChange={(event) => patch({ confirmationCode: event.target.value })} /></label>
-              <label className="reservation-wide"><span>Fuso orario</span><input type="text" maxLength={100} readOnly={readOnly} placeholder="Europe/Paris" value={draft.timezone ?? ''} onChange={(event) => patch({ timezone: event.target.value })} /></label>
-              <label className="reservation-wide"><span>Link prenotazione</span><input type="url" maxLength={2048} readOnly={readOnly} placeholder="https://…" value={draft.url ?? ''} onChange={(event) => patch({ url: event.target.value })} /></label>
-              <label className="reservation-wide"><span>Note</span><textarea rows={4} maxLength={4000} readOnly={readOnly} placeholder={config.notesPlaceholder} value={draft.notes ?? ''} onChange={(event) => patch({ notes: event.target.value })} /></label>
+              <label>
+                <span>Fornitore</span>
+                <input
+                  type="text"
+                  maxLength={200}
+                  readOnly={readOnly}
+                  placeholder={config.providerPlaceholder}
+                  value={draft.provider ?? ''}
+                  onChange={(event) => patch({ provider: event.target.value })}
+                />
+              </label>
+              <label>
+                <span>Codice prenotazione</span>
+                <input
+                  type="text"
+                  maxLength={200}
+                  readOnly={readOnly}
+                  placeholder="ABC123"
+                  value={draft.confirmationCode ?? ''}
+                  onChange={(event) => patch({ confirmationCode: event.target.value })}
+                />
+              </label>
+              <label className="reservation-wide">
+                <span>Fuso orario</span>
+                <input
+                  type="text"
+                  maxLength={100}
+                  readOnly={readOnly}
+                  placeholder="Europe/Paris"
+                  value={draft.timezone ?? ''}
+                  onChange={(event) => patch({ timezone: event.target.value })}
+                />
+              </label>
+              <label className="reservation-wide">
+                <span>Link prenotazione</span>
+                <input
+                  type="url"
+                  maxLength={2048}
+                  readOnly={readOnly}
+                  placeholder="https://…"
+                  value={draft.url ?? ''}
+                  onChange={(event) => patch({ url: event.target.value })}
+                />
+              </label>
+              <label className="reservation-wide">
+                <span>Note</span>
+                <textarea
+                  rows={4}
+                  maxLength={4000}
+                  readOnly={readOnly}
+                  placeholder={config.notesPlaceholder}
+                  value={draft.notes ?? ''}
+                  onChange={(event) => patch({ notes: event.target.value })}
+                />
+              </label>
             </div>
           </details>
 
           <details className="reservation-optional reservation-attachment-details">
             <summary>
-              <span><strong>Allegato</strong><small>PDF o immagine · massimo 25 MiB</small></span>
+              <span>
+                <strong>Allegato</strong>
+                <small>PDF o immagine · massimo 25 MiB</small>
+              </span>
               {attachment && <span className="reservation-optional-state">Presente</span>}
             </summary>
             <section className="reservation-attachment" aria-label="Allegato prenotazione">
               <div className="reservation-attachment-heading">
-                <div><strong>Documento della prenotazione</strong><span>Biglietto, conferma o immagine</span></div>
+                <div>
+                  <strong>Documento della prenotazione</strong>
+                  <span>Biglietto, conferma o immagine</span>
+                </div>
                 {attachmentBusy && <small role="status">Aggiornamento…</small>}
               </div>
 
               {attachment ? (
                 <div className="reservation-attachment-current">
-                  <div><strong>{attachment.originalName ?? 'Allegato'}</strong><span>{attachment.mimeType} · {formatBytes(attachment.sizeBytes)}</span></div>
+                  <div>
+                    <strong>{attachment.originalName ?? 'Allegato'}</strong>
+                    <span>
+                      {attachment.mimeType} · {formatBytes(attachment.sizeBytes)}
+                    </span>
+                  </div>
                   <div className="reservation-attachment-actions">
-                    <button type="button" disabled={attachmentBusy} onClick={() => void openAttachment()}>Apri</button>
-                    {!readOnly && <button type="button" disabled={busy} onClick={() => setRemoveTarget('attachment')}>Rimuovi</button>}
+                    <button type="button" disabled={attachmentBusy} onClick={() => void openAttachment()}>
+                      Apri
+                    </button>
+                    {!readOnly && (
+                      <button type="button" disabled={busy} onClick={() => setRemoveTarget('attachment')}>
+                        Rimuovi
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
-                <p className="reservation-attachment-empty">{reservation ? 'Nessun allegato collegato.' : 'Salva prima la prenotazione per aggiungere un allegato.'}</p>
+                <p className="reservation-attachment-empty">
+                  {reservation
+                    ? 'Nessun allegato collegato.'
+                    : 'Salva prima la prenotazione per aggiungere un allegato.'}
+                </p>
               )}
 
               {removeTarget === 'attachment' && attachment && (
@@ -445,26 +616,43 @@ export default function ReservationBlockEditor({
               )}
 
               {!readOnly && reservation && (
-                <label className={`reservation-attachment-picker${busy ? ' reservation-attachment-picker-disabled' : ''}`}>
+                <label
+                  className={`reservation-attachment-picker${busy ? ' reservation-attachment-picker-disabled' : ''}`}
+                >
                   <span>{attachment ? 'Sostituisci allegato' : 'Aggiungi allegato'}</span>
-                  <input type="file" accept={RESERVATION_ATTACHMENT_ACCEPT} disabled={busy} onChange={(event) => {
-                    const file = event.currentTarget.files?.[0]
-                    event.currentTarget.value = ''
-                    if (file) void uploadAttachment(file)
-                  }} />
+                  <input
+                    type="file"
+                    accept={RESERVATION_ATTACHMENT_ACCEPT}
+                    disabled={busy}
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0]
+                      event.currentTarget.value = ''
+                      if (file) void uploadAttachment(file)
+                    }}
+                  />
                 </label>
               )}
             </section>
           </details>
 
-          {places.length === 0 && <small className="reservation-hint">Salva prima un ristorante o un luogo nella sezione Luoghi per poterlo riutilizzare qui.</small>}
-          {error && <small className="planner-block-error" role="alert">{error}</small>}
+          {places.length === 0 && (
+            <small className="reservation-hint">
+              Salva prima un ristorante o un luogo nella sezione Luoghi per poterlo riutilizzare qui.
+            </small>
+          )}
+          {error && (
+            <small className="planner-block-error" role="alert">
+              {error}
+            </small>
+          )}
           {removeTarget === 'reservation' && (
             <InlineConfirm
               title={`Eliminare ${config.label.toLowerCase()}?`}
-              message={reservation
-                ? `Verranno rimossi il blocco e la prenotazione “${reservation.title}”.${attachment ? ' Anche il collegamento all’allegato verrà rimosso.' : ''}`
-                : `Verrà rimosso questo blocco ${config.label.toLowerCase()} dalla giornata.`}
+              message={
+                reservation
+                  ? `Verranno rimossi il blocco e la prenotazione “${reservation.title}”.${attachment ? ' Anche il collegamento all’allegato verrà rimosso.' : ''}`
+                  : `Verrà rimosso questo blocco ${config.label.toLowerCase()} dalla giornata.`
+              }
               confirmLabel={`Elimina ${config.label.toLowerCase()}`}
               busy={saving}
               onCancel={() => setRemoveTarget(undefined)}
@@ -473,8 +661,16 @@ export default function ReservationBlockEditor({
           )}
 
           <div className="reservation-actions">
-            {reservation?.url && <a href={reservation.url} target="_blank" rel="noreferrer">Apri prenotazione ↗</a>}
-            {!readOnly && <button type="submit" disabled={busy}>{saving ? 'Salvataggio…' : reservation ? 'Salva prenotazione' : 'Crea prenotazione'}</button>}
+            {reservation?.url && (
+              <a href={reservation.url} target="_blank" rel="noreferrer">
+                Apri prenotazione ↗
+              </a>
+            )}
+            {!readOnly && (
+              <button type="submit" disabled={busy}>
+                {saving ? 'Salvataggio…' : reservation ? 'Salva prenotazione' : 'Crea prenotazione'}
+              </button>
+            )}
           </div>
         </>
       )}

@@ -84,9 +84,7 @@ async function requireDocumentDirectory(documentId: string): Promise<FileSystemD
   return documentsDirectory.getDirectoryHandle(documentId)
 }
 
-async function getDirectoryEntries(
-  directory: FileSystemDirectoryHandle,
-): Promise<Array<[string, FileSystemHandle]>> {
+async function getDirectoryEntries(directory: FileSystemDirectoryHandle): Promise<Array<[string, FileSystemHandle]>> {
   const iterableDirectory = directory as FileSystemDirectoryHandle & {
     entries?: () => AsyncIterableIterator<[string, FileSystemHandle]>
   }
@@ -100,10 +98,7 @@ async function getDirectoryEntries(
   return entries
 }
 
-function buildEnvelope(
-  iv: Uint8Array<ArrayBuffer>,
-  ciphertext: Uint8Array<ArrayBuffer>,
-): Uint8Array<ArrayBuffer> {
+function buildEnvelope(iv: Uint8Array<ArrayBuffer>, ciphertext: Uint8Array<ArrayBuffer>): Uint8Array<ArrayBuffer> {
   const envelope = new Uint8Array(FILE_MAGIC.length + AES_GCM_IV_BYTES + ciphertext.length)
   envelope.set(FILE_MAGIC, 0)
   envelope.set(iv, FILE_MAGIC.length)
@@ -155,9 +150,7 @@ export async function listPrivateDocumentRootEntries(): Promise<PrivateDocumentR
   if (!documentsDirectory) return []
 
   const entries = await getDirectoryEntries(documentsDirectory)
-  return entries
-    .map(([name, handle]) => ({ name, kind: handle.kind }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+  return entries.map(([name, handle]) => ({ name, kind: handle.kind })).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function listPrivateDocumentAttachmentEntries(
@@ -217,11 +210,7 @@ export async function writeEncryptedDocumentAttachment(
   const plaintext = new Uint8Array(await source.arrayBuffer())
 
   try {
-    const encrypted = await encryptBytes(
-      ENCRYPTION_PURPOSE,
-      encryptionEntityId(documentId, attachmentId),
-      plaintext,
-    )
+    const encrypted = await encryptBytes(ENCRYPTION_PURPOSE, encryptionEntityId(documentId, attachmentId), plaintext)
     const envelope = buildEnvelope(encrypted.iv, encrypted.ciphertext)
     const fileHandle = await documentDirectory.getFileHandle(fileName, { create: true })
     const writable = await fileHandle.createWritable()
@@ -231,7 +220,9 @@ export async function writeEncryptedDocumentAttachment(
       await writable.close()
       const stored = await fileHandle.getFile()
       if (stored.size !== envelope.byteLength) {
-        throw new Error(`Encrypted private document write is incomplete: expected ${envelope.byteLength} bytes, found ${stored.size}.`)
+        throw new Error(
+          `Encrypted private document write is incomplete: expected ${envelope.byteLength} bytes, found ${stored.size}.`,
+        )
       }
     } catch (error) {
       try {
@@ -268,21 +259,13 @@ export async function readEncryptedDocumentAttachment(
 
   try {
     const { iv, ciphertext } = parseEnvelope(envelope)
-    return await decryptBytes(
-      ENCRYPTION_PURPOSE,
-      encryptionEntityId(documentId, attachmentId),
-      iv,
-      ciphertext,
-    )
+    return await decryptBytes(ENCRYPTION_PURPOSE, encryptionEntityId(documentId, attachmentId), iv, ciphertext)
   } finally {
     envelope.fill(0)
   }
 }
 
-export async function encryptedDocumentAttachmentExists(
-  documentId: string,
-  attachmentId: string,
-): Promise<boolean> {
+export async function encryptedDocumentAttachmentExists(documentId: string, attachmentId: string): Promise<boolean> {
   try {
     const documentDirectory = await requireDocumentDirectory(documentId)
     await documentDirectory.getFileHandle(attachmentFileName(attachmentId))
@@ -293,10 +276,7 @@ export async function encryptedDocumentAttachmentExists(
   }
 }
 
-export async function deleteEncryptedDocumentAttachment(
-  documentId: string,
-  attachmentId: string,
-): Promise<void> {
+export async function deleteEncryptedDocumentAttachment(documentId: string, attachmentId: string): Promise<void> {
   const documentDirectory = await requireDocumentDirectory(documentId)
   await documentDirectory.removeEntry(attachmentFileName(attachmentId))
 }

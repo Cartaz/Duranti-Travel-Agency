@@ -15,23 +15,15 @@ export interface RepositoryReadOptions {
 export class Repository<T extends EntityBase> {
   constructor(protected readonly table: Table<T, EntityId>) {}
 
-  async get(
-    id: EntityId,
-    options: RepositoryReadOptions = {},
-  ): Promise<T | undefined> {
+  async get(id: EntityId, options: RepositoryReadOptions = {}): Promise<T | undefined> {
     const entity = await this.table.get(id)
     if (!entity || (!options.includeDeleted && entity.deletedAt)) return undefined
     return entity
   }
 
-  async getMany(
-    ids: EntityId[],
-    options: RepositoryReadOptions = {},
-  ): Promise<T[]> {
+  async getMany(ids: EntityId[], options: RepositoryReadOptions = {}): Promise<T[]> {
     const entities = await this.table.bulkGet(ids)
-    return entities.filter((entity): entity is T => Boolean(
-      entity && (options.includeDeleted || !entity.deletedAt),
-    ))
+    return entities.filter((entity): entity is T => Boolean(entity && (options.includeDeleted || !entity.deletedAt)))
   }
 
   async list(options: RepositoryReadOptions = {}): Promise<T[]> {

@@ -72,9 +72,7 @@ async function getRootDirectory(): Promise<FileSystemDirectoryHandle> {
   return navigator.storage.getDirectory()
 }
 
-async function getDirectoryEntries(
-  directory: FileSystemDirectoryHandle,
-): Promise<Array<[string, FileSystemHandle]>> {
+async function getDirectoryEntries(directory: FileSystemDirectoryHandle): Promise<Array<[string, FileSystemHandle]>> {
   const iterableDirectory = directory as FileSystemDirectoryHandle & {
     entries?: () => AsyncIterableIterator<[string, FileSystemHandle]>
   }
@@ -120,12 +118,7 @@ async function collectFilesRecursively(
       continue
     }
 
-    await collectFilesRecursively(
-      handle as FileSystemDirectoryHandle,
-      path,
-      namespace,
-      output,
-    )
+    await collectFilesRecursively(handle as FileSystemDirectoryHandle, path, namespace, output)
   }
 }
 
@@ -135,12 +128,7 @@ async function collectManagedOpfsFiles(): Promise<VaultSourceFile[]> {
 
   const mediaDirectory = await getExistingNestedDirectory(root, [ROOT_DIRECTORY, MEDIA_DIRECTORY])
   if (mediaDirectory) {
-    await collectFilesRecursively(
-      mediaDirectory,
-      `${ROOT_DIRECTORY}/${MEDIA_DIRECTORY}`,
-      'media',
-      output,
-    )
+    await collectFilesRecursively(mediaDirectory, `${ROOT_DIRECTORY}/${MEDIA_DIRECTORY}`, 'media', output)
   }
 
   const privateDocumentsDirectory = await getExistingNestedDirectory(root, [
@@ -213,17 +201,11 @@ async function getVaultStagingDirectory(): Promise<FileSystemDirectoryHandle> {
   return dtagency.getDirectoryHandle(VAULT_STAGING_DIRECTORY, { create: true })
 }
 
-async function writeBytes(
-  writable: FileSystemWritableFileStream,
-  bytes: Uint8Array<ArrayBuffer>,
-): Promise<void> {
+async function writeBytes(writable: FileSystemWritableFileStream, bytes: Uint8Array<ArrayBuffer>): Promise<void> {
   await writable.write(bytes)
 }
 
-function emitProgress(
-  callback: PrepareVaultExportOptions['onProgress'],
-  progress: VaultExportProgress,
-): void {
+function emitProgress(callback: PrepareVaultExportOptions['onProgress'], progress: VaultExportProgress): void {
   callback?.(progress)
 }
 
@@ -309,11 +291,7 @@ export async function prepareVaultExport(
     await writeBytes(writable, encodeUint32(headerBytes.byteLength))
     await writeBytes(writable, headerBytes)
 
-    const encryptedManifest = await encryptVaultPayload(
-      key,
-      manifestAdditionalData(archiveId),
-      manifestBytes,
-    )
+    const encryptedManifest = await encryptVaultPayload(key, manifestAdditionalData(archiveId), manifestBytes)
     try {
       await writeBytes(writable, new Uint8Array([VAULT_FRAME_MANIFEST]))
       await writeBytes(writable, encryptedManifest.iv)
@@ -345,12 +323,7 @@ export async function prepareVaultExport(
         try {
           const encrypted = await encryptVaultPayload(
             key,
-            fileChunkAdditionalData(
-              archiveId,
-              entry,
-              chunkIndex,
-              plaintext.byteLength,
-            ),
+            fileChunkAdditionalData(archiveId, entry, chunkIndex, plaintext.byteLength),
             plaintext,
           )
 

@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { itineraryStatusForReservation, itineraryTypeForReservation, reservationTypeForBlockType } from '../../src/domain/reservation-itinerary-mapping.ts'
+import {
+  itineraryStatusForReservation,
+  itineraryTypeForReservation,
+  reservationTypeForBlockType,
+} from '../../src/domain/reservation-itinerary-mapping.ts'
 
 test('planner block types map to the canonical reservation types', () => {
   assert.equal(reservationTypeForBlockType('transport'), 'transport')

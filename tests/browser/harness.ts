@@ -73,18 +73,18 @@ async function copyFileToMemory(file: File): Promise<File> {
   })
 }
 
-async function writeOpfsFile(
-  directory: FileSystemDirectoryHandle,
-  name: string,
-  body: BlobPart,
-): Promise<void> {
+async function writeOpfsFile(directory: FileSystemDirectoryHandle, name: string, body: BlobPart): Promise<void> {
   const handle = await directory.getFileHandle(name, { create: true })
   const writable = await handle.createWritable()
   try {
     await writable.write(body)
     await writable.close()
   } catch (error) {
-    try { await writable.abort() } catch { /* preserve original error */ }
+    try {
+      await writable.abort()
+    } catch {
+      /* preserve original error */
+    }
     throw error
   }
 }
@@ -153,12 +153,14 @@ async function createInterruptedRestoreFixture(): Promise<string> {
       version: 1,
       restoreId,
       createdAt: new Date().toISOString(),
-      files: [{
-        index: 0,
-        namespace: 'media',
-        path: `dtagency/media/${mediaId}/original`,
-        sizeBytes: utf8(originalText).byteLength,
-      }],
+      files: [
+        {
+          index: 0,
+          namespace: 'media',
+          path: `dtagency/media/${mediaId}/original`,
+          sizeBytes: utf8(originalText).byteLength,
+        },
+      ],
     }),
   )
 
@@ -194,13 +196,27 @@ await run('IndexedDB upgrades the v1 baseline to v2 without rewriting user rows'
   const now = new Date().toISOString()
   const placeId = 'legacy-place'
   await legacy.table('blocks').add({
-    id: 'legacy-block', tripId: 'legacy-trip', dayId: 'legacy-day', type: 'place', position: 1,
-    content: { placeId }, createdAt: now, updatedAt: now,
+    id: 'legacy-block',
+    tripId: 'legacy-trip',
+    dayId: 'legacy-day',
+    type: 'place',
+    position: 1,
+    content: { placeId },
+    createdAt: now,
+    updatedAt: now,
   })
   await legacy.table('media').add({
-    id: 'legacy-media', tripId: 'legacy-trip', dayId: 'legacy-day', kind: 'image', placeId,
-    mimeType: 'image/jpeg', originalName: 'legacy.jpg', sizeBytes: 1, opfsPath: 'dtagency/media/legacy-media/original',
-    createdAt: now, updatedAt: now,
+    id: 'legacy-media',
+    tripId: 'legacy-trip',
+    dayId: 'legacy-day',
+    kind: 'image',
+    placeId,
+    mimeType: 'image/jpeg',
+    originalName: 'legacy.jpg',
+    sizeBytes: 1,
+    opfsPath: 'dtagency/media/legacy-media/original',
+    createdAt: now,
+    updatedAt: now,
   })
   legacy.close()
 
@@ -210,11 +226,20 @@ await run('IndexedDB upgrades the v1 baseline to v2 without rewriting user rows'
   assert(db.verno === 2, `Unexpected Dexie version ${db.verno}.`)
   const tableNames = db.tables.map((table) => table.name).sort()
   assert(tableNames.length === 15, `Expected 15 tables after migration, got ${tableNames.length}.`)
-  assert(tableNames.includes('appMeta') && tableNames.includes('travelerDocuments'), 'Required tables are missing after migration.')
+  assert(
+    tableNames.includes('appMeta') && tableNames.includes('travelerDocuments'),
+    'Required tables are missing after migration.',
+  )
   const blocks = await db.blocks.where('content.placeId').equals(placeId).toArray()
   const media = await db.media.where('placeId').equals(placeId).toArray()
-  assert(blocks.length === 1 && blocks[0]?.id === 'legacy-block', 'v1 block row or its new nested index was lost during migration.')
-  assert(media.length === 1 && media[0]?.id === 'legacy-media', 'v1 media row or its new place index was lost during migration.')
+  assert(
+    blocks.length === 1 && blocks[0]?.id === 'legacy-block',
+    'v1 block row or its new nested index was lost during migration.',
+  )
+  assert(
+    media.length === 1 && media[0]?.id === 'legacy-media',
+    'v1 media row or its new place index was lost during migration.',
+  )
 })
 
 await run('OPFS media CRUD uses the DTAgency namespace', async () => {
@@ -224,7 +249,7 @@ await run('OPFS media CRUD uses the DTAgency namespace', async () => {
   const path = await writeMediaFile(mediaId, new Blob([expected], { type: 'text/plain' }))
   assert(path === `dtagency/media/${mediaId}/original`, `Unexpected media path ${path}.`)
   const stored = await readMediaFile(mediaId)
-  assert(await readText(stored) === expected, 'OPFS round-trip changed media bytes.')
+  assert((await readText(stored)) === expected, 'OPFS round-trip changed media bytes.')
 })
 
 await run('Concurrent ordered writes stay unique and repair legacy duplicate order values', async () => {
@@ -246,59 +271,139 @@ await run('Concurrent ordered writes stay unique and repair legacy duplicate ord
     dayRepository.createForTrip({ id: 'concurrent-day-b', tripId, date: '2026-09-02', createdAt: now, updatedAt: now }),
   ])
   const concurrentSequences = [firstDay.sequence, secondDay.sequence].sort((a, b) => a - b)
-  assert(concurrentSequences.join(',') === '1,2', `Concurrent days received invalid sequences ${concurrentSequences.join(',')}.`)
+  assert(
+    concurrentSequences.join(',') === '1,2',
+    `Concurrent days received invalid sequences ${concurrentSequences.join(',')}.`,
+  )
 
   await db.days.bulkPut([
     { ...firstDay, sequence: 9 },
     { ...secondDay, sequence: 9 },
   ])
   const thirdDay = await dayRepository.createForTrip({
-    id: 'concurrent-day-c', tripId, date: '2026-09-03', createdAt: now, updatedAt: now,
+    id: 'concurrent-day-c',
+    tripId,
+    date: '2026-09-03',
+    createdAt: now,
+    updatedAt: now,
   })
   const repairedSequences = (await dayRepository.listByTrip(tripId)).map((day) => day.sequence).sort((a, b) => a - b)
-  assert(thirdDay.sequence === 3 && repairedSequences.join(',') === '1,2,3', `Day sequence repair failed: ${repairedSequences.join(',')}.`)
+  assert(
+    thirdDay.sequence === 3 && repairedSequences.join(',') === '1,2,3',
+    `Day sequence repair failed: ${repairedSequences.join(',')}.`,
+  )
 
   const dayId = firstDay.id
   const [firstBlock, secondBlock] = await Promise.all([
-    plannerBlockRepository.createAtEnd({ id: 'concurrent-block-a', tripId, dayId, type: 'text', content: {}, createdAt: now, updatedAt: now }),
-    plannerBlockRepository.createAtEnd({ id: 'concurrent-block-b', tripId, dayId, type: 'text', content: {}, createdAt: now, updatedAt: now }),
+    plannerBlockRepository.createAtEnd({
+      id: 'concurrent-block-a',
+      tripId,
+      dayId,
+      type: 'text',
+      content: {},
+      createdAt: now,
+      updatedAt: now,
+    }),
+    plannerBlockRepository.createAtEnd({
+      id: 'concurrent-block-b',
+      tripId,
+      dayId,
+      type: 'text',
+      content: {},
+      createdAt: now,
+      updatedAt: now,
+    }),
   ])
   const concurrentPositions = [firstBlock.position, secondBlock.position].sort((a, b) => a - b)
-  assert(concurrentPositions.join(',') === '1,2', `Concurrent blocks received invalid positions ${concurrentPositions.join(',')}.`)
+  assert(
+    concurrentPositions.join(',') === '1,2',
+    `Concurrent blocks received invalid positions ${concurrentPositions.join(',')}.`,
+  )
 
   await db.blocks.bulkPut([
     { ...firstBlock, position: 8 },
     { ...secondBlock, position: 8 },
   ])
   const thirdBlock = await plannerBlockRepository.createAtEnd({
-    id: 'concurrent-block-c', tripId, dayId, type: 'text', content: {}, createdAt: now, updatedAt: now,
+    id: 'concurrent-block-c',
+    tripId,
+    dayId,
+    type: 'text',
+    content: {},
+    createdAt: now,
+    updatedAt: now,
   })
-  const repairedBlockPositions = (await plannerBlockRepository.listByDay(dayId)).map((block) => block.position).sort((a, b) => a - b)
-  assert(thirdBlock.position === 3 && repairedBlockPositions.join(',') === '1,2,3', `Block position repair failed: ${repairedBlockPositions.join(',')}.`)
+  const repairedBlockPositions = (await plannerBlockRepository.listByDay(dayId))
+    .map((block) => block.position)
+    .sort((a, b) => a - b)
+  assert(
+    thirdBlock.position === 3 && repairedBlockPositions.join(',') === '1,2,3',
+    `Block position repair failed: ${repairedBlockPositions.join(',')}.`,
+  )
 
   const [firstItinerary, secondItinerary] = await Promise.all([
-    itineraryRepository.saveManual({ id: 'concurrent-itinerary-a', tripId, dayId, title: 'Prima tappa', type: 'custom', status: 'planned', createdAt: now, updatedAt: now }),
-    itineraryRepository.saveManual({ id: 'concurrent-itinerary-b', tripId, dayId, title: 'Seconda tappa', type: 'custom', status: 'planned', createdAt: now, updatedAt: now }),
+    itineraryRepository.saveManual({
+      id: 'concurrent-itinerary-a',
+      tripId,
+      dayId,
+      title: 'Prima tappa',
+      type: 'custom',
+      status: 'planned',
+      createdAt: now,
+      updatedAt: now,
+    }),
+    itineraryRepository.saveManual({
+      id: 'concurrent-itinerary-b',
+      tripId,
+      dayId,
+      title: 'Seconda tappa',
+      type: 'custom',
+      status: 'planned',
+      createdAt: now,
+      updatedAt: now,
+    }),
   ])
-  const concurrentItineraryPositions = [firstItinerary.position, secondItinerary.position].sort((a, b) => (a ?? 0) - (b ?? 0))
-  assert(concurrentItineraryPositions.join(',') === '1,2', `Concurrent itinerary items received invalid positions ${concurrentItineraryPositions.join(',')}.`)
+  const concurrentItineraryPositions = [firstItinerary.position, secondItinerary.position].sort(
+    (a, b) => (a ?? 0) - (b ?? 0),
+  )
+  assert(
+    concurrentItineraryPositions.join(',') === '1,2',
+    `Concurrent itinerary items received invalid positions ${concurrentItineraryPositions.join(',')}.`,
+  )
 
   await db.itineraries.bulkPut([
     { ...firstItinerary, position: 7 },
     { ...secondItinerary, position: 7 },
   ])
   const thirdItinerary = await itineraryRepository.saveManual({
-    id: 'concurrent-itinerary-c', tripId, dayId, title: 'Terza tappa', type: 'custom', status: 'planned', createdAt: now, updatedAt: now,
+    id: 'concurrent-itinerary-c',
+    tripId,
+    dayId,
+    title: 'Terza tappa',
+    type: 'custom',
+    status: 'planned',
+    createdAt: now,
+    updatedAt: now,
   })
   const repairedItineraryPositions = (await itineraryRepository.listByDay(dayId))
     .filter((item) => !item.startsAt && !item.reservationId && !item.blockId)
     .map((item) => item.position)
     .sort((a, b) => (a ?? 0) - (b ?? 0))
-  assert(thirdItinerary.position === 3 && repairedItineraryPositions.join(',') === '1,2,3', `Itinerary position repair failed: ${repairedItineraryPositions.join(',')}.`)
+  assert(
+    thirdItinerary.position === 3 && repairedItineraryPositions.join(',') === '1,2,3',
+    `Itinerary position repair failed: ${repairedItineraryPositions.join(',')}.`,
+  )
 
   const timedItinerary = await itineraryRepository.saveManual({
-    id: 'timed-itinerary', tripId, dayId, title: 'Tappa con orario', type: 'custom', status: 'planned',
-    startsAt: '2026-09-01T10:00', createdAt: now, updatedAt: now,
+    id: 'timed-itinerary',
+    tripId,
+    dayId,
+    title: 'Tappa con orario',
+    type: 'custom',
+    status: 'planned',
+    startsAt: '2026-09-01T10:00',
+    createdAt: now,
+    updatedAt: now,
   })
   assert(timedItinerary.position === undefined, 'Timed manual itinerary retained an unnecessary manual-order position.')
 })
@@ -322,7 +427,10 @@ await run('Vault export wipe import restore round-trips IndexedDB and OPFS', asy
 
   const trip = await db.trips.get(seeded.tripId)
   assert(trip?.title === 'Browser integration trip', 'Trip did not survive Vault round-trip.')
-  assert(await readText(await readMediaFile(seeded.mediaId)) === seeded.mediaText, 'Media bytes did not survive Vault round-trip.')
+  assert(
+    (await readText(await readMediaFile(seeded.mediaId))) === seeded.mediaText,
+    'Media bytes did not survive Vault round-trip.',
+  )
 })
 
 await run('Tampered Vault manifest fails before mutating live state', async () => {
@@ -341,7 +449,10 @@ await run('Tampered Vault manifest fails before mutating live state', async () =
   }
   assert(rejected, 'Tampered Vault was unexpectedly accepted.')
   assert(Boolean(await db.trips.get(seeded.tripId)), 'Tampered import mutated live IndexedDB.')
-  assert(await readText(await readMediaFile(seeded.mediaId)) === seeded.mediaText, 'Tampered import mutated live OPFS.')
+  assert(
+    (await readText(await readMediaFile(seeded.mediaId))) === seeded.mediaText,
+    'Tampered import mutated live OPFS.',
+  )
 })
 
 await run('Interrupted files-mutating restore rolls OPFS back from journal backup', async () => {
@@ -350,7 +461,7 @@ await run('Interrupted files-mutating restore rolls OPFS back from journal backu
   const result = await recoverInterruptedVaultRestore()
   assert(result === 'rolled-back', `Expected rolled-back recovery, got ${result}.`)
   assert(
-    await readText(await readMediaFile(mediaId)) === 'original-before-interrupted-restore',
+    (await readText(await readMediaFile(mediaId))) === 'original-before-interrupted-restore',
     'Recovery did not restore original OPFS bytes.',
   )
 })

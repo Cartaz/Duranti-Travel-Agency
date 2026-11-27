@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  assertDayDateWithinTripRange,
-  isDayDateWithinTripRange,
-} from '../../src/domain/trip-calendar.ts'
+import { assertDayDateWithinTripRange, isDayDateWithinTripRange } from '../../src/domain/trip-calendar.ts'
 
 test('accepts dates inside a closed trip range', () => {
   const range = { startDate: '2026-08-10', endDate: '2026-08-20' }
@@ -29,13 +26,7 @@ test('supports open-ended trip ranges', () => {
 test('assertion reports the violated trip boundary', () => {
   const range = { startDate: '2026-08-10', endDate: '2026-08-20' }
 
-  assert.throws(
-    () => assertDayDateWithinTripRange(range, '2026-08-09'),
-    /2026-08-10/,
-  )
-  assert.throws(
-    () => assertDayDateWithinTripRange(range, '2026-08-21'),
-    /2026-08-20/,
-  )
+  assert.throws(() => assertDayDateWithinTripRange(range, '2026-08-09'), /2026-08-10/)
+  assert.throws(() => assertDayDateWithinTripRange(range, '2026-08-21'), /2026-08-20/)
   assert.doesNotThrow(() => assertDayDateWithinTripRange(range, '2026-08-15'))
 })

@@ -20,10 +20,7 @@ export async function readTrip(
   return deps.trips.get(tripId)
 }
 
-export async function requireTrip(
-  deps: Pick<TripDayContextDependencies, 'trips'>,
-  tripId: string,
-): Promise<Trip> {
+export async function requireTrip(deps: Pick<TripDayContextDependencies, 'trips'>, tripId: string): Promise<Trip> {
   const trip = await readTrip(deps, tripId)
   if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
   return trip

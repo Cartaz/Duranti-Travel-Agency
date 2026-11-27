@@ -15,12 +15,7 @@ function assertExpenseContext(expense: Expense, tripId: string, dayId: string): 
 }
 
 export class ExpenseBlockRepository {
-  async saveExpenseForBlock(
-    blockId: string,
-    tripId: string,
-    dayId: string,
-    expense: Expense,
-  ): Promise<void> {
+  async saveExpenseForBlock(blockId: string, tripId: string, dayId: string, expense: Expense): Promise<void> {
     await db.transaction('rw', db.blocks, db.expenses, async () => {
       const block = await db.blocks.get(blockId)
       if (!block || block.deletedAt) throw new Error('Il blocco spesa non esiste più.')

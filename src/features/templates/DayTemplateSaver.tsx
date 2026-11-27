@@ -17,13 +17,16 @@ export default function DayTemplateSaver({ tripId, dayId }: { tripId: string; da
 
   useEffect(() => {
     let cancelled = false
-    void days.getTripDay(tripId, dayId)
+    void days
+      .getTripDay(tripId, dayId)
       .then((day) => {
         if (cancelled || !day) return
         setName(day.title?.trim() || `Giorno ${day.sequence}`)
       })
       .catch(() => {})
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [dayId, days, tripId])
 
   useEffect(() => {
@@ -53,18 +56,59 @@ export default function DayTemplateSaver({ tripId, dayId }: { tripId: string; da
     <section className="day-template-save-wrap" aria-label="Modello personale">
       <details className="day-template-save" ref={detailsRef}>
         <summary>
-          <span><strong>Salva come modello</strong><small>Riutilizza la struttura di questa giornata in altri viaggi.</small></span>
+          <span>
+            <strong>Salva come modello</strong>
+            <small>Riutilizza la struttura di questa giornata in altri viaggi.</small>
+          </span>
           <span className="day-template-save-badge">Personale</span>
         </summary>
         <form className="day-template-save-form" onSubmit={(event) => void submit(event)}>
-          <p>Verranno copiati titoli, testo e checklist. Luoghi, prenotazioni, spese e collegamenti specifici verranno svuotati. Diario, foto e video non fanno parte del modello.</p>
-          {error && <p className="day-template-save-error" role="alert">{error}</p>}
-          <label><span>Nome del modello *</span><input required maxLength={MAX_DAY_TEMPLATE_NAME_LENGTH} value={name} placeholder="Giornata musei e centro" disabled={saving} onChange={(event) => setName(event.target.value)} /></label>
-          <label><span>Descrizione</span><textarea rows={3} maxLength={MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH} value={description} placeholder="Quando usare questo modello…" disabled={saving} onChange={(event) => setDescription(event.target.value)} /><small>{description.length}/{MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH}</small></label>
-          <div className="day-template-save-actions"><button type="submit" disabled={saving || !name.trim()}>{saving ? 'Salvataggio…' : 'Salva modello'}</button></div>
+          <p>
+            Verranno copiati titoli, testo e checklist. Luoghi, prenotazioni, spese e collegamenti specifici verranno
+            svuotati. Diario, foto e video non fanno parte del modello.
+          </p>
+          {error && (
+            <p className="day-template-save-error" role="alert">
+              {error}
+            </p>
+          )}
+          <label>
+            <span>Nome del modello *</span>
+            <input
+              required
+              maxLength={MAX_DAY_TEMPLATE_NAME_LENGTH}
+              value={name}
+              placeholder="Giornata musei e centro"
+              disabled={saving}
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Descrizione</span>
+            <textarea
+              rows={3}
+              maxLength={MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH}
+              value={description}
+              placeholder="Quando usare questo modello…"
+              disabled={saving}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+            <small>
+              {description.length}/{MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH}
+            </small>
+          </label>
+          <div className="day-template-save-actions">
+            <button type="submit" disabled={saving || !name.trim()}>
+              {saving ? 'Salvataggio…' : 'Salva modello'}
+            </button>
+          </div>
         </form>
       </details>
-      {status && <p className="day-template-save-status" role="status">{status}</p>}
+      {status && (
+        <p className="day-template-save-status" role="status">
+          {status}
+        </p>
+      )}
     </section>
   )
 }
