@@ -3,7 +3,7 @@ import type { Place } from '../../domain/entities'
 import type { PlaceDraft } from '../../application/places/place-application'
 import type { PlaceImportCandidate } from '../../application/places/place-import'
 import { useApplicationServices } from '../../ui/application-context'
-import { googleMapsUrlForPlace } from './maps-url'
+import { googleMapsUrlForPlace } from '../../domain/maps-url'
 import './place-catalog.css'
 
 interface EditableImport {

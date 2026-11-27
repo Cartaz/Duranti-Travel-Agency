@@ -24,11 +24,7 @@ Rules:
 - Do not route passport/identity scans through the ordinary unencrypted media OPFS path.
 - Private attachment v1 is capped at 20 MiB because Web Crypto encrypt/decrypt consumes a complete BufferSource; larger files require a separately reviewed chunked format.
 - Replacement writes a new random attachment file before updating encrypted metadata. After the metadata switch, the old file is removed best-effort; an interrupted cleanup can therefore leave a recoverable orphan, never a metadata reference to intentionally deleted bytes.
-- Purge deletes the private OPFS directory before deleting the tombstoned IndexedDB record, matching the crash-safe media lifecycle.
-- Private-document integrity scanning is read-only by default and requires the local encryption key to be unlocked so encrypted attachment metadata can be compared with OPFS.
-- Normal integrity scans inspect directory structure, file size and the `DTADOC01` envelope marker without decrypting complete attachment bodies. AES-GCM authentication is verified when an attachment is actually decrypted/read.
-- Orphan/empty-directory cleanup is exposed only through guarded explicit maintenance functions that re-check current IndexedDB references before deletion.
+- Purge deletes the tombstoned IndexedDB record inside a transaction that re-checks the tombstone, then removes the private OPFS directory. An interrupted purge can leave a recoverable orphan directory, never an active record whose bytes were deleted.
+- AES-GCM authentication of a private attachment is verified whenever it is decrypted/read. There is currently no relational private-document integrity scanner: an unused prototype was removed during the 2026-11 audit because it was never wired into any workflow. Reintroduce one only together with a user-facing maintenance flow and tests.
 - Encryption at rest does not defend against malicious script executing while the app is unlocked. CSP/XSS hardening remains required.
 - Losing the passphrase without a valid encrypted Vault/recovery design can make sensitive data unrecoverable.
-
-`kdf-benchmark.ts` is an explicit diagnostic helper only. It must never run automatically and never uses the user's real passphrase.

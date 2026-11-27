@@ -1,4 +1,4 @@
-import type { Place } from '../../domain/entities'
+import type { Place } from './entities'
 
 export interface GoogleMapsSearchSource {
   name: string

@@ -13,10 +13,7 @@ export interface TripDayContextDependencies {
   days: DayContextReaderPort
 }
 
-export async function readTrip(
-  deps: Pick<TripDayContextDependencies, 'trips'>,
-  tripId: string,
-): Promise<Trip | undefined> {
+async function readTrip(deps: Pick<TripDayContextDependencies, 'trips'>, tripId: string): Promise<Trip | undefined> {
   return deps.trips.get(tripId)
 }
 
@@ -26,7 +23,7 @@ export async function requireTrip(deps: Pick<TripDayContextDependencies, 'trips'
   return trip
 }
 
-export async function readTripDay(
+async function readTripDay(
   deps: TripDayContextDependencies,
   tripId: string,
   dayId: string,

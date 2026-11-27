@@ -1,3 +1,4 @@
+import { saveFileToDevice } from '../../lib/browser-file'
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Traveler, TravelerDocument, TravelerDocumentSecret } from '../../domain/entities'
@@ -211,12 +212,7 @@ export default function TravelerDocumentsPage() {
         setError('Questo documento non ha un allegato disponibile.')
         return
       }
-      const url = URL.createObjectURL(file)
-      const anchor = window.document.createElement('a')
-      anchor.href = url
-      anchor.download = file.name
-      anchor.click()
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      saveFileToDevice(file, file.name)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile aprire l’allegato cifrato.')
     }

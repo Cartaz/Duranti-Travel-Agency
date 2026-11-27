@@ -1,3 +1,4 @@
+import { openFileInNewTab } from '../../lib/browser-file'
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Block, Media, Place, Reservation } from '../../domain/entities'
 import {
@@ -277,13 +278,7 @@ export default function ReservationBlockEditor({
     setError('')
     try {
       const file = await reservations.readPlannerReservationAttachment(attachment)
-      const objectUrl = URL.createObjectURL(file)
-      const anchor = document.createElement('a')
-      anchor.href = objectUrl
-      anchor.target = '_blank'
-      anchor.rel = 'noopener noreferrer'
-      anchor.click()
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+      openFileInNewTab(file)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile aprire l’allegato.')
     } finally {

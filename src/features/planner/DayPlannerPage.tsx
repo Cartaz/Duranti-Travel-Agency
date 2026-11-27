@@ -12,7 +12,7 @@ import InlineConfirm from '../../ui/InlineConfirm'
 import { useApplicationServices } from '../../ui/application-context'
 import ExpenseBlockEditor from '../expenses/ExpenseBlockEditor'
 import DayItinerarySummary from '../itinerary/DayItinerarySummary'
-import { googleMapsUrlForPlace } from '../places/maps-url'
+import { googleMapsUrlForPlace } from '../../domain/maps-url'
 import ReservationBlockEditor from '../reservations/ReservationBlockEditor'
 import './planner.css'
 
