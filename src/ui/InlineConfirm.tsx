@@ -26,7 +26,9 @@ export default function InlineConfirm({
         <p>{message}</p>
       </div>
       <div className="inline-confirm-actions">
-        <button type="button" disabled={busy} onClick={onCancel}>{cancelLabel}</button>
+        <button type="button" disabled={busy} onClick={onCancel}>
+          {cancelLabel}
+        </button>
         <button className="inline-confirm-danger" type="button" disabled={busy} onClick={onConfirm}>
           {busy ? 'Attendi…' : confirmLabel}
         </button>

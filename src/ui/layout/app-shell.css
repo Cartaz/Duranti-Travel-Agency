@@ -6,9 +6,9 @@
   justify-content: space-between;
   gap: 18px;
   padding: 14px 16px;
-  border: 1px solid rgba(164, 117, 58, .45);
+  border: 1px solid rgba(164, 117, 58, 0.45);
   border-radius: 16px;
-  background: rgba(255, 246, 227, .92);
+  background: rgba(255, 246, 227, 0.92);
   color: #4a3523;
 }
 
@@ -64,7 +64,7 @@
   border-radius: 16px;
   background: #2b1d19;
   color: #fff1e8;
-  box-shadow: 0 20px 55px rgba(0, 0, 0, .48);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.48);
 }
 
 .app-validation-notice > div {

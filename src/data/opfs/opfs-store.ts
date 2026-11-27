@@ -36,9 +36,7 @@ async function requireExistingMediaDirectory(): Promise<FileSystemDirectoryHandl
   throw new DOMException('DTAgency media directory was not found.', 'NotFoundError')
 }
 
-async function getDirectoryEntries(
-  directory: FileSystemDirectoryHandle,
-): Promise<Array<[string, FileSystemHandle]>> {
+async function getDirectoryEntries(directory: FileSystemDirectoryHandle): Promise<Array<[string, FileSystemHandle]>> {
   const iterableDirectory = directory as FileSystemDirectoryHandle & {
     entries?: () => AsyncIterableIterator<[string, FileSystemHandle]>
   }

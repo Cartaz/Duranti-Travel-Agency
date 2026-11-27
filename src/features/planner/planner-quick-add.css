@@ -11,8 +11,8 @@
   width: min(720px, calc(100% - 24px));
   border: 1px solid #5a4938;
   border-radius: 18px;
-  background: rgba(24, 19, 15, .97);
-  box-shadow: 0 20px 55px rgba(0, 0, 0, .48);
+  background: rgba(24, 19, 15, 0.97);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.48);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
@@ -94,7 +94,7 @@
 .planner-quick-add-primary button {
   min-height: 76px;
   border-color: #6a563f;
-  background: linear-gradient(145deg, rgba(151, 124, 80, .10), rgba(32, 26, 20, .98));
+  background: linear-gradient(145deg, rgba(151, 124, 80, 0.1), rgba(32, 26, 20, 0.98));
 }
 
 .planner-quick-add-primary button strong,
@@ -149,7 +149,7 @@
   border: 1px solid #71473e;
   border-radius: 12px;
   padding: 9px 10px;
-  background: rgba(113, 71, 62, .17);
+  background: rgba(113, 71, 62, 0.17);
   color: #e4ad9f;
   font-size: 12px;
 }
@@ -167,7 +167,7 @@
   padding: 10px 12px;
   background: #1d2519;
   color: #c9d7af;
-  box-shadow: 0 15px 38px rgba(0, 0, 0, .35);
+  box-shadow: 0 15px 38px rgba(0, 0, 0, 0.35);
   font-size: 12px;
   text-align: center;
 }

@@ -1,8 +1,5 @@
 import type { TravelerDocumentAttachment } from '../../domain/entities'
-import {
-  isLocalEncryptionUnlocked,
-  LocalEncryptionLockedError,
-} from '../../security/local-encryption'
+import { isLocalEncryptionUnlocked, LocalEncryptionLockedError } from '../../security/local-encryption'
 import { db } from '../db/dtagency-db'
 import {
   buildPrivateDocumentAttachmentPath,
@@ -81,18 +78,20 @@ function isTravelerDocumentAttachment(value: unknown): value is TravelerDocument
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const record = value as Record<string, unknown>
   return (
-    typeof record.id === 'string' && record.id.length > 0 &&
-    typeof record.opfsPath === 'string' && record.opfsPath.length > 0 &&
-    typeof record.mimeType === 'string' && record.mimeType.length > 0 &&
-    typeof record.sizeBytes === 'number' && Number.isSafeInteger(record.sizeBytes) && record.sizeBytes > 0 &&
+    typeof record.id === 'string' &&
+    record.id.length > 0 &&
+    typeof record.opfsPath === 'string' &&
+    record.opfsPath.length > 0 &&
+    typeof record.mimeType === 'string' &&
+    record.mimeType.length > 0 &&
+    typeof record.sizeBytes === 'number' &&
+    Number.isSafeInteger(record.sizeBytes) &&
+    record.sizeBytes > 0 &&
     (record.originalName === undefined || typeof record.originalName === 'string')
   )
 }
 
-async function listDocumentEntriesSafely(
-  documentId: string,
-  unreadableEntries: PrivateDocumentUnreadableEntry[],
-) {
+async function listDocumentEntriesSafely(documentId: string, unreadableEntries: PrivateDocumentUnreadableEntry[]) {
   try {
     return await listPrivateDocumentAttachmentEntries(documentId)
   } catch (error) {
@@ -125,9 +124,7 @@ export async function scanPrivateDocumentIntegrity(): Promise<PrivateDocumentInt
   const metadata = await db.travelerDocuments.toArray()
   const rootEntries = await listPrivateDocumentRootEntries()
   const metadataIds = new Set(metadata.map((record) => record.id))
-  const documentDirectoryIds = rootEntries
-    .filter((entry) => entry.kind === 'directory')
-    .map((entry) => entry.name)
+  const documentDirectoryIds = rootEntries.filter((entry) => entry.kind === 'directory').map((entry) => entry.name)
   const directoryIdSet = new Set(documentDirectoryIds)
 
   const orphanDirectoryIds = documentDirectoryIds.filter((id) => !metadataIds.has(id))
@@ -200,9 +197,7 @@ export async function scanPrivateDocumentIntegrity(): Promise<PrivateDocumentInt
     if (!entries) continue
     collectDirectoryResidue(record.id, attachment.id, entries, orphanAttachments, unexpectedEntries)
 
-    const expectedEntry = entries.find(
-      (entry) => entry.kind === 'file' && entry.attachmentId === attachment.id,
-    )
+    const expectedEntry = entries.find((entry) => entry.kind === 'file' && entry.attachmentId === attachment.id)
     if (!expectedEntry) {
       missingAttachments.push({ documentId: record.id, attachmentId: attachment.id })
       continue
@@ -283,10 +278,7 @@ export async function removeOrphanPrivateDocumentDirectory(documentId: string): 
   await deleteEncryptedDocumentDirectory(documentId)
 }
 
-export async function removeOrphanPrivateDocumentAttachment(
-  documentId: string,
-  attachmentId: string,
-): Promise<void> {
+export async function removeOrphanPrivateDocumentAttachment(documentId: string, attachmentId: string): Promise<void> {
   if (!isLocalEncryptionUnlocked()) throw new LocalEncryptionLockedError()
   const metadata = await db.travelerDocuments.get(documentId)
   if (!metadata) throw new Error(`Traveler document ${documentId} does not exist; remove its orphan directory instead.`)
@@ -310,7 +302,8 @@ export async function removeOrphanPrivateDocumentAttachment(
 export async function removeStaleEmptyPrivateDocumentDirectory(documentId: string): Promise<void> {
   if (!isLocalEncryptionUnlocked()) throw new LocalEncryptionLockedError()
   const metadata = await db.travelerDocuments.get(documentId)
-  if (!metadata) throw new Error(`Traveler document ${documentId} does not exist; use orphan-directory cleanup instead.`)
+  if (!metadata)
+    throw new Error(`Traveler document ${documentId} does not exist; use orphan-directory cleanup instead.`)
   const view = await secureTravelerDocumentRepository.get(documentId, { includeDeleted: true })
   if (!view) throw new Error(`Traveler document ${documentId} could not be read.`)
   if (view.attachment) throw new Error(`Traveler document ${documentId} still references an encrypted attachment.`)

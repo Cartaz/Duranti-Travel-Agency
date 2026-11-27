@@ -14,6 +14,9 @@ test('catalog place editing preserves canonical identity and creation timestamp'
   assert.notEqual(updateEnd, -1)
   assert.match(source, /updateCatalogPlace\(placeId: string, input: PlaceDraft\): Promise<Place>/)
   assert.match(updateSource, /const current = await deps\.places\.get\(placeId\)/)
-  assert.match(updateSource, /const updated: Place = \{ \.\.\.current, \.\.\.placeBaseFromDraft\(input\), updatedAt: deps\.now\(\) \}/)
+  assert.match(
+    updateSource,
+    /const updated: Place = \{ \.\.\.current, \.\.\.placeBaseFromDraft\(input\), updatedAt: deps\.now\(\) \}/,
+  )
   assert.doesNotMatch(updateSource, /newId\(\)/)
 })

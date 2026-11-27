@@ -1,6 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { placeIdForBlock, reservationIdForBlock, withPlaceId, withReservationId } from '../../src/domain/block-content.ts'
+import {
+  placeIdForBlock,
+  reservationIdForBlock,
+  withPlaceId,
+  withReservationId,
+} from '../../src/domain/block-content.ts'
 
 test('block reference accessors normalize one persisted contract', () => {
   assert.equal(reservationIdForBlock({ content: { reservationId: 'reservation-1' } }), 'reservation-1')

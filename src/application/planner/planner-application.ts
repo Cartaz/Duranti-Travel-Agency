@@ -2,7 +2,9 @@ import type { Block, BlockType } from '../../domain/entities'
 import type { BlockMoveDirection, PlannerApplicationDependencies } from './ports'
 
 export type BasicPlannerBlockType = Extract<BlockType, 'text' | 'heading' | 'checklist' | 'divider'>
-export type PlannerBlockType = BasicPlannerBlockType | Extract<BlockType, 'place' | 'transport' | 'accommodation' | 'restaurant' | 'activity' | 'expense'>
+export type PlannerBlockType =
+  | BasicPlannerBlockType
+  | Extract<BlockType, 'place' | 'transport' | 'accommodation' | 'restaurant' | 'activity' | 'expense'>
 
 export interface ChecklistItemDraft {
   id: string
@@ -17,10 +19,25 @@ export type PlannerBlockDraft =
   | { type: 'divider' }
 
 const plannerBlockTypes = new Set<BlockType>([
-  'text', 'heading', 'checklist', 'divider', 'place', 'transport', 'accommodation', 'restaurant', 'activity', 'expense',
+  'text',
+  'heading',
+  'checklist',
+  'divider',
+  'place',
+  'transport',
+  'accommodation',
+  'restaurant',
+  'activity',
+  'expense',
 ])
 const basicPlannerBlockTypes = new Set<BlockType>(['text', 'heading', 'checklist', 'divider'])
-const transactionalDeleteBlockTypes = new Set<BlockType>(['transport', 'accommodation', 'restaurant', 'activity', 'expense'])
+const transactionalDeleteBlockTypes = new Set<BlockType>([
+  'transport',
+  'accommodation',
+  'restaurant',
+  'activity',
+  'expense',
+])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -40,38 +57,51 @@ function normalizeChecklistItems(value: unknown, newId: () => string): Checklist
   if (!Array.isArray(value)) throw new Error('Checklist: elenco non valido.')
   if (value.length > 100) throw new Error('Checklist: massimo 100 elementi per blocco.')
 
-  return value.map((item) => {
-    if (!isRecord(item)) throw new Error('Checklist: elemento non valido.')
-    const text = normalizeText(item.text, 'Checklist', 500).trim()
-    const id = typeof item.id === 'string' && item.id ? item.id : newId()
-    return { id, text, checked: item.checked === true }
-  }).filter((item) => item.text.length > 0)
+  return value
+    .map((item) => {
+      if (!isRecord(item)) throw new Error('Checklist: elemento non valido.')
+      const text = normalizeText(item.text, 'Checklist', 500).trim()
+      const id = typeof item.id === 'string' && item.id ? item.id : newId()
+      return { id, text, checked: item.checked === true }
+    })
+    .filter((item) => item.text.length > 0)
 }
 
 function normalizeDraft(input: PlannerBlockDraft, newId: () => string): PlannerBlockDraft {
   switch (input.type) {
-    case 'text': return { type: 'text', text: normalizeText(input.text, 'Testo', 10_000) }
-    case 'heading': return { type: 'heading', text: normalizeText(input.text, 'Titolo', 200) }
-    case 'checklist': return { type: 'checklist', items: normalizeChecklistItems(input.items, newId) }
-    case 'divider': return { type: 'divider' }
+    case 'text':
+      return { type: 'text', text: normalizeText(input.text, 'Testo', 10_000) }
+    case 'heading':
+      return { type: 'heading', text: normalizeText(input.text, 'Titolo', 200) }
+    case 'checklist':
+      return { type: 'checklist', items: normalizeChecklistItems(input.items, newId) }
+    case 'divider':
+      return { type: 'divider' }
   }
 }
 
 function contentFromDraft(input: PlannerBlockDraft): Record<string, unknown> {
   switch (input.type) {
     case 'text':
-    case 'heading': return { text: input.text }
-    case 'checklist': return { items: input.items }
-    case 'divider': return {}
+    case 'heading':
+      return { text: input.text }
+    case 'checklist':
+      return { items: input.items }
+    case 'divider':
+      return {}
   }
 }
 
 function defaultDraft(type: BasicPlannerBlockType): PlannerBlockDraft {
   switch (type) {
-    case 'text': return { type: 'text', text: '' }
-    case 'heading': return { type: 'heading', text: '' }
-    case 'checklist': return { type: 'checklist', items: [] }
-    case 'divider': return { type: 'divider' }
+    case 'text':
+      return { type: 'text', text: '' }
+    case 'heading':
+      return { type: 'heading', text: '' }
+    case 'checklist':
+      return { type: 'checklist', items: [] }
+    case 'divider':
+      return { type: 'divider' }
   }
 }
 
@@ -102,11 +132,12 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
     const blocks = await deps.blocks.listByDay(dayId)
     return blocks
       .filter((block) => block.tripId === tripId && plannerBlockTypes.has(block.type))
-      .sort((left, right) => (
-        left.position - right.position ||
-        left.createdAt.localeCompare(right.createdAt) ||
-        left.id.localeCompare(right.id)
-      ))
+      .sort(
+        (left, right) =>
+          left.position - right.position ||
+          left.createdAt.localeCompare(right.createdAt) ||
+          left.id.localeCompare(right.id),
+      )
   }
 
   function readPlannerBlockDraft(block: Block): PlannerBlockDraft {
@@ -114,10 +145,14 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
     if (!isRecord(block.content)) throw new Error('Il contenuto del blocco non è valido.')
 
     switch (block.type) {
-      case 'text': return normalizeDraft({ type: 'text', text: block.content.text as string }, deps.newId)
-      case 'heading': return normalizeDraft({ type: 'heading', text: block.content.text as string }, deps.newId)
-      case 'checklist': return normalizeDraft({ type: 'checklist', items: block.content.items as ChecklistItemDraft[] }, deps.newId)
-      case 'divider': return { type: 'divider' }
+      case 'text':
+        return normalizeDraft({ type: 'text', text: block.content.text as string }, deps.newId)
+      case 'heading':
+        return normalizeDraft({ type: 'heading', text: block.content.text as string }, deps.newId)
+      case 'checklist':
+        return normalizeDraft({ type: 'checklist', items: block.content.items as ChecklistItemDraft[] }, deps.newId)
+      case 'divider':
+        return { type: 'divider' }
     }
   }
 
@@ -128,13 +163,25 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
       : contentFromDraft(defaultDraft(type as BasicPlannerBlockType))
 
     return deps.blocks.createAtEnd({
-      id: deps.newId(), tripId, dayId, type, content, createdAt: now, updatedAt: now,
+      id: deps.newId(),
+      tripId,
+      dayId,
+      type,
+      content,
+      createdAt: now,
+      updatedAt: now,
     })
   }
 
-  async function updatePlannerBlock(tripId: string, dayId: string, blockId: string, input: PlannerBlockDraft): Promise<Block> {
+  async function updatePlannerBlock(
+    tripId: string,
+    dayId: string,
+    blockId: string,
+    input: PlannerBlockDraft,
+  ): Promise<Block> {
     const block = await deps.blocks.get(blockId)
-    if (!block || block.tripId !== tripId || block.dayId !== dayId) throw new Error('Il blocco non appartiene a questa giornata.')
+    if (!block || block.tripId !== tripId || block.dayId !== dayId)
+      throw new Error('Il blocco non appartiene a questa giornata.')
     assertBasicPlannerType(block.type)
     if (block.type !== input.type) throw new Error('Il tipo del blocco non può essere cambiato durante la modifica.')
 
@@ -144,7 +191,12 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
     return updated
   }
 
-  async function movePlannerBlock(tripId: string, dayId: string, blockId: string, direction: BlockMoveDirection): Promise<void> {
+  async function movePlannerBlock(
+    tripId: string,
+    dayId: string,
+    blockId: string,
+    direction: BlockMoveDirection,
+  ): Promise<void> {
     const result = await deps.blocks.moveWithinDay(blockId, tripId, dayId, direction)
     if (result === 'not-found') throw new Error('Il blocco non esiste più.')
     if (result === 'invalid-context') throw new Error('Il blocco non appartiene a questa giornata.')
@@ -152,9 +204,12 @@ export function createPlannerApplication(deps: PlannerApplicationDependencies): 
 
   async function deletePlannerBlock(tripId: string, dayId: string, blockId: string): Promise<void> {
     const block = await deps.blocks.get(blockId)
-    if (!block || block.tripId !== tripId || block.dayId !== dayId) throw new Error('Il blocco non appartiene a questa giornata.')
+    if (!block || block.tripId !== tripId || block.dayId !== dayId)
+      throw new Error('Il blocco non appartiene a questa giornata.')
     if (transactionalDeleteBlockTypes.has(block.type)) {
-      throw new Error('Questo blocco deve essere eliminato dal suo editor dedicato per rimuovere in sicurezza i dati collegati.')
+      throw new Error(
+        'Questo blocco deve essere eliminato dal suo editor dedicato per rimuovere in sicurezza i dati collegati.',
+      )
     }
     const result = await deps.blocks.softDeleteWithinDay(blockId, tripId, dayId)
     if (result === 'not-found') throw new Error('Il blocco non esiste più.')

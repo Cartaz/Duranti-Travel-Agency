@@ -27,11 +27,7 @@ test('restaurant selection links the canonical place and initializes an empty ti
 })
 
 test('restaurant selection preserves a title already authored by the user', () => {
-  const next = selectSavedPlaceForReservation(
-    { ...emptyDraft, title: 'Cena di anniversario' },
-    place,
-    'restaurant',
-  )
+  const next = selectSavedPlaceForReservation({ ...emptyDraft, title: 'Cena di anniversario' }, place, 'restaurant')
 
   assert.equal(next.placeId, place.id)
   assert.equal(next.title, 'Cena di anniversario')

@@ -12,7 +12,8 @@ test('DTAgency application use-case contracts', async ({ page }) => {
   expect(response.status(), `Application harness returned HTTP ${response.status()}.`).toBeLessThan(400)
 
   await page.waitForFunction(
-    () => Array.isArray(window.__DTAGENCY_APPLICATION_RESULTS__) && window.__DTAGENCY_APPLICATION_RESULTS__.length === 6,
+    () =>
+      Array.isArray(window.__DTAGENCY_APPLICATION_RESULTS__) && window.__DTAGENCY_APPLICATION_RESULTS__.length === 6,
     null,
     { timeout: 30_000 },
   )
@@ -20,5 +21,8 @@ test('DTAgency application use-case contracts', async ({ page }) => {
   const results = await page.evaluate(() => window.__DTAGENCY_APPLICATION_RESULTS__)
   expect(consoleErrors, `Browser console errors:\n${consoleErrors.join('\n')}`).toEqual([])
   expect(results).toHaveLength(6)
-  expect(results.filter((result) => !result.ok), `Application contract failures:\n${JSON.stringify(results, null, 2)}`).toEqual([])
+  expect(
+    results.filter((result) => !result.ok),
+    `Application contract failures:\n${JSON.stringify(results, null, 2)}`,
+  ).toEqual([])
 })

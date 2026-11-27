@@ -24,7 +24,9 @@ test('real app restores a downloaded Vault snapshot and reloads the restored dat
   await protectCard.getByLabel('Password del backup').fill(password)
   await protectCard.getByLabel('Ripeti la password').fill(password)
   await protectCard.getByRole('button', { name: 'Prepara backup' }).click()
-  await expect(page.getByText('Backup cifrato pronto. Salvalo fuori da questo browser.')).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText('Backup cifrato pronto. Salvalo fuori da questo browser.')).toBeVisible({
+    timeout: 120_000,
+  })
 
   const downloadPromise = page.waitForEvent('download')
   await protectCard.getByRole('button', { name: 'Scarica file' }).click()

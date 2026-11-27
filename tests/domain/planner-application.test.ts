@@ -67,13 +67,15 @@ test('planner lists blocks through the semantic day query and keeps trip isolati
         return blocks
       },
       get: async () => undefined,
-      createAtEnd: async () => { throw new Error('unexpected create') },
+      createAtEnd: async () => {
+        throw new Error('unexpected create')
+      },
       putInEditableDay: async () => undefined,
       softDeleteWithinDay: async () => 'not-found',
       moveWithinDay: async () => 'boundary',
     },
-    trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
-    days: { getTripDay: async (tripId, dayId) => tripId === trip.id && dayId === day.id ? day : undefined },
+    trips: { getTrip: async (tripId) => (tripId === trip.id ? trip : undefined) },
+    days: { getTripDay: async (tripId, dayId) => (tripId === trip.id && dayId === day.id ? day : undefined) },
     now: () => timestamp,
     newId: () => 'new-block',
   })
@@ -81,7 +83,10 @@ test('planner lists blocks through the semantic day query and keeps trip isolati
   const listed = await application.listDayPlannerBlocks(trip.id, day.id)
 
   assert.deepEqual(queriedDayIds, [day.id])
-  assert.deepEqual(listed.map((block) => block.id), ['block-earlier', 'block-later'])
+  assert.deepEqual(
+    listed.map((block) => block.id),
+    ['block-earlier', 'block-later'],
+  )
 })
 
 test('planner delegates end-position allocation to the atomic block mutation', async () => {
@@ -90,7 +95,9 @@ test('planner delegates end-position allocation to the atomic block mutation', a
 
   const application = createPlannerApplication({
     blocks: {
-      listByDay: async () => { throw new Error('application must not allocate position from a pre-read') },
+      listByDay: async () => {
+        throw new Error('application must not allocate position from a pre-read')
+      },
       get: async () => undefined,
       createAtEnd: async (block) => {
         received = block
@@ -100,8 +107,8 @@ test('planner delegates end-position allocation to the atomic block mutation', a
       softDeleteWithinDay: async () => 'not-found',
       moveWithinDay: async () => 'boundary',
     },
-    trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
-    days: { getTripDay: async (tripId, dayId) => tripId === trip.id && dayId === day.id ? day : undefined },
+    trips: { getTrip: async (tripId) => (tripId === trip.id ? trip : undefined) },
+    days: { getTripDay: async (tripId, dayId) => (tripId === trip.id && dayId === day.id ? day : undefined) },
     now: () => '2026-08-25T13:00:00.000Z',
     newId: () => 'block-new',
   })
@@ -132,22 +139,24 @@ test('planner generic delete refuses blocks whose linked data needs a transactio
   const application = createPlannerApplication({
     blocks: {
       listByDay: async () => [expenseBlock],
-      get: async (blockId) => blockId === expenseBlock.id ? expenseBlock : undefined,
-      createAtEnd: async () => { throw new Error('unexpected create') },
+      get: async (blockId) => (blockId === expenseBlock.id ? expenseBlock : undefined),
+      createAtEnd: async () => {
+        throw new Error('unexpected create')
+      },
       putInEditableDay: async () => undefined,
-      softDeleteWithinDay: async () => { softDeleteCalls += 1; return 'tombstoned' },
+      softDeleteWithinDay: async () => {
+        softDeleteCalls += 1
+        return 'tombstoned'
+      },
       moveWithinDay: async () => 'boundary',
     },
-    trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
-    days: { getTripDay: async (tripId, dayId) => tripId === trip.id && dayId === day.id ? day : undefined },
+    trips: { getTrip: async (tripId) => (tripId === trip.id ? trip : undefined) },
+    days: { getTripDay: async (tripId, dayId) => (tripId === trip.id && dayId === day.id ? day : undefined) },
     now: () => timestamp,
     newId: () => 'new-block',
   })
 
-  await assert.rejects(
-    application.deletePlannerBlock(trip.id, day.id, expenseBlock.id),
-    /editor dedicato/,
-  )
+  await assert.rejects(application.deletePlannerBlock(trip.id, day.id, expenseBlock.id), /editor dedicato/)
   assert.equal(softDeleteCalls, 0)
 })
 
@@ -168,8 +177,10 @@ test('planner generic delete delegates standalone tombstones to the contextual m
   const application = createPlannerApplication({
     blocks: {
       listByDay: async () => [textBlock],
-      get: async (blockId) => blockId === textBlock.id ? textBlock : undefined,
-      createAtEnd: async () => { throw new Error('unexpected create') },
+      get: async (blockId) => (blockId === textBlock.id ? textBlock : undefined),
+      createAtEnd: async () => {
+        throw new Error('unexpected create')
+      },
       putInEditableDay: async () => undefined,
       softDeleteWithinDay: async (blockId, tripId, dayId) => {
         deleted.push([blockId, tripId, dayId])
@@ -177,8 +188,8 @@ test('planner generic delete delegates standalone tombstones to the contextual m
       },
       moveWithinDay: async () => 'boundary',
     },
-    trips: { getTrip: async (tripId) => tripId === trip.id ? trip : undefined },
-    days: { getTripDay: async (tripId, dayId) => tripId === trip.id && dayId === day.id ? day : undefined },
+    trips: { getTrip: async (tripId) => (tripId === trip.id ? trip : undefined) },
+    days: { getTripDay: async (tripId, dayId) => (tripId === trip.id && dayId === day.id ? day : undefined) },
     now: () => timestamp,
     newId: () => 'new-block',
   })

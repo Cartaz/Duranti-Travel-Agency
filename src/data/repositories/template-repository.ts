@@ -7,10 +7,7 @@ export class TemplateRepository extends Repository<Template> {
     super(db.templates)
   }
 
-  async listByCategory(
-    category: string,
-    options: RepositoryReadOptions = {},
-  ): Promise<Template[]> {
+  async listByCategory(category: string, options: RepositoryReadOptions = {}): Promise<Template[]> {
     const templates = await db.templates.where('category').equals(category).toArray()
     if (options.includeDeleted) return templates
     return templates.filter((template) => !template.deletedAt)

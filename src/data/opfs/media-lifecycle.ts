@@ -1,10 +1,4 @@
-import {
-  buildMediaPath,
-  deleteMediaFile,
-  mediaFileExists,
-  readMediaFile,
-  writeMediaFile,
-} from './opfs-store'
+import { buildMediaPath, deleteMediaFile, mediaFileExists, readMediaFile, writeMediaFile } from './opfs-store'
 
 export interface MediaFileInfo {
   id: string

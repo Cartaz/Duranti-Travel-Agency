@@ -30,7 +30,10 @@ test('real app reads day media through the travel book and navigates chapters', 
   await page.getByLabel('+ Aggiungi ricordi').setInputFiles({
     name: mediaName,
     mimeType: 'image/png',
-    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    ),
   })
   await expect(page.getByText(new RegExp(mediaName))).toBeVisible()
 

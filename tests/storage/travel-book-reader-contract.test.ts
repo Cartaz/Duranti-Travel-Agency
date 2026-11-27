@@ -18,5 +18,5 @@ test('travel book reader supports reduced motion and a narrow-screen spread', as
   const source = await readFile(cssPath, 'utf8')
   assert.ok(source.includes('prefers-reduced-motion: reduce'))
   assert.ok(source.includes('@media (max-width: 760px)'))
-  assert.ok(source.includes('.travel-book-spread { display: block; }'))
+  assert.match(source, /\.travel-book-spread\s*\{\s*display:\s*block;\s*\}/)
 })

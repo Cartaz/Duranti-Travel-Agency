@@ -42,9 +42,7 @@ export function majorAmountToMinor(amountInput: string, currencyInput: string): 
   }
 
   const factor = 10n ** BigInt(digits)
-  const fractionMinor = digits === 0
-    ? 0n
-    : BigInt((fraction + '0'.repeat(digits)).slice(0, digits))
+  const fractionMinor = digits === 0 ? 0n : BigInt((fraction + '0'.repeat(digits)).slice(0, digits))
   const minor = BigInt(whole) * factor + fractionMinor
 
   if (minor <= 0n) throw new Error('L’importo deve essere maggiore di zero.')
@@ -122,14 +120,9 @@ export function convertMinorByRate(
   return { rate, convertedAmountMinor: Number(converted) }
 }
 
-export function formatMinorCurrency(
-  amountMinor: number,
-  currencyInput: string,
-  locale = 'it-IT',
-): string {
+export function formatMinorCurrency(amountMinor: number, currencyInput: string, locale = 'it-IT'): string {
   const currency = normalizeCurrencyCode(currencyInput)
   const digits = currencyFractionDigits(currency)
   const divisor = 10 ** digits
-  return new Intl.NumberFormat(locale, { style: 'currency', currency })
-    .format(amountMinor / divisor)
+  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amountMinor / divisor)
 }

@@ -7,9 +7,11 @@ export type ItineraryMoveDirection = 'up' | 'down'
 export type OrphanResolutionAction = 'convert-to-manual' | 'delete'
 
 function compareManualUntimed(left: Itinerary, right: Itinerary): number {
-  return (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER)
-    || left.createdAt.localeCompare(right.createdAt)
-    || left.id.localeCompare(right.id)
+  return (
+    (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER) ||
+    left.createdAt.localeCompare(right.createdAt) ||
+    left.id.localeCompare(right.id)
+  )
 }
 
 async function normalizeManualUntimedPositions(items: Itinerary[]): Promise<Itinerary[]> {
@@ -26,7 +28,8 @@ function reservationIdFromBlock(block: Block | undefined): string | undefined {
   if (!block || !reservationTypeForBlockType(block.type)) return undefined
   const value = block.content.reservationId
   if (value === undefined) return undefined
-  if (typeof value !== 'string' || !value) throw new Error('Il planner contiene un riferimento prenotazione non valido.')
+  if (typeof value !== 'string' || !value)
+    throw new Error('Il planner contiene un riferimento prenotazione non valido.')
   return value
 }
 
@@ -44,38 +47,39 @@ export class ItineraryRepository extends Repository<Itinerary> {
   }
 
   async listByDay(dayId: string): Promise<Itinerary[]> {
-    return (await db.itineraries.where('dayId').equals(dayId).toArray())
-      .filter((item) => !item.deletedAt)
+    return (await db.itineraries.where('dayId').equals(dayId).toArray()).filter((item) => !item.deletedAt)
   }
 
   async listByTrip(tripId: string): Promise<Itinerary[]> {
-    return (await db.itineraries.where('tripId').equals(tripId).toArray())
-      .filter((item) => !item.deletedAt)
+    return (await db.itineraries.where('tripId').equals(tripId).toArray()).filter((item) => !item.deletedAt)
   }
 
   async saveManual(value: Itinerary): Promise<Itinerary> {
     return db.transaction('rw', db.trips, db.days, db.itineraries, async () => {
       if (!value.dayId) throw new Error('La tappa manuale deve appartenere a una giornata.')
       await requireEditableDay(value.tripId, value.dayId)
-      if (value.reservationId || value.blockId) throw new Error('Una tappa manuale non può possedere riferimenti di prenotazione.')
+      if (value.reservationId || value.blockId)
+        throw new Error('Una tappa manuale non può possedere riferimenti di prenotazione.')
 
       const existing = await db.itineraries.get(value.id)
       if (existing?.deletedAt) throw new Error('La tappa è stata eliminata e non può essere riattivata implicitamente.')
-      if (existing && (existing.tripId !== value.tripId || existing.dayId !== value.dayId || existing.reservationId || existing.blockId)) {
+      if (
+        existing &&
+        (existing.tripId !== value.tripId ||
+          existing.dayId !== value.dayId ||
+          existing.reservationId ||
+          existing.blockId)
+      ) {
         throw new Error('La tappa non appartiene a questa giornata.')
       }
 
       let position: number | undefined
       if (!value.startsAt) {
         const siblings = await normalizeManualUntimedPositions(
-          (await db.itineraries.where('dayId').equals(value.dayId).toArray())
-            .filter((item) => (
-              !item.deletedAt
-              && item.tripId === value.tripId
-              && !item.reservationId
-              && !item.blockId
-              && !item.startsAt
-            )),
+          (await db.itineraries.where('dayId').equals(value.dayId).toArray()).filter(
+            (item) =>
+              !item.deletedAt && item.tripId === value.tripId && !item.reservationId && !item.blockId && !item.startsAt,
+          ),
         )
         position = siblings.find((item) => item.id === value.id)?.position ?? siblings.length + 1
       }
@@ -97,8 +101,10 @@ export class ItineraryRepository extends Repository<Itinerary> {
       await requireEditableDay(tripId, dayId)
       const itinerary = await db.itineraries.get(itineraryId)
       if (!itinerary || itinerary.deletedAt) return 'not-found'
-      if (itinerary.tripId !== tripId || itinerary.dayId !== dayId) throw new Error('La tappa non appartiene a questa giornata.')
-      if (itinerary.reservationId || itinerary.blockId) throw new Error('Le tappe derivate da prenotazioni si eliminano dal relativo blocco del planner.')
+      if (itinerary.tripId !== tripId || itinerary.dayId !== dayId)
+        throw new Error('La tappa non appartiene a questa giornata.')
+      if (itinerary.reservationId || itinerary.blockId)
+        throw new Error('Le tappe derivate da prenotazioni si eliminano dal relativo blocco del planner.')
       const now = new Date().toISOString()
       await db.itineraries.put({ ...itinerary, deletedAt: now, updatedAt: now })
       return 'deleted'
@@ -116,17 +122,22 @@ export class ItineraryRepository extends Repository<Itinerary> {
       await requireEditableDay(tripId, dayId)
       const itinerary = await db.itineraries.get(itineraryId)
       if (!itinerary || itinerary.deletedAt) throw new Error('La tappa non esiste più.')
-      if (itinerary.tripId !== tripId || itinerary.dayId !== dayId) throw new Error('La tappa non appartiene a questa giornata.')
-      if (!itinerary.reservationId && !itinerary.blockId) throw new Error('La tappa è già manuale e non richiede una riconciliazione.')
+      if (itinerary.tripId !== tripId || itinerary.dayId !== dayId)
+        throw new Error('La tappa non appartiene a questa giornata.')
+      if (!itinerary.reservationId && !itinerary.blockId)
+        throw new Error('La tappa è già manuale e non richiede una riconciliazione.')
 
-      const blocks = (await db.blocks.where('dayId').equals(dayId).toArray())
-        .filter((block) => !block.deletedAt && block.tripId === tripId && block.dayId === dayId)
+      const blocks = (await db.blocks.where('dayId').equals(dayId).toArray()).filter(
+        (block) => !block.deletedAt && block.tripId === tripId && block.dayId === dayId,
+      )
       const linkedBlock = itinerary.blockId ? blocks.find((block) => block.id === itinerary.blockId) : undefined
       const reservationId = itinerary.reservationId ?? reservationIdFromBlock(linkedBlock)
       if (reservationId) {
         const sourceBlocks = blocks.filter((block) => reservationIdFromBlock(block) === reservationId)
         if (sourceBlocks.length > 1) {
-          throw new Error('Più blocchi attivi fanno riferimento alla stessa prenotazione: risolvi prima l’ambiguità nel planner.')
+          throw new Error(
+            'Più blocchi attivi fanno riferimento alla stessa prenotazione: risolvi prima l’ambiguità nel planner.',
+          )
         }
         const reservation = await db.reservations.get(reservationId)
         if (reservation && !reservation.deletedAt && sourceBlocks.length === 1) {
@@ -142,16 +153,16 @@ export class ItineraryRepository extends Repository<Itinerary> {
       let position: number | undefined
       if (!itinerary.startsAt) {
         const siblings = await normalizeManualUntimedPositions(
-          (await db.itineraries.where('dayId').equals(dayId).toArray())
-            .filter((item) => (
-              !item.deletedAt
-              && item.id !== itinerary.id
-              && item.tripId === tripId
-              && item.dayId === dayId
-              && !item.reservationId
-              && !item.blockId
-              && !item.startsAt
-            )),
+          (await db.itineraries.where('dayId').equals(dayId).toArray()).filter(
+            (item) =>
+              !item.deletedAt &&
+              item.id !== itinerary.id &&
+              item.tripId === tripId &&
+              item.dayId === dayId &&
+              !item.reservationId &&
+              !item.blockId &&
+              !item.startsAt,
+          ),
         )
         position = siblings.length + 1
       }
@@ -176,19 +187,16 @@ export class ItineraryRepository extends Repository<Itinerary> {
       await requireEditableDay(tripId, dayId)
       const target = await db.itineraries.get(itineraryId)
       if (!target || target.deletedAt) return false
-      if (target.tripId !== tripId || target.dayId !== dayId) throw new Error('La tappa non appartiene a questa giornata.')
-      if (target.reservationId || target.blockId) throw new Error('Le tappe derivate da prenotazioni seguono l’ordine del planner.')
+      if (target.tripId !== tripId || target.dayId !== dayId)
+        throw new Error('La tappa non appartiene a questa giornata.')
+      if (target.reservationId || target.blockId)
+        throw new Error('Le tappe derivate da prenotazioni seguono l’ordine del planner.')
       if (target.startsAt) throw new Error('Le tappe con orario sono ordinate cronologicamente.')
 
       const items = await normalizeManualUntimedPositions(
-        (await db.itineraries.where('dayId').equals(dayId).toArray())
-          .filter((item) => (
-            !item.deletedAt
-            && item.tripId === tripId
-            && !item.reservationId
-            && !item.blockId
-            && !item.startsAt
-          )),
+        (await db.itineraries.where('dayId').equals(dayId).toArray()).filter(
+          (item) => !item.deletedAt && item.tripId === tripId && !item.reservationId && !item.blockId && !item.startsAt,
+        ),
       )
 
       const currentIndex = items.findIndex((item) => item.id === itineraryId)

@@ -4,11 +4,7 @@ export function normalizeDateOnly(value: string, label = 'La data'): string {
 
   const [year, month, day] = date.split('-').map(Number)
   const parsed = new Date(Date.UTC(year, month - 1, day))
-  if (
-    parsed.getUTCFullYear() !== year
-    || parsed.getUTCMonth() !== month - 1
-    || parsed.getUTCDate() !== day
-  ) {
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
     throw new Error(`${label} non esiste nel calendario.`)
   }
 

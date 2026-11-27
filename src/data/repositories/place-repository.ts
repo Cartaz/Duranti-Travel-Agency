@@ -10,9 +10,7 @@ export interface PlaceReferenceCounts {
 }
 
 export type SafeDeletePlaceResult =
-  | { status: 'not-found' }
-  | { status: 'in-use'; references: PlaceReferenceCounts }
-  | { status: 'deleted' }
+  { status: 'not-found' } | { status: 'in-use'; references: PlaceReferenceCounts } | { status: 'deleted' }
 
 export class PlaceRepository extends Repository<Place> {
   constructor() {
@@ -25,10 +23,26 @@ export class PlaceRepository extends Repository<Place> {
       if (!place || place.deletedAt) return { status: 'not-found' }
 
       const [blocks, reservations, itineraries, media] = await Promise.all([
-        db.blocks.where('content.placeId').equals(id).toArray().then((items) => items.filter((item) => !item.deletedAt).length),
-        db.reservations.where('placeId').equals(id).toArray().then((items) => items.filter((item) => !item.deletedAt).length),
-        db.itineraries.where('placeId').equals(id).toArray().then((items) => items.filter((item) => !item.deletedAt).length),
-        db.media.where('placeId').equals(id).toArray().then((items) => items.filter((item) => !item.deletedAt).length),
+        db.blocks
+          .where('content.placeId')
+          .equals(id)
+          .toArray()
+          .then((items) => items.filter((item) => !item.deletedAt).length),
+        db.reservations
+          .where('placeId')
+          .equals(id)
+          .toArray()
+          .then((items) => items.filter((item) => !item.deletedAt).length),
+        db.itineraries
+          .where('placeId')
+          .equals(id)
+          .toArray()
+          .then((items) => items.filter((item) => !item.deletedAt).length),
+        db.media
+          .where('placeId')
+          .equals(id)
+          .toArray()
+          .then((items) => items.filter((item) => !item.deletedAt).length),
       ])
       const references = { blocks, reservations, itineraries, media }
       if (Object.values(references).some((count) => count > 0)) return { status: 'in-use', references }

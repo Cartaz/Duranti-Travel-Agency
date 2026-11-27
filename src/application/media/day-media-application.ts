@@ -35,8 +35,16 @@ export interface DayMediaDetailsDraft {
 export type DayMediaMoveDirection = 'up' | 'down'
 
 const mimeByExtension: Record<string, string> = {
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', avif: 'image/avif',
-  mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  avif: 'image/avif',
+  mp4: 'video/mp4',
+  m4v: 'video/mp4',
+  mov: 'video/quicktime',
+  webm: 'video/webm',
 }
 
 function kindForMime(mimeType: string | undefined): 'image' | 'video' | undefined {
@@ -55,12 +63,14 @@ function mediaDescriptor(file: File): { kind: 'image' | 'video'; mimeType: strin
   const declaredMime = file.type.trim().toLowerCase().split(';')[0]
   const declaredKind = kindForMime(declaredMime)
   const extensionKind = kindForMime(extensionMime)
-  if (declaredKind && extensionKind && declaredKind !== extensionKind) throw new Error('Il tipo del file non corrisponde alla sua estensione.')
+  if (declaredKind && extensionKind && declaredKind !== extensionKind)
+    throw new Error('Il tipo del file non corrisponde alla sua estensione.')
   const mimeType = declaredKind ? declaredMime : extensionMime
   const kind = kindForMime(mimeType)
   if (!kind || !mimeType) throw new Error('Formato non supportato. Seleziona una foto o un video.')
   const maximum = kind === 'image' ? MAX_DAY_IMAGE_BYTES : MAX_DAY_VIDEO_BYTES
-  if (file.size > maximum) throw new Error(kind === 'image' ? 'La foto supera il limite di 25 MiB.' : 'Il video supera il limite di 250 MiB.')
+  if (file.size > maximum)
+    throw new Error(kind === 'image' ? 'La foto supera il limite di 25 MiB.' : 'Il video supera il limite di 250 MiB.')
   return { kind, mimeType, originalName }
 }
 
@@ -89,7 +99,13 @@ export function createDayMediaApplication(deps: DayMediaApplicationDependencies)
   const contextDependencies = { trips: deps.trips, days: deps.days }
 
   async function assertDayContext(tripId: string, dayId: string, editable: boolean): Promise<void> {
-    await assertTripDayContext(contextDependencies, tripId, dayId, editable, 'Ripristina il viaggio prima di modificare foto e video.')
+    await assertTripDayContext(
+      contextDependencies,
+      tripId,
+      dayId,
+      editable,
+      'Ripristina il viaggio prima di modificare foto e video.',
+    )
   }
 
   async function listDayMedia(tripId: string, dayId: string): Promise<Media[]> {
@@ -138,23 +154,39 @@ export function createDayMediaApplication(deps: DayMediaApplicationDependencies)
   async function importDayMedia(tripId: string, dayId: string, file: File): Promise<Media> {
     await assertDayContext(tripId, dayId, true)
     const descriptor = mediaDescriptor(file)
-    return deps.media.create({ tripId, dayId, kind: descriptor.kind, mimeType: descriptor.mimeType, originalName: descriptor.originalName }, file)
+    return deps.media.create(
+      { tripId, dayId, kind: descriptor.kind, mimeType: descriptor.mimeType, originalName: descriptor.originalName },
+      file,
+    )
   }
 
   async function readDayMedia(media: Media, tripId: string, dayId: string): Promise<File> {
-    if (media.tripId !== tripId || media.dayId !== dayId || media.blockId || (media.kind !== 'image' && media.kind !== 'video')) {
+    if (
+      media.tripId !== tripId ||
+      media.dayId !== dayId ||
+      media.blockId ||
+      (media.kind !== 'image' && media.kind !== 'video')
+    ) {
       throw new Error('Il file non appartiene a questa giornata.')
     }
     return deps.media.getFile(media.id)
   }
 
-  async function updateDayMediaDetails(tripId: string, dayId: string, mediaId: string, input: DayMediaDetailsDraft): Promise<Media> {
+  async function updateDayMediaDetails(
+    tripId: string,
+    dayId: string,
+    mediaId: string,
+    input: DayMediaDetailsDraft,
+  ): Promise<Media> {
     await assertDayContext(tripId, dayId, true)
     const media = await deps.media.get(mediaId)
-    if (!media || media.tripId !== tripId || media.dayId !== dayId || media.blockId) throw new Error('La foto o il video non appartiene a questa giornata.')
-    if (input.caption.length > MAX_DAY_MEDIA_CAPTION_LENGTH) throw new Error(`La didascalia può contenere al massimo ${MAX_DAY_MEDIA_CAPTION_LENGTH} caratteri.`)
+    if (!media || media.tripId !== tripId || media.dayId !== dayId || media.blockId)
+      throw new Error('La foto o il video non appartiene a questa giornata.')
+    if (input.caption.length > MAX_DAY_MEDIA_CAPTION_LENGTH)
+      throw new Error(`La didascalia può contenere al massimo ${MAX_DAY_MEDIA_CAPTION_LENGTH} caratteri.`)
     const placeId = input.placeId?.trim() || undefined
-    if (placeId && placeId !== media.placeId && !(await deps.places.get(placeId))) throw new Error('Il luogo collegato non esiste più.')
+    if (placeId && placeId !== media.placeId && !(await deps.places.get(placeId)))
+      throw new Error('Il luogo collegato non esiste più.')
     let itineraryId: string | undefined
     let reservationId: string | undefined
     const itineraryKey = input.itineraryKey?.trim() || undefined
@@ -174,13 +206,27 @@ export function createDayMediaApplication(deps: DayMediaApplicationDependencies)
     return deps.media.updateDayMetadata(mediaId, { caption: input.caption, placeId, itineraryId, reservationId })
   }
 
-  async function updateDayMediaCaption(tripId: string, dayId: string, mediaId: string, caption: string): Promise<Media> {
+  async function updateDayMediaCaption(
+    tripId: string,
+    dayId: string,
+    mediaId: string,
+    caption: string,
+  ): Promise<Media> {
     const media = await deps.media.get(mediaId)
     if (!media) throw new Error('La foto o il video non esiste più.')
-    return updateDayMediaDetails(tripId, dayId, mediaId, { caption, placeId: media.placeId, itineraryKey: dayMediaItineraryKey(media) })
+    return updateDayMediaDetails(tripId, dayId, mediaId, {
+      caption,
+      placeId: media.placeId,
+      itineraryKey: dayMediaItineraryKey(media),
+    })
   }
 
-  async function moveDayMedia(tripId: string, dayId: string, mediaId: string, direction: DayMediaMoveDirection): Promise<void> {
+  async function moveDayMedia(
+    tripId: string,
+    dayId: string,
+    mediaId: string,
+    direction: DayMediaMoveDirection,
+  ): Promise<void> {
     await assertDayContext(tripId, dayId, true)
     const items = await deps.media.listForDay(tripId, dayId)
     const index = items.findIndex((item) => item.id === mediaId)
@@ -194,11 +240,21 @@ export function createDayMediaApplication(deps: DayMediaApplicationDependencies)
 
   async function removeDayMedia(tripId: string, dayId: string, mediaId: string): Promise<void> {
     await deps.media.softDeleteForDay(mediaId, tripId, dayId)
-    try { await deps.media.purge(mediaId) } catch { /* tombstone keeps media hidden */ }
+    try {
+      await deps.media.purge(mediaId)
+    } catch {
+      /* tombstone keeps media hidden */
+    }
   }
 
   return {
-    listDayMedia, listDayMediaContext, importDayMedia, readDayMedia, updateDayMediaDetails,
-    updateDayMediaCaption, moveDayMedia, removeDayMedia,
+    listDayMedia,
+    listDayMediaContext,
+    importDayMedia,
+    readDayMedia,
+    updateDayMediaDetails,
+    updateDayMediaCaption,
+    moveDayMedia,
+    removeDayMedia,
   }
 }

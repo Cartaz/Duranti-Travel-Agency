@@ -7,7 +7,7 @@
   overflow: hidden;
   border: 1px solid #44382e;
   border-radius: 16px;
-  background: rgba(17, 14, 11, .62);
+  background: rgba(17, 14, 11, 0.62);
 }
 
 .day-template-save > summary {
@@ -50,7 +50,7 @@
   padding: 4px 7px;
   color: #c9ae8c;
   font-size: 9px;
-  letter-spacing: .07em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
@@ -119,7 +119,7 @@
 }
 
 .day-template-save-actions button:disabled {
-  opacity: .45;
+  opacity: 0.45;
   cursor: default;
 }
 
@@ -134,13 +134,13 @@
 
 .day-template-save-error {
   border: 1px solid #6a3f38;
-  background: rgba(106, 63, 56, .16);
+  background: rgba(106, 63, 56, 0.16);
   color: #e0a093;
 }
 
 .day-template-save-status {
   border: 1px solid #46553b;
-  background: rgba(70, 85, 59, .14);
+  background: rgba(70, 85, 59, 0.14);
   color: #b9c99e;
 }
 

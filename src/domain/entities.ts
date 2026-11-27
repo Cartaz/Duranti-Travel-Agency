@@ -103,10 +103,23 @@ export interface Day extends EntityBase {
 }
 
 export type BlockType =
-  | 'text' | 'heading' | 'checklist' | 'place' | 'map' | 'media'
-  | 'link' | 'quote' | 'divider' | 'table' | 'expense'
-  | 'transport' | 'accommodation' | 'restaurant' | 'activity'
-  | 'document' | 'weatherSnapshot'
+  | 'text'
+  | 'heading'
+  | 'checklist'
+  | 'place'
+  | 'map'
+  | 'media'
+  | 'link'
+  | 'quote'
+  | 'divider'
+  | 'table'
+  | 'expense'
+  | 'transport'
+  | 'accommodation'
+  | 'restaurant'
+  | 'activity'
+  | 'document'
+  | 'weatherSnapshot'
 
 export interface Block extends EntityBase {
   tripId: string

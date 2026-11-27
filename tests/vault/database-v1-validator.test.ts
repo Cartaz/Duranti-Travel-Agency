@@ -12,29 +12,45 @@ function table(name: string, rows: unknown[]): VaultTableSnapshot {
 
 test('Vault v1 semantic validation rejects impossible calendar dates', () => {
   assert.throws(
-    () => validateDatabaseV1Semantics([
-      table('trips', [{
-        id: 'trip-1', title: 'Impossible', status: 'planned',
-        startDate: '2026-02-30', createdAt: timestamp, updatedAt: timestamp,
-      }]),
-    ]),
+    () =>
+      validateDatabaseV1Semantics([
+        table('trips', [
+          {
+            id: 'trip-1',
+            title: 'Impossible',
+            status: 'planned',
+            startDate: '2026-02-30',
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ]),
+      ]),
     /does not exist in the calendar/,
   )
 })
 
 test('Vault v1 semantic validation rejects dangling traveler document ownership', () => {
   assert.throws(
-    () => validateDatabaseV1Semantics([
-      table('travelers', []),
-      table('travelerDocuments', [{
-        id: 'document-1', travelerId: 'traveler-missing', type: 'passport',
-        encryptedPayload: {
-          version: 1, algorithm: 'AES-GCM', tagLength: 128,
-          ivB64: 'AA==', ciphertextB64: 'AA==',
-        },
-        createdAt: timestamp, updatedAt: timestamp,
-      }]),
-    ]),
+    () =>
+      validateDatabaseV1Semantics([
+        table('travelers', []),
+        table('travelerDocuments', [
+          {
+            id: 'document-1',
+            travelerId: 'traveler-missing',
+            type: 'passport',
+            encryptedPayload: {
+              version: 1,
+              algorithm: 'AES-GCM',
+              tagLength: 128,
+              ivB64: 'AA==',
+              ciphertextB64: 'AA==',
+            },
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ]),
+      ]),
     /references missing entity traveler-missing/,
   )
 })

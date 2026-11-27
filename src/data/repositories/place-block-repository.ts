@@ -3,12 +3,7 @@ import type { Place } from '../../domain/entities'
 import { db } from '../db/dtagency-db'
 
 export class PlaceBlockRepository {
-  async savePlaceForBlock(
-    blockId: string,
-    tripId: string,
-    dayId: string,
-    place: Place,
-  ): Promise<void> {
+  async savePlaceForBlock(blockId: string, tripId: string, dayId: string, place: Place): Promise<void> {
     await db.transaction('rw', db.blocks, db.places, async () => {
       const block = await db.blocks.get(blockId)
       if (!block || block.deletedAt) throw new Error('Il blocco luogo non esiste più.')

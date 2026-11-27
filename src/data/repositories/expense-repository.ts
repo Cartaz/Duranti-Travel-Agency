@@ -8,8 +8,7 @@ export class ExpenseRepository extends Repository<Expense> {
   }
 
   async listByTrip(tripId: string): Promise<Expense[]> {
-    return (await db.expenses.where('tripId').equals(tripId).toArray())
-      .filter((expense) => !expense.deletedAt)
+    return (await db.expenses.where('tripId').equals(tripId).toArray()).filter((expense) => !expense.deletedAt)
   }
 }
 

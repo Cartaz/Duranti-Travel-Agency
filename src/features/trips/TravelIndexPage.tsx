@@ -35,8 +35,9 @@ function formatTripDates(trip: Trip): string {
   const format = (value: string): string => {
     const [year, month, day] = value.split('-').map(Number)
     if (!year || !month || !day) return value
-    return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short', year: 'numeric' })
-      .format(new Date(year, month - 1, day))
+    return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short', year: 'numeric' }).format(
+      new Date(year, month - 1, day),
+    )
   }
 
   if (trip.startDate && trip.endDate) return `${format(trip.startDate)} — ${format(trip.endDate)}`
@@ -53,7 +54,8 @@ export default function TravelIndexPage() {
 
   useEffect(() => {
     let cancelled = false
-    void tripApplication.listBookTrips()
+    void tripApplication
+      .listBookTrips()
       .then((items) => {
         if (!cancelled) setTrips(items)
       })
@@ -70,10 +72,7 @@ export default function TravelIndexPage() {
   }, [tripApplication])
 
   const groups = useMemo(() => {
-    return new Map(chapters.map((chapter) => [
-      chapter.key,
-      trips.filter((trip) => trip.status === chapter.key),
-    ]))
+    return new Map(chapters.map((chapter) => [chapter.key, trips.filter((trip) => trip.status === chapter.key)]))
   }, [trips])
 
   return (
@@ -89,9 +88,15 @@ export default function TravelIndexPage() {
         </div>
         <div className="book-intro-actions">
           <div className="trip-index-actions">
-            <Link className="trip-secondary-action" to="/travelers">Viaggiatori</Link>
-            <Link className="trip-secondary-action" to="/archive">Archivio</Link>
-            <Link className="trip-primary-action" to="/trips/new">Nuovo viaggio</Link>
+            <Link className="trip-secondary-action" to="/travelers">
+              Viaggiatori
+            </Link>
+            <Link className="trip-secondary-action" to="/archive">
+              Archivio
+            </Link>
+            <Link className="trip-primary-action" to="/trips/new">
+              Nuovo viaggio
+            </Link>
           </div>
           <div className="book-emblem" aria-hidden="true">
             <span>DTA</span>
@@ -100,8 +105,16 @@ export default function TravelIndexPage() {
         </div>
       </div>
 
-      {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
-      {loading && <p className="trip-feedback" role="status">Apro l’indice locale…</p>}
+      {error && (
+        <p className="trip-feedback trip-feedback-error" role="alert">
+          {error}
+        </p>
+      )}
+      {loading && (
+        <p className="trip-feedback" role="status">
+          Apro l’indice locale…
+        </p>
+      )}
 
       <div className="chapter-list" aria-label="Indice dei viaggi">
         {chapters.map((chapter, index) => {

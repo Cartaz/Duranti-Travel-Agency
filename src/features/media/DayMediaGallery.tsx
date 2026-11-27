@@ -37,22 +37,25 @@ export default function DayMediaGallery({
   const [lightboxIndex, setLightboxIndex] = useState<number>()
   const [error, setError] = useState('')
 
-  const refresh = useCallback(async (preserveError = false): Promise<void> => {
-    setLoading(true)
-    if (!preserveError) setError('')
-    try {
-      const [loadedItems, loadedContext] = await Promise.all([
-        mediaApplication.listDayMedia(tripId, dayId),
-        mediaApplication.listDayMediaContext(tripId, dayId),
-      ])
-      setItems(loadedItems)
-      setContext(loadedContext)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Impossibile leggere foto e video della giornata.')
-    } finally {
-      setLoading(false)
-    }
-  }, [dayId, mediaApplication, tripId])
+  const refresh = useCallback(
+    async (preserveError = false): Promise<void> => {
+      setLoading(true)
+      if (!preserveError) setError('')
+      try {
+        const [loadedItems, loadedContext] = await Promise.all([
+          mediaApplication.listDayMedia(tripId, dayId),
+          mediaApplication.listDayMediaContext(tripId, dayId),
+        ])
+        setItems(loadedItems)
+        setContext(loadedContext)
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Impossibile leggere foto e video della giornata.')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [dayId, mediaApplication, tripId],
+  )
 
   useEffect(() => {
     void refresh()
@@ -113,13 +116,25 @@ export default function DayMediaGallery({
         )}
       </div>
 
-      {error && <p className="day-media-error" role="alert">{error}</p>}
-      {loading && <p className="day-media-status" role="status">Apro i ricordi della giornata…</p>}
+      {error && (
+        <p className="day-media-error" role="alert">
+          {error}
+        </p>
+      )}
+      {loading && (
+        <p className="day-media-status" role="status">
+          Apro i ricordi della giornata…
+        </p>
+      )}
 
       {!loading && items.length === 0 && (
         <div className="day-media-empty">
           <strong>Nessuna foto o video ancora.</strong>
-          <span>{readOnly ? 'Questa giornata non contiene ricordi multimediali.' : 'Aggiungi una foto o un video per iniziare la galleria.'}</span>
+          <span>
+            {readOnly
+              ? 'Questa giornata non contiene ricordi multimediali.'
+              : 'Aggiungi una foto o un video per iniziare la galleria.'}
+          </span>
         </div>
       )}
 
@@ -189,16 +204,18 @@ function DayMediaCard({
   const [confirmRemove, setConfirmRemove] = useState(false)
 
   const originalItineraryKey = dayMediaItineraryKey(media)
-  const detailsChanged = caption.trim() !== (media.caption ?? '').trim()
-    || placeId !== (media.placeId ?? '')
-    || itineraryKey !== originalItineraryKey
+  const detailsChanged =
+    caption.trim() !== (media.caption ?? '').trim() ||
+    placeId !== (media.placeId ?? '') ||
+    itineraryKey !== originalItineraryKey
   const placeOption = context.places.find((option) => option.id === placeId)
   const itineraryOption = context.itineraries.find((option) => option.key === itineraryKey)
 
   useEffect(() => {
     let cancelled = false
     let url = ''
-    void mediaApplication.readDayMedia(media, tripId, dayId)
+    void mediaApplication
+      .readDayMedia(media, tripId, dayId)
       .then((file) => {
         if (cancelled) return
         url = URL.createObjectURL(file)
@@ -263,7 +280,9 @@ function DayMediaCard({
   return (
     <article className="day-media-card">
       <div className="day-media-preview">
-        {objectUrl && media.kind === 'image' && <img src={objectUrl} alt={media.caption || media.originalName || 'Foto della giornata'} />}
+        {objectUrl && media.kind === 'image' && (
+          <img src={objectUrl} alt={media.caption || media.originalName || 'Foto della giornata'} />
+        )}
         {objectUrl && media.kind === 'video' && <video src={objectUrl} controls preload="metadata" />}
         {!objectUrl && !previewError && <span role="status">Carico anteprima…</span>}
         {previewError && <span className="day-media-preview-error">{previewError}</span>}
@@ -272,7 +291,9 @@ function DayMediaCard({
       <div className="day-media-card-copy">
         <div className="day-media-meta">
           <strong>{media.kind === 'image' ? 'Foto' : 'Video'}</strong>
-          <span>{media.originalName ?? 'File locale'} · {formatBytes(media.sizeBytes)}</span>
+          <span>
+            {media.originalName ?? 'File locale'} · {formatBytes(media.sizeBytes)}
+          </span>
         </div>
 
         {readOnly ? (
@@ -281,7 +302,9 @@ function DayMediaCard({
             {(media.placeId || originalItineraryKey) && (
               <div className="day-media-linked-summary">
                 {media.placeId && <span>Luogo: {placeOption?.name ?? 'collegamento non più disponibile'}</span>}
-                {originalItineraryKey && <span>Tappa: {itineraryOption?.title ?? 'collegamento non più disponibile'}</span>}
+                {originalItineraryKey && (
+                  <span>Tappa: {itineraryOption?.title ?? 'collegamento non più disponibile'}</span>
+                )}
               </div>
             )}
           </>
@@ -296,7 +319,9 @@ function DayMediaCard({
                 placeholder="Dove eravamo, cosa stavamo facendo, cosa vuoi ricordare…"
                 onChange={(event) => setCaption(event.target.value)}
               />
-              <small>{caption.length}/{MAX_DAY_MEDIA_CAPTION_LENGTH}</small>
+              <small>
+                {caption.length}/{MAX_DAY_MEDIA_CAPTION_LENGTH}
+              </small>
             </label>
 
             <details className="day-media-links-editor">
@@ -313,17 +338,24 @@ function DayMediaCard({
                   <select value={placeId} onChange={(event) => setPlaceId(event.target.value)}>
                     <option value="">Nessun luogo</option>
                     {placeId && !placeOption && <option value={placeId}>Luogo non più nella giornata</option>}
-                    {context.places.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+                    {context.places.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label>
                   <span>Tappa</span>
                   <select value={itineraryKey} onChange={(event) => setItineraryKey(event.target.value)}>
                     <option value="">Nessuna tappa</option>
-                    {itineraryKey && !itineraryOption && <option value={itineraryKey}>Tappa non più disponibile</option>}
+                    {itineraryKey && !itineraryOption && (
+                      <option value={itineraryKey}>Tappa non più disponibile</option>
+                    )}
                     {context.itineraries.map((option) => (
                       <option key={option.key} value={option.key}>
-                        {option.title}{option.placeName ? ` · ${option.placeName}` : ''}
+                        {option.title}
+                        {option.placeName ? ` · ${option.placeName}` : ''}
                       </option>
                     ))}
                   </select>
@@ -335,15 +367,38 @@ function DayMediaCard({
 
         {!confirmRemove && (
           <div className="day-media-card-actions">
-            <button type="button" onClick={onOpen}>Apri</button>
+            <button type="button" onClick={onOpen}>
+              Apri
+            </button>
             {!readOnly && (
               <>
-                <button type="button" disabled={saving || !canMoveUp} aria-label="Sposta ricordo su" title="Sposta su" onClick={() => void move('up')}>↑</button>
-                <button type="button" disabled={saving || !canMoveDown} aria-label="Sposta ricordo giù" title="Sposta giù" onClick={() => void move('down')}>↓</button>
+                <button
+                  type="button"
+                  disabled={saving || !canMoveUp}
+                  aria-label="Sposta ricordo su"
+                  title="Sposta su"
+                  onClick={() => void move('up')}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  disabled={saving || !canMoveDown}
+                  aria-label="Sposta ricordo giù"
+                  title="Sposta giù"
+                  onClick={() => void move('down')}
+                >
+                  ↓
+                </button>
                 <button type="button" disabled={saving || !detailsChanged} onClick={() => void saveDetails()}>
                   {saving ? 'Aggiornamento…' : 'Salva dettagli'}
                 </button>
-                <button className="day-media-remove" type="button" disabled={saving} onClick={() => setConfirmRemove(true)}>
+                <button
+                  className="day-media-remove"
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setConfirmRemove(true)}
+                >
                   Rimuovi
                 </button>
               </>

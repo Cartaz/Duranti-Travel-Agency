@@ -9,8 +9,7 @@ export class TripRepository extends Repository<Trip> {
   }
 
   async listByStatus(status: TripStatus): Promise<Trip[]> {
-    return (await db.trips.where('status').equals(status).toArray())
-      .filter((trip) => !trip.deletedAt)
+    return (await db.trips.where('status').equals(status).toArray()).filter((trip) => !trip.deletedAt)
   }
 
   async listBookTrips(): Promise<Trip[]> {
@@ -29,14 +28,14 @@ export class TripRepository extends Repository<Trip> {
       if (!current || current.deletedAt) throw new Error('Il viaggio non esiste o è stato eliminato.')
       if (current.status === 'archived') throw new Error('Ripristina il viaggio dall’archivio prima di modificarlo.')
 
-      const days = (await db.days.where('tripId').equals(value.id).toArray())
-        .filter((day) => !day.deletedAt)
+      const days = (await db.days.where('tripId').equals(value.id).toArray()).filter((day) => !day.deletedAt)
       const invalidDays = days
         .filter((day) => !isDayDateWithinTripRange(value, day.date))
         .sort((left, right) => left.date.localeCompare(right.date))
       if (invalidDays.length > 0) {
         const first = invalidDays[0]
-        const extra = invalidDays.length > 1 ? ` Ci sono anche altre ${invalidDays.length - 1} giornate fuori intervallo.` : ''
+        const extra =
+          invalidDays.length > 1 ? ` Ci sono anche altre ${invalidDays.length - 1} giornate fuori intervallo.` : ''
         throw new Error(
           `Non posso salvare queste date: la giornata del ${first.date} resterebbe fuori dal nuovo intervallo.${extra} Modifica prima le giornate interessate oppure amplia l’intervallo del viaggio.`,
         )

@@ -19,8 +19,12 @@
   font-weight: 500;
 }
 
-.travelers-heading h1 { font-size: clamp(34px, 8vw, 58px); }
-.trip-travelers-heading h2 { font-size: clamp(24px, 5vw, 34px); }
+.travelers-heading h1 {
+  font-size: clamp(34px, 8vw, 58px);
+}
+.trip-travelers-heading h2 {
+  font-size: clamp(24px, 5vw, 34px);
+}
 
 .travelers-heading p,
 .trip-travelers-heading p {
@@ -43,11 +47,17 @@
   padding: 14px 16px;
   border: 1px solid #45503c;
   border-radius: 16px;
-  background: rgba(38, 47, 32, .48);
+  background: rgba(38, 47, 32, 0.48);
 }
 
-.traveler-privacy-note strong { color: #d6dcb8; }
-.traveler-privacy-note span { color: #aebc9b; line-height: 1.45; font-size: 13px; }
+.traveler-privacy-note strong {
+  color: #d6dcb8;
+}
+.traveler-privacy-note span {
+  color: #aebc9b;
+  line-height: 1.45;
+  font-size: 13px;
+}
 
 .travelers-empty,
 .trip-travelers-empty,
@@ -66,7 +76,9 @@
   gap: 14px;
 }
 
-.travelers-empty span { color: #938472; }
+.travelers-empty span {
+  color: #938472;
+}
 
 .traveler-card-list,
 .trip-participant-list {
@@ -82,7 +94,7 @@
   padding: 16px;
   border: 1px solid #43372c;
   border-radius: 18px;
-  background: rgba(29, 24, 19, .84);
+  background: rgba(29, 24, 19, 0.84);
 }
 
 .traveler-avatar {
@@ -96,7 +108,7 @@
   background: #22291d;
   color: #d7dcbd;
   font-family: Georgia, serif;
-  letter-spacing: .04em;
+  letter-spacing: 0.04em;
 }
 
 .traveler-avatar-small {
@@ -142,7 +154,7 @@
   padding: 20px;
   border: 1px solid #43372c;
   border-radius: 22px;
-  background: rgba(28, 23, 18, .84);
+  background: rgba(28, 23, 18, 0.84);
 }
 
 .traveler-form-grid {
@@ -172,8 +184,12 @@
   font: inherit;
 }
 
-.traveler-form textarea { resize: vertical; }
-.traveler-form-wide { grid-column: 1 / -1; }
+.traveler-form textarea {
+  resize: vertical;
+}
+.traveler-form-wide {
+  grid-column: 1 / -1;
+}
 
 .traveler-form-actions {
   display: flex;
@@ -188,7 +204,7 @@
   padding: 20px;
   border: 1px solid #43372c;
   border-radius: 22px;
-  background: rgba(26, 22, 17, .76);
+  background: rgba(26, 22, 17, 0.76);
 }
 
 .trip-participant-row {
@@ -199,7 +215,7 @@
   padding: 11px;
   border: 1px solid #3c3229;
   border-radius: 15px;
-  background: rgba(14, 12, 10, .34);
+  background: rgba(14, 12, 10, 0.34);
 }
 
 .trip-participant-row button {
@@ -208,7 +224,7 @@
 
 .trip-traveler-add {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(130px, .7fr) auto;
+  grid-template-columns: minmax(0, 1.4fr) minmax(130px, 0.7fr) auto;
   align-items: end;
   gap: 10px;
   padding-top: 14px;
@@ -221,7 +237,9 @@
     display: grid;
   }
 
-  .travelers-heading-actions { justify-content: flex-start; }
+  .travelers-heading-actions {
+    justify-content: flex-start;
+  }
 
   .traveler-card {
     grid-template-columns: auto minmax(0, 1fr);
@@ -232,8 +250,12 @@
     text-align: center;
   }
 
-  .traveler-form-grid { grid-template-columns: 1fr; }
-  .traveler-form-wide { grid-column: auto; }
+  .traveler-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .traveler-form-wide {
+    grid-column: auto;
+  }
 
   .trip-participant-row {
     grid-template-columns: auto minmax(0, 1fr);
@@ -244,7 +266,9 @@
     grid-column: 1 / -1;
   }
 
-  .trip-traveler-add { grid-template-columns: 1fr; }
+  .trip-traveler-add {
+    grid-template-columns: 1fr;
+  }
 
   .travelers-empty,
   .trip-travelers-create-first {

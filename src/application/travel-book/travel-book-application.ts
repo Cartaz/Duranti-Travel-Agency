@@ -36,7 +36,8 @@ export interface TravelBookApplication {
 }
 
 function toTravelBookMedia(media: Media): TravelBookMedia {
-  if (media.kind !== 'image' && media.kind !== 'video') throw new Error('Il media non è supportato dal libro di viaggio.')
+  if (media.kind !== 'image' && media.kind !== 'video')
+    throw new Error('Il media non è supportato dal libro di viaggio.')
   return {
     id: media.id,
     kind: media.kind,
@@ -51,8 +52,10 @@ export function createTravelBookApplication(deps: TravelBookApplicationDependenc
     const trip = await deps.trips.getTrip(tripId)
     if (!trip) throw new Error('Il viaggio non esiste o è stato eliminato.')
 
-    const days = [...await deps.days.listTripDays(tripId)]
-      .sort((left, right) => left.sequence - right.sequence || left.date.localeCompare(right.date) || left.id.localeCompare(right.id))
+    const days = [...(await deps.days.listTripDays(tripId))].sort(
+      (left, right) =>
+        left.sequence - right.sequence || left.date.localeCompare(right.date) || left.id.localeCompare(right.id),
+    )
 
     const chapterMedia = await Promise.all(days.map((day) => deps.media.listDayMedia(tripId, day.id)))
     const chapters = days.map((day, index) => ({

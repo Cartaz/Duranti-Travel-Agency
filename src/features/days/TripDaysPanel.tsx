@@ -7,8 +7,9 @@ import './days.css'
 function formatDayDate(value: string): string {
   const [year, month, day] = value.split('-').map(Number)
   if (!year || !month || !day) return value
-  return new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: 'numeric', month: 'long' })
-    .format(new Date(year, month - 1, day))
+  return new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: 'numeric', month: 'long' }).format(
+    new Date(year, month - 1, day),
+  )
 }
 
 export default function TripDaysPanel({ trip }: { trip: Trip }) {
@@ -19,7 +20,8 @@ export default function TripDaysPanel({ trip }: { trip: Trip }) {
 
   useEffect(() => {
     let cancelled = false
-    void dayApplication.listTripDays(trip.id)
+    void dayApplication
+      .listTripDays(trip.id)
       .then((items) => {
         if (!cancelled) setDays(items)
       })
@@ -43,11 +45,23 @@ export default function TripDaysPanel({ trip }: { trip: Trip }) {
           <h2 id="trip-days-title">Giornate</h2>
           <p>Ogni giornata raccoglie programma, tappe e ricordi in un’unica pagina.</p>
         </div>
-        {trip.status !== 'archived' && <Link className="trip-primary-action" to={`/trips/${trip.id}/days/new`}>Nuova giornata</Link>}
+        {trip.status !== 'archived' && (
+          <Link className="trip-primary-action" to={`/trips/${trip.id}/days/new`}>
+            Nuova giornata
+          </Link>
+        )}
       </div>
 
-      {error && <p className="trip-feedback trip-feedback-error" role="alert">{error}</p>}
-      {loading && <p className="trip-feedback" role="status">Apro le pagine del viaggio…</p>}
+      {error && (
+        <p className="trip-feedback trip-feedback-error" role="alert">
+          {error}
+        </p>
+      )}
+      {loading && (
+        <p className="trip-feedback" role="status">
+          Apro le pagine del viaggio…
+        </p>
+      )}
 
       {!loading && days.length === 0 && (
         <div className="days-empty">
@@ -60,7 +74,9 @@ export default function TripDaysPanel({ trip }: { trip: Trip }) {
         <ol className="day-list">
           {days.map((day) => (
             <li className="day-card" key={day.id}>
-              <span className="day-sequence" aria-label={`Giorno ${day.sequence}`}>{String(day.sequence).padStart(2, '0')}</span>
+              <span className="day-sequence" aria-label={`Giorno ${day.sequence}`}>
+                {String(day.sequence).padStart(2, '0')}
+              </span>
               <div className="day-card-copy">
                 <span>{formatDayDate(day.date)}</span>
                 <strong>{day.title ?? `Giorno ${day.sequence}`}</strong>
@@ -68,11 +84,19 @@ export default function TripDaysPanel({ trip }: { trip: Trip }) {
                 {day.journalText?.trim() && <span className="day-journal-badge">Diario scritto</span>}
               </div>
               <div className="day-card-actions">
-                <Link className="day-open-link" to={`/trips/${trip.id}/days/${day.id}`} aria-label={`Apri ${day.title ?? `giorno ${day.sequence}`}`}>
+                <Link
+                  className="day-open-link"
+                  to={`/trips/${trip.id}/days/${day.id}`}
+                  aria-label={`Apri ${day.title ?? `giorno ${day.sequence}`}`}
+                >
                   Apri pagina
                 </Link>
                 {trip.status !== 'archived' && (
-                  <Link className="day-edit-link" to={`/trips/${trip.id}/days/${day.id}/edit`} aria-label={`Modifica ${day.title ?? `giorno ${day.sequence}`}`}>
+                  <Link
+                    className="day-edit-link"
+                    to={`/trips/${trip.id}/days/${day.id}/edit`}
+                    aria-label={`Modifica ${day.title ?? `giorno ${day.sequence}`}`}
+                  >
                     Modifica
                   </Link>
                 )}

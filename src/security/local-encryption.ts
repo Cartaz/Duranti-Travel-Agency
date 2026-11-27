@@ -134,19 +134,11 @@ async function deriveWrappingKey(
   )
 }
 
-async function unwrapDataKey(
-  wrappedKey: Uint8Array<ArrayBuffer>,
-  wrappingKey: CryptoKey,
-): Promise<CryptoKey> {
-  return crypto.subtle.unwrapKey(
-    'raw',
-    wrappedKey,
-    wrappingKey,
-    'AES-KW',
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt'],
-  )
+async function unwrapDataKey(wrappedKey: Uint8Array<ArrayBuffer>, wrappingKey: CryptoKey): Promise<CryptoKey> {
+  return crypto.subtle.unwrapKey('raw', wrappedKey, wrappingKey, 'AES-KW', { name: 'AES-GCM', length: 256 }, false, [
+    'encrypt',
+    'decrypt',
+  ])
 }
 
 function requireSessionDataKey(): CryptoKey {
@@ -181,11 +173,10 @@ export async function configureLocalEncryption(passphrase: string): Promise<void
 
   const salt = crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES))
   const wrappingKey = await deriveWrappingKey(passphrase, salt, PBKDF2_ITERATIONS)
-  const generatedDataKey = await crypto.subtle.generateKey(
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt'],
-  )
+  const generatedDataKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, [
+    'encrypt',
+    'decrypt',
+  ])
   const wrappedKeyBuffer = await crypto.subtle.wrapKey('raw', generatedDataKey, wrappingKey, 'AES-KW')
   const wrappedKey = new Uint8Array(wrappedKeyBuffer)
   const nonExtractableDataKey = await unwrapDataKey(wrappedKey, wrappingKey)
@@ -232,11 +223,7 @@ export async function unlockLocalEncryption(passphrase: string): Promise<void> {
   }
 }
 
-export async function encryptJson<T>(
-  purpose: string,
-  entityId: string,
-  value: T,
-): Promise<EncryptedPayloadV1> {
+export async function encryptJson<T>(purpose: string, entityId: string, value: T): Promise<EncryptedPayloadV1> {
   const key = requireSessionDataKey()
   const iv = crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES))
   const additionalData = buildJsonAdditionalData(purpose, entityId)
@@ -266,11 +253,7 @@ export async function encryptJson<T>(
   }
 }
 
-export async function decryptJson<T>(
-  purpose: string,
-  entityId: string,
-  payload: EncryptedPayloadV1,
-): Promise<T> {
+export async function decryptJson<T>(purpose: string, entityId: string, payload: EncryptedPayloadV1): Promise<T> {
   if (!isEncryptedPayloadV1(payload)) throw new Error('Unsupported encrypted payload format.')
 
   const key = requireSessionDataKey()

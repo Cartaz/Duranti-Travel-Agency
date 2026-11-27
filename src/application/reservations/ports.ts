@@ -40,7 +40,12 @@ export interface ReservationTransactionPort {
     input: ReservationAttachmentCreateInput,
     source: Blob,
   ): Promise<ReservationAttachmentWriteResult>
-  removeReservationAttachment(blockId: string, tripId: string, dayId: string, reservationId: string): Promise<Reservation>
+  removeReservationAttachment(
+    blockId: string,
+    tripId: string,
+    dayId: string,
+    reservationId: string,
+  ): Promise<Reservation>
   softDeleteReservationBlock(blockId: string, tripId: string, dayId: string): Promise<void>
 }
 

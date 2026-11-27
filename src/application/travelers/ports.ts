@@ -9,7 +9,9 @@ export interface TravelerRepositoryPort {
   put(value: Traveler): Promise<unknown>
 }
 
-export interface TravelerTripPort { get(id: string): Promise<Trip | undefined> }
+export interface TravelerTripPort {
+  get(id: string): Promise<Trip | undefined>
+}
 
 export interface TripTravelerPort {
   listActiveForTrip(tripId: string): Promise<TripTraveler[]>

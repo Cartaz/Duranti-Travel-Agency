@@ -22,7 +22,7 @@
   overflow: hidden;
   border: 1px solid #46392b;
   border-radius: 16px;
-  background: rgba(18, 14, 11, .62);
+  background: rgba(18, 14, 11, 0.62);
 }
 
 .trip-form-optional > summary,
@@ -67,7 +67,7 @@
   color: #b8c7a0;
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: 0.06em;
 }
 
 .trip-form-optional-grid {
@@ -133,16 +133,36 @@
   }
 
   /* Put travel actions first; writing/layout tools remain available by scrolling. */
-  .planner-toolbar-actions button:nth-child(5) { order: 1; }  /* Luogo */
-  .planner-toolbar-actions button:nth-child(9) { order: 2; }  /* Attività */
-  .planner-toolbar-actions button:nth-child(8) { order: 3; }  /* Ristorante */
-  .planner-toolbar-actions button:nth-child(6) { order: 4; }  /* Trasporto */
-  .planner-toolbar-actions button:nth-child(7) { order: 5; }  /* Alloggio */
-  .planner-toolbar-actions button:nth-child(10) { order: 6; } /* Spesa */
-  .planner-toolbar-actions button:nth-child(1) { order: 7; }  /* Testo */
-  .planner-toolbar-actions button:nth-child(3) { order: 8; }  /* Checklist */
-  .planner-toolbar-actions button:nth-child(2) { order: 9; }  /* Titolo */
-  .planner-toolbar-actions button:nth-child(4) { order: 10; } /* Separatore */
+  .planner-toolbar-actions button:nth-child(5) {
+    order: 1;
+  } /* Luogo */
+  .planner-toolbar-actions button:nth-child(9) {
+    order: 2;
+  } /* Attività */
+  .planner-toolbar-actions button:nth-child(8) {
+    order: 3;
+  } /* Ristorante */
+  .planner-toolbar-actions button:nth-child(6) {
+    order: 4;
+  } /* Trasporto */
+  .planner-toolbar-actions button:nth-child(7) {
+    order: 5;
+  } /* Alloggio */
+  .planner-toolbar-actions button:nth-child(10) {
+    order: 6;
+  } /* Spesa */
+  .planner-toolbar-actions button:nth-child(1) {
+    order: 7;
+  } /* Testo */
+  .planner-toolbar-actions button:nth-child(3) {
+    order: 8;
+  } /* Checklist */
+  .planner-toolbar-actions button:nth-child(2) {
+    order: 9;
+  } /* Titolo */
+  .planner-toolbar-actions button:nth-child(4) {
+    order: 10;
+  } /* Separatore */
 
   .planner-block {
     padding: 13px;

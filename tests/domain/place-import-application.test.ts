@@ -10,10 +10,7 @@ test('Google Maps full place URLs become a provider-neutral search query', () =>
 })
 
 test('Google Maps country domains are accepted', () => {
-  assert.equal(
-    googleMapsSearchQuery('https://www.google.it/maps/place/Da+Enzo+al+29/'),
-    'Da Enzo al 29',
-  )
+  assert.equal(googleMapsSearchQuery('https://www.google.it/maps/place/Da+Enzo+al+29/'), 'Da Enzo al 29')
 })
 
 test('Google Maps query URLs use the explicit query parameter', () => {
@@ -24,10 +21,7 @@ test('Google Maps query URLs use the explicit query parameter', () => {
 })
 
 test('short Google Maps links fail visibly instead of depending on a fragile redirect scraper', () => {
-  assert.throws(
-    () => googleMapsSearchQuery('https://maps.app.goo.gl/abc123'),
-    /link Google Maps abbreviato/,
-  )
+  assert.throws(() => googleMapsSearchQuery('https://maps.app.goo.gl/abc123'), /link Google Maps abbreviato/)
 })
 
 test('non-Google and Google-lookalike URLs are rejected before external discovery', () => {
@@ -36,10 +30,7 @@ test('non-Google and Google-lookalike URLs are rejected before external discover
     'https://notgoogle.com/maps/place/Test',
     'https://google.example.com/maps/place/Test',
   ]) {
-    assert.throws(
-      () => googleMapsSearchQuery(url),
-      /link completo di Google Maps/,
-    )
+    assert.throws(() => googleMapsSearchQuery(url), /link completo di Google Maps/)
   }
 })
 
@@ -61,7 +52,11 @@ test('place import delegates only the parsed query to the discovery port', async
 })
 
 test('empty discovery results are actionable and do not silently create data', async () => {
-  const application = createPlaceImportApplication({ async search() { return [] } })
+  const application = createPlaceImportApplication({
+    async search() {
+      return []
+    },
+  })
 
   await assert.rejects(
     application.previewGoogleMapsImport({ sourceUrl: 'https://www.google.com/maps/place/Unknown/' }),

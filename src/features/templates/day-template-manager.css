@@ -55,7 +55,7 @@
   padding: 11px;
   border: 1px solid #44382d;
   border-radius: 12px;
-  background: rgba(14, 11, 9, .62);
+  background: rgba(14, 11, 9, 0.62);
 }
 
 .day-template-manager-copy {
@@ -121,7 +121,7 @@
 }
 
 .day-template-manager-actions button:disabled {
-  opacity: .45;
+  opacity: 0.45;
   cursor: default;
 }
 
@@ -140,13 +140,13 @@
 
 .day-template-manager-error {
   border: 1px solid #684037;
-  background: rgba(104, 64, 55, .15);
+  background: rgba(104, 64, 55, 0.15);
   color: #dfa094 !important;
 }
 
 .day-template-manager-status {
   border: 1px solid #45553d;
-  background: rgba(69, 85, 61, .14);
+  background: rgba(69, 85, 61, 0.14);
   color: #b8c8a0 !important;
 }
 

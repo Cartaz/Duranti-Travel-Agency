@@ -93,13 +93,13 @@ export function createTripApplication(dependencies: TripApplicationDependencies)
 
   return {
     async listBookTrips(): Promise<Trip[]> {
-      return (await trips.listBookTrips())
-        .sort((left, right) => tripSortValue(left).localeCompare(tripSortValue(right)))
+      return (await trips.listBookTrips()).sort((left, right) =>
+        tripSortValue(left).localeCompare(tripSortValue(right)),
+      )
     },
 
     async listArchivedTrips(): Promise<Trip[]> {
-      return (await trips.listArchivedTrips())
-        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      return (await trips.listArchivedTrips()).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     },
 
     getTrip(tripId: string): Promise<Trip | undefined> {

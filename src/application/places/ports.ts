@@ -8,13 +8,17 @@ export interface PlaceReferenceCounts {
 }
 
 export type SafeDeletePlaceResult =
-  | { status: 'not-found' }
-  | { status: 'in-use'; references: PlaceReferenceCounts }
-  | { status: 'deleted' }
+  { status: 'not-found' } | { status: 'in-use'; references: PlaceReferenceCounts } | { status: 'deleted' }
 
-export interface PlaceTripPort { get(id: string): Promise<Trip | undefined> }
-export interface PlaceDayPort { get(id: string): Promise<Day | undefined> }
-export interface PlaceBlockPort { get(id: string): Promise<Block | undefined> }
+export interface PlaceTripPort {
+  get(id: string): Promise<Trip | undefined>
+}
+export interface PlaceDayPort {
+  get(id: string): Promise<Day | undefined>
+}
+export interface PlaceBlockPort {
+  get(id: string): Promise<Block | undefined>
+}
 export interface PlaceRepositoryPort {
   get(id: string): Promise<Place | undefined>
   list(): Promise<Place[]>

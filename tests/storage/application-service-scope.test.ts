@@ -7,7 +7,7 @@ async function collect(directory: string): Promise<string[]> {
   const files: string[] = []
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name)
-    if (entry.isDirectory()) files.push(...await collect(path))
+    if (entry.isDirectory()) files.push(...(await collect(path)))
     else if (entry.isFile() && ['.ts', '.tsx'].includes(extname(path))) files.push(path)
   }
   return files

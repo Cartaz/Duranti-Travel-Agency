@@ -40,7 +40,7 @@
   border: 1px solid #65513d;
   border-radius: 14px;
   padding: 12px 14px;
-  background: rgba(38, 29, 22, .8);
+  background: rgba(38, 29, 22, 0.8);
   color: #c8b69e;
 }
 
@@ -51,7 +51,7 @@
   padding: 20px;
   border: 1px solid #554633;
   border-radius: 22px;
-  background: rgba(31, 24, 17, .72);
+  background: rgba(31, 24, 17, 0.72);
 }
 
 .planner-journal-heading {
@@ -89,7 +89,7 @@
   padding: 17px;
   border: 1px solid #493b2f;
   border-radius: 18px;
-  background: rgba(24, 19, 15, .88);
+  background: rgba(24, 19, 15, 0.88);
 }
 
 .planner-toolbar strong {
@@ -125,7 +125,7 @@
   border: 1px dashed #4d3f32;
   border-radius: 20px;
   color: #bca991;
-  background: rgba(20, 16, 13, .56);
+  background: rgba(20, 16, 13, 0.56);
 }
 
 .planner-empty span {
@@ -137,7 +137,7 @@
   border: 1px solid #44372c;
   border-radius: 17px;
   padding: 15px;
-  background: rgba(19, 15, 12, .82);
+  background: rgba(19, 15, 12, 0.82);
 }
 
 .planner-block-topline {
@@ -152,7 +152,7 @@
   color: #9d8b76;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: .12em;
+  letter-spacing: 0.12em;
 }
 
 .planner-block-tools {
@@ -169,16 +169,16 @@
 
 .planner-block-tools button:not(.planner-delete) {
   border-color: #4e4033;
-  background: rgba(33, 27, 21, .8);
+  background: rgba(33, 27, 21, 0.8);
   color: #c8b294;
 }
 
 .planner-block-tools button:disabled {
-  opacity: .38;
+  opacity: 0.38;
 }
 
 .planner-block textarea,
-.planner-block > input[type="text"] {
+.planner-block > input[type='text'] {
   width: 100%;
   border: 1px solid #493b30;
   border-radius: 12px;
@@ -194,14 +194,14 @@
   line-height: 1.55;
 }
 
-.planner-block-heading > input[type="text"] {
+.planner-block-heading > input[type='text'] {
   font-family: Georgia, serif;
   font-size: 24px;
 }
 
 .planner-block textarea:focus,
-.planner-block > input[type="text"]:focus,
-.planner-checklist-row > input[type="text"]:focus,
+.planner-block > input[type='text']:focus,
+.planner-checklist-row > input[type='text']:focus,
 .planner-place-grid input:focus,
 .planner-place-grid textarea:focus {
   border-color: #967552;
@@ -237,13 +237,13 @@
   gap: 9px;
 }
 
-.planner-checklist-row > input[type="checkbox"] {
+.planner-checklist-row > input[type='checkbox'] {
   width: 18px;
   height: 18px;
   accent-color: #a7855f;
 }
 
-.planner-checklist-row > input[type="text"] {
+.planner-checklist-row > input[type='text'] {
   min-width: 0;
   border: 1px solid #493b30;
   border-radius: 10px;
@@ -308,7 +308,7 @@
   grid-column: 1 / -1;
   border: 1px solid #3f352c;
   border-radius: 13px;
-  background: rgba(17, 14, 12, .45);
+  background: rgba(17, 14, 12, 0.45);
   overflow: hidden;
 }
 
@@ -367,7 +367,7 @@
   color: #b9a483;
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: 0.06em;
 }
 
 .planner-place-optional-grid {

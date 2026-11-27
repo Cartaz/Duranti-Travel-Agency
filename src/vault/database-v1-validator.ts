@@ -5,7 +5,25 @@ type Row = Record<string, unknown>
 const tripStatuses = new Set(['planned', 'ongoing', 'completed', 'archived'])
 const travelerDocumentTypes = new Set(['passport', 'identityCard', 'drivingLicense', 'visa', 'other'])
 const travelerRoles = new Set(['owner', 'companion', 'child', 'other'])
-const blockTypes = new Set(['text', 'heading', 'checklist', 'place', 'map', 'media', 'link', 'quote', 'divider', 'table', 'expense', 'transport', 'accommodation', 'restaurant', 'activity', 'document', 'weatherSnapshot'])
+const blockTypes = new Set([
+  'text',
+  'heading',
+  'checklist',
+  'place',
+  'map',
+  'media',
+  'link',
+  'quote',
+  'divider',
+  'table',
+  'expense',
+  'transport',
+  'accommodation',
+  'restaurant',
+  'activity',
+  'document',
+  'weatherSnapshot',
+])
 const mediaKinds = new Set(['image', 'video', 'audio', 'document'])
 const itineraryTypes = new Set(['transport', 'activity', 'meal', 'reservation', 'free-time', 'custom'])
 const itineraryStatuses = new Set(['idea', 'planned', 'booked', 'done', 'cancelled'])
@@ -41,14 +59,29 @@ function finiteNumber(row: Row, key: string, table: string, id: string, optional
   return value
 }
 
-function safeInteger(row: Row, key: string, table: string, id: string, minimum = Number.MIN_SAFE_INTEGER, optional = false): number | undefined {
+function safeInteger(
+  row: Row,
+  key: string,
+  table: string,
+  id: string,
+  minimum = Number.MIN_SAFE_INTEGER,
+  optional = false,
+): number | undefined {
   const value = row[key]
   if (optional && value === undefined) return undefined
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum) fail(table, id, `${key} is invalid.`)
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum)
+    fail(table, id, `${key} is invalid.`)
   return value
 }
 
-function enumValue(row: Row, key: string, allowed: Set<string>, table: string, id: string, optional = false): string | undefined {
+function enumValue(
+  row: Row,
+  key: string,
+  allowed: Set<string>,
+  table: string,
+  id: string,
+  optional = false,
+): string | undefined {
   const value = row[key]
   if (optional && value === undefined) return undefined
   if (typeof value !== 'string' || !allowed.has(value)) fail(table, id, `${key} is unsupported.`)
@@ -57,7 +90,8 @@ function enumValue(row: Row, key: string, allowed: Set<string>, table: string, i
 
 function assertIsoTimestamp(value: unknown, table: string, id: string, key: string, optional = false): void {
   if (optional && value === undefined) return
-  if (typeof value !== 'string' || !value || !Number.isFinite(Date.parse(value))) fail(table, id, `${key} is not a valid timestamp.`)
+  if (typeof value !== 'string' || !value || !Number.isFinite(Date.parse(value)))
+    fail(table, id, `${key} is not a valid timestamp.`)
 }
 
 function assertDateOnly(value: unknown, table: string, id: string, key: string, optional = false): void {
@@ -72,7 +106,8 @@ function assertDateOnly(value: unknown, table: string, id: string, key: string, 
 
 function assertLocalDateTime(value: unknown, table: string, id: string, key: string, optional = false): void {
   if (optional && value === undefined) return
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) fail(table, id, `${key} is not a valid local date/time.`)
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))
+    fail(table, id, `${key} is not a valid local date/time.`)
   const [date, time] = value.split('T')
   assertDateOnly(date, table, id, key)
   const [hour, minute] = time.split(':').map(Number)
@@ -89,8 +124,14 @@ function assertEntityBase(row: Row, table: string): string {
 
 function assertEncryptedPayload(value: unknown, table: string, id: string): void {
   if (!isRecord(value)) fail(table, id, 'encryptedPayload is invalid.')
-  if (value.version !== 1 || value.algorithm !== 'AES-GCM' || value.tagLength !== 128) fail(table, id, 'encryptedPayload uses unsupported cryptographic metadata.')
-  if (typeof value.ivB64 !== 'string' || !value.ivB64 || typeof value.ciphertextB64 !== 'string' || !value.ciphertextB64) {
+  if (value.version !== 1 || value.algorithm !== 'AES-GCM' || value.tagLength !== 128)
+    fail(table, id, 'encryptedPayload uses unsupported cryptographic metadata.')
+  if (
+    typeof value.ivB64 !== 'string' ||
+    !value.ivB64 ||
+    typeof value.ciphertextB64 !== 'string' ||
+    !value.ciphertextB64
+  ) {
     fail(table, id, 'encryptedPayload is incomplete.')
   }
 }
@@ -111,8 +152,10 @@ function validateEntityRow(table: string, row: Row): void {
         if (status !== 'archived') fail(table, id, 'archivedFromStatus is only valid for archived trips.')
       }
       const budget = safeInteger(row, 'budgetMinor', table, id, 1, true)
-      if (budget !== undefined && !optionalString(row, 'currency', table, id)) fail(table, id, 'budgetMinor requires currency.')
-      if (row.currency !== undefined && !/^[A-Z]{3}$/.test(row.currency as string)) fail(table, id, 'currency is invalid.')
+      if (budget !== undefined && !optionalString(row, 'currency', table, id))
+        fail(table, id, 'budgetMinor requires currency.')
+      if (row.currency !== undefined && !/^[A-Z]{3}$/.test(row.currency as string))
+        fail(table, id, 'currency is invalid.')
       break
     }
     case 'travelers':
@@ -148,8 +191,10 @@ function validateEntityRow(table: string, row: Row): void {
       stringValue(row, 'name', table, id)
       const latitude = finiteNumber(row, 'latitude', table, id, true)
       const longitude = finiteNumber(row, 'longitude', table, id, true)
-      if (latitude !== undefined && (latitude < -90 || latitude > 90)) fail(table, id, 'latitude is outside its valid range.')
-      if (longitude !== undefined && (longitude < -180 || longitude > 180)) fail(table, id, 'longitude is outside its valid range.')
+      if (latitude !== undefined && (latitude < -90 || latitude > 90))
+        fail(table, id, 'latitude is outside its valid range.')
+      if (longitude !== undefined && (longitude < -180 || longitude > 180))
+        fail(table, id, 'longitude is outside its valid range.')
       break
     }
     case 'media':
@@ -182,7 +227,8 @@ function validateEntityRow(table: string, row: Row): void {
       enumValue(row, 'status', itineraryStatuses, table, id, true)
       assertLocalDateTime(row.startsAt, table, id, 'startsAt', true)
       assertLocalDateTime(row.endsAt, table, id, 'endsAt', true)
-      if (row.startsAt && row.endsAt && (row.endsAt as string) < (row.startsAt as string)) fail(table, id, 'endsAt precedes startsAt.')
+      if (row.startsAt && row.endsAt && (row.endsAt as string) < (row.startsAt as string))
+        fail(table, id, 'endsAt precedes startsAt.')
       safeInteger(row, 'position', table, id, 1, true)
       break
     case 'templates': {
@@ -216,7 +262,8 @@ function validateEntityRow(table: string, row: Row): void {
       optionalString(row, 'attachmentMediaId', table, id)
       assertLocalDateTime(row.startsAt, table, id, 'startsAt', true)
       assertLocalDateTime(row.endsAt, table, id, 'endsAt', true)
-      if (row.startsAt && row.endsAt && (row.endsAt as string) < (row.startsAt as string)) fail(table, id, 'endsAt precedes startsAt.')
+      if (row.startsAt && row.endsAt && (row.endsAt as string) < (row.startsAt as string))
+        fail(table, id, 'endsAt precedes startsAt.')
       break
     case 'auditLog':
       stringValue(row, 'entityType', table, id)
@@ -234,7 +281,8 @@ function rowsByTable(tables: VaultTableSnapshot[]): Map<string, Row[]> {
   for (const table of tables) {
     if (table.name === 'appMeta') {
       for (const raw of table.rows) {
-        if (!isRecord(raw) || typeof raw.key !== 'string' || !raw.key) throw new Error('Vault appMeta contains an invalid row.')
+        if (!isRecord(raw) || typeof raw.key !== 'string' || !raw.key)
+          throw new Error('Vault appMeta contains an invalid row.')
       }
       result.set(table.name, table.rows as Row[])
       continue
@@ -253,7 +301,13 @@ function indexed(rows: Row[] | undefined): Map<string, Row> {
   return new Map((rows ?? []).map((row) => [row.id as string, row]))
 }
 
-function requireReference(index: Map<string, Row>, id: unknown, table: string, rowId: string, field: string): Row | undefined {
+function requireReference(
+  index: Map<string, Row>,
+  id: unknown,
+  table: string,
+  rowId: string,
+  field: string,
+): Row | undefined {
   if (id === undefined) return undefined
   if (typeof id !== 'string' || !id) fail(table, rowId, `${field} is invalid.`)
   const target = index.get(id)
@@ -274,7 +328,8 @@ export function validateDatabaseV1Semantics(tables: VaultTableSnapshot[]): void 
   const itineraries = indexed(rows.get('itineraries'))
   const reservations = indexed(rows.get('reservations'))
 
-  for (const document of documents.values()) requireReference(travelers, document.travelerId, 'travelerDocuments', document.id as string, 'travelerId')
+  for (const document of documents.values())
+    requireReference(travelers, document.travelerId, 'travelerDocuments', document.id as string, 'travelerId')
 
   const activeMemberships = new Set<string>()
   for (const membership of memberships.values()) {
@@ -296,7 +351,8 @@ export function validateDatabaseV1Semantics(tables: VaultTableSnapshot[]): void 
       const date = day.date as string
       const startDate = trip.startDate as string | undefined
       const endDate = trip.endDate as string | undefined
-      if ((startDate && date < startDate) || (endDate && date > endDate)) fail('days', id, 'date is outside its trip range.')
+      if ((startDate && date < startDate) || (endDate && date > endDate))
+        fail('days', id, 'date is outside its trip range.')
       const sequenceKey = `${day.tripId}\u0000${day.sequence}`
       if (activeDaySequences.has(sequenceKey)) fail('days', id, 'duplicates an active day sequence in the same trip.')
       activeDaySequences.add(sequenceKey)
@@ -310,7 +366,8 @@ export function validateDatabaseV1Semantics(tables: VaultTableSnapshot[]): void 
     const day = requireReference(days, block.dayId, 'blocks', id, 'dayId')
     if (day && day.tripId !== block.tripId) fail('blocks', id, 'dayId belongs to a different trip.')
     const parent = requireReference(blocks, block.parentBlockId, 'blocks', id, 'parentBlockId')
-    if (parent && (parent.tripId !== block.tripId || parent.dayId !== block.dayId)) fail('blocks', id, 'parentBlockId belongs to a different context.')
+    if (parent && (parent.tripId !== block.tripId || parent.dayId !== block.dayId))
+      fail('blocks', id, 'parentBlockId belongs to a different context.')
     if (!block.deletedAt && block.dayId) {
       const key = `${block.dayId}\u0000${block.position}`
       if (activeBlockPositions.has(key)) fail('blocks', id, 'duplicates an active block position in the same day.')
@@ -324,9 +381,11 @@ export function validateDatabaseV1Semantics(tables: VaultTableSnapshot[]): void 
     const day = requireReference(days, item.dayId, 'itineraries', id, 'dayId')
     if (day && day.tripId !== item.tripId) fail('itineraries', id, 'dayId belongs to a different trip.')
     const block = requireReference(blocks, item.blockId, 'itineraries', id, 'blockId')
-    if (block && (block.tripId !== item.tripId || block.dayId !== item.dayId)) fail('itineraries', id, 'blockId belongs to a different context.')
+    if (block && (block.tripId !== item.tripId || block.dayId !== item.dayId))
+      fail('itineraries', id, 'blockId belongs to a different context.')
     const reservation = requireReference(reservations, item.reservationId, 'itineraries', id, 'reservationId')
-    if (reservation && (reservation.tripId !== item.tripId || reservation.dayId !== item.dayId)) fail('itineraries', id, 'reservationId belongs to a different context.')
+    if (reservation && (reservation.tripId !== item.tripId || reservation.dayId !== item.dayId))
+      fail('itineraries', id, 'reservationId belongs to a different context.')
     requireReference(places, item.placeId, 'itineraries', id, 'placeId')
   }
 
@@ -368,7 +427,8 @@ export function validateDatabaseV1Semantics(tables: VaultTableSnapshot[]): void 
     requireReference(blocks, link.blockId, 'links', id, 'blockId')
   }
 
-  for (const trip of trips.values()) requireReference(media, trip.coverMediaId, 'trips', trip.id as string, 'coverMediaId')
+  for (const trip of trips.values())
+    requireReference(media, trip.coverMediaId, 'trips', trip.id as string, 'coverMediaId')
 }
 
 export function validateActiveMediaFiles(tables: VaultTableSnapshot[], files: VaultFileManifestEntry[]): void {

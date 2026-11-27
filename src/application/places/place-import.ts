@@ -18,7 +18,11 @@ export interface PlaceImportApplication {
 }
 
 function decodedPathPart(value: string): string {
-  try { return decodeURIComponent(value.replace(/\+/g, ' ')) } catch { return value.replace(/\+/g, ' ') }
+  try {
+    return decodeURIComponent(value.replace(/\+/g, ' '))
+  } catch {
+    return value.replace(/\+/g, ' ')
+  }
 }
 
 function isGoogleMapsHost(hostname: string): boolean {
@@ -32,10 +36,16 @@ export function googleMapsSearchQuery(sourceUrl: string): string {
   if (!raw) throw new Error('Incolla un link Google Maps.')
 
   let url: URL
-  try { url = new URL(raw) } catch { throw new Error('Il link Google Maps non è valido.') }
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error('Il link Google Maps non è valido.')
+  }
 
   if (url.hostname.toLowerCase() === 'maps.app.goo.gl') {
-    throw new Error('Questo è un link Google Maps abbreviato. Aprilo nel browser e copia il link completo dalla barra degli indirizzi, poi riprova.')
+    throw new Error(
+      'Questo è un link Google Maps abbreviato. Aprilo nel browser e copia il link completo dalla barra degli indirizzi, poi riprova.',
+    )
   }
 
   if (!isGoogleMapsHost(url.hostname) || !url.pathname.includes('/maps')) {
@@ -51,7 +61,9 @@ export function googleMapsSearchQuery(sourceUrl: string): string {
     if (name) return name
   }
 
-  throw new Error('Non riesco a ricavare il nome del luogo da questo link. Apri la scheda del ristorante in Google Maps e copia il link completo.')
+  throw new Error(
+    'Non riesco a ricavare il nome del luogo da questo link. Apri la scheda del ristorante in Google Maps e copia il link completo.',
+  )
 }
 
 export function createPlaceImportApplication(discovery: PlaceDiscoveryPort): PlaceImportApplication {
@@ -59,7 +71,8 @@ export function createPlaceImportApplication(discovery: PlaceDiscoveryPort): Pla
     async previewGoogleMapsImport(input: GoogleMapsImportRequest): Promise<PlaceImportCandidate[]> {
       const query = googleMapsSearchQuery(input.sourceUrl)
       const candidates = await discovery.search(query)
-      if (candidates.length === 0) throw new Error('Nessun luogo corrispondente trovato su OpenStreetMap. Puoi comunque inserirlo manualmente.')
+      if (candidates.length === 0)
+        throw new Error('Nessun luogo corrispondente trovato su OpenStreetMap. Puoi comunque inserirlo manualmente.')
       return candidates
     },
   }

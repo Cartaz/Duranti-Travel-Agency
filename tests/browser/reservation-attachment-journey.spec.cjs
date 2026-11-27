@@ -7,7 +7,10 @@ function readPersistedReservationTitles() {
     request.onsuccess = () => {
       const database = request.result
       const read = database.transaction('reservations', 'readonly').objectStore('reservations').getAll()
-      read.onerror = () => { database.close(); reject(read.error) }
+      read.onerror = () => {
+        database.close()
+        reject(read.error)
+      }
       read.onsuccess = () => {
         database.close()
         resolve(read.result.filter((row) => !row.deletedAt).map((row) => row.title))

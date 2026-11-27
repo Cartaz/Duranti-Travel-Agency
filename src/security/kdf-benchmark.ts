@@ -23,13 +23,7 @@ async function benchmarkSingleDerivation(iterations: number): Promise<number> {
   const salt = crypto.getRandomValues(new Uint8Array(16))
 
   try {
-    const material = await crypto.subtle.importKey(
-      'raw',
-      encoded,
-      'PBKDF2',
-      false,
-      ['deriveKey'],
-    )
+    const material = await crypto.subtle.importKey('raw', encoded, 'PBKDF2', false, ['deriveKey'])
 
     const startedAt = performance.now()
     await crypto.subtle.deriveKey(
@@ -51,9 +45,7 @@ async function benchmarkSingleDerivation(iterations: number): Promise<number> {
   }
 }
 
-export async function benchmarkPbkdf2(
-  options: Pbkdf2BenchmarkOptions = {},
-): Promise<Pbkdf2BenchmarkResult[]> {
+export async function benchmarkPbkdf2(options: Pbkdf2BenchmarkOptions = {}): Promise<Pbkdf2BenchmarkResult[]> {
   const iterations = options.iterations ?? DEFAULT_ITERATIONS
   const runsPerCandidate = options.runsPerCandidate ?? DEFAULT_RUNS
 
