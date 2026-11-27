@@ -289,3 +289,23 @@ export async function deleteEncryptedDocumentDirectory(documentId: string): Prom
   }
   await documentsDirectory.removeEntry(documentId, { recursive: true })
 }
+
+export interface PrivateDocumentDirectoryFootprint {
+  bytes: number
+  /** Newest file modification time; 0 for an empty directory. */
+  newestModified: number
+}
+
+/** Size and age of one document directory, for storage maintenance. */
+export async function describePrivateDocumentDirectory(documentId: string): Promise<PrivateDocumentDirectoryFootprint> {
+  const directory = await requireDocumentDirectory(documentId)
+  let bytes = 0
+  let newestModified = 0
+  for (const [, handle] of await getDirectoryEntries(directory)) {
+    if (handle.kind !== 'file') continue
+    const file = await (handle as FileSystemFileHandle).getFile()
+    bytes += file.size
+    newestModified = Math.max(newestModified, file.lastModified)
+  }
+  return { bytes, newestModified }
+}

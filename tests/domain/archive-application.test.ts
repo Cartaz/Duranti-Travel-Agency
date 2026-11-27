@@ -17,6 +17,7 @@ function harness(options: {
       scan: async () => ({
         reclaimableMediaIds: options.reclaimable ?? [],
         orphanDirectoryIds: [],
+        orphanPrivateDocumentIds: [],
         reclaimableBytes: 0,
         unhealthyActiveCount: 0,
       }),

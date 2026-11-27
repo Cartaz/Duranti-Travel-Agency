@@ -678,6 +678,7 @@ async function stageVaultImportUnlocked(
   }
 }
 
-export async function discardStagedVaultImport(staged: StagedVaultImport): Promise<void> {
-  await deleteStageDirectory(staged.stageId)
+export function discardStagedVaultImport(staged: StagedVaultImport): Promise<void> {
+  // Under the Vault lock: a restore commit reading this stage (in any tab) finishes first.
+  return withVaultLock(() => deleteStageDirectory(staged.stageId))
 }

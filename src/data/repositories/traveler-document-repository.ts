@@ -1,3 +1,4 @@
+import { withVaultLock } from '../../lib/vault-lock'
 import type {
   EncryptedPayloadV1,
   TravelerDocument,
@@ -246,7 +247,11 @@ export class TravelerDocumentRepository {
     })
   }
 
-  async purge(id: string): Promise<TravelerDocumentPurgeResult> {
+  purge(id: string): Promise<TravelerDocumentPurgeResult> {
+    return withVaultLock(() => this.purgeUnlocked(id))
+  }
+
+  private async purgeUnlocked(id: string): Promise<TravelerDocumentPurgeResult> {
     // Row first (re-checking the tombstone), bytes second: an interruption can
     // leave a recoverable orphan directory, never an active record without bytes.
     const outcome = await db.transaction('rw', db.travelerDocuments, async () => {

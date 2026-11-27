@@ -900,44 +900,50 @@ async function newestFileTimestamp(directory: FileSystemDirectoryHandle): Promis
  * still be waiting for the user to save or confirm them; the stage referenced
  * by a restore journal is never touched.
  */
-export function sweepStaleVaultStaging(
+export async function sweepStaleVaultStaging(
   now = Date.now(),
   maxAgeMs = STALE_VAULT_STAGING_MS,
 ): Promise<VaultStagingSweepResult> {
-  return withVaultLock(async () => {
-    const result: VaultStagingSweepResult = { removedExports: 0, removedImportStages: 0 }
-    if (!hasOpfsSupport()) return result
-    const appRoot = await getExistingDirectory(await getRootDirectory(), ROOT_DIRECTORY)
-    if (!appRoot) return result
+  // Opportunistic: when another tab is busy with the Vault, skip and retry next launch.
+  const skipped: VaultStagingSweepResult = { removedExports: 0, removedImportStages: 0 }
+  const result = await withVaultLock(
+    async () => {
+      const result: VaultStagingSweepResult = { removedExports: 0, removedImportStages: 0 }
+      if (!hasOpfsSupport()) return result
+      const appRoot = await getExistingDirectory(await getRootDirectory(), ROOT_DIRECTORY)
+      if (!appRoot) return result
 
-    const exports = await getExistingDirectory(appRoot, EXPORT_STAGING_DIRECTORY)
-    if (exports) {
-      for (const [name, handle] of await getDirectoryEntries(exports)) {
-        const timestamp =
-          handle.kind === 'file'
-            ? (await (handle as FileSystemFileHandle).getFile()).lastModified
-            : await newestFileTimestamp(handle as FileSystemDirectoryHandle)
-        if (now - timestamp < maxAgeMs) continue
-        await removeEntryIfExists(exports, name, handle.kind === 'directory')
-        result.removedExports += 1
+      const exports = await getExistingDirectory(appRoot, EXPORT_STAGING_DIRECTORY)
+      if (exports) {
+        for (const [name, handle] of await getDirectoryEntries(exports)) {
+          const timestamp =
+            handle.kind === 'file'
+              ? (await (handle as FileSystemFileHandle).getFile()).lastModified
+              : await newestFileTimestamp(handle as FileSystemDirectoryHandle)
+          if (now - timestamp < maxAgeMs) continue
+          await removeEntryIfExists(exports, name, handle.kind === 'directory')
+          result.removedExports += 1
+        }
       }
-    }
 
-    const imports = await getExistingDirectory(appRoot, IMPORT_STAGING_DIRECTORY)
-    if (imports) {
-      // An unreadable journal means recovery still owns some stage: keep them all.
-      const journal = await readRestoreJournal()
-      for (const [name, handle] of await getDirectoryEntries(imports)) {
-        if (name === journal?.stageId) continue
-        const timestamp =
-          handle.kind === 'directory'
-            ? await newestFileTimestamp(handle as FileSystemDirectoryHandle)
-            : (await (handle as FileSystemFileHandle).getFile()).lastModified
-        if (now - timestamp < maxAgeMs) continue
-        await removeEntryIfExists(imports, name, handle.kind === 'directory')
-        result.removedImportStages += 1
+      const imports = await getExistingDirectory(appRoot, IMPORT_STAGING_DIRECTORY)
+      if (imports) {
+        // An unreadable journal means recovery still owns some stage: keep them all.
+        const journal = await readRestoreJournal()
+        for (const [name, handle] of await getDirectoryEntries(imports)) {
+          if (name === journal?.stageId) continue
+          const timestamp =
+            handle.kind === 'directory'
+              ? await newestFileTimestamp(handle as FileSystemDirectoryHandle)
+              : (await (handle as FileSystemFileHandle).getFile()).lastModified
+          if (now - timestamp < maxAgeMs) continue
+          await removeEntryIfExists(imports, name, handle.kind === 'directory')
+          result.removedImportStages += 1
+        }
       }
-    }
-    return result
-  })
+      return result
+    },
+    { ifAvailable: true },
+  )
+  return result ?? skipped
 }

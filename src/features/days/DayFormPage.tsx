@@ -266,10 +266,8 @@ export default function DayFormPage({ mode }: { mode: 'create' | 'edit' }) {
           confirmTitle="Eliminare questa giornata?"
           confirmMessage="Tutti i contenuti della giornata verranno eliminati da questo dispositivo. Potrai recuperarli solo da un backup .dtagency precedente."
           confirmLabel="Elimina giornata e contenuti"
-          onDelete={async () => {
-            await dayApplication.deleteTripDay(tripId, dayId)
-            navigate(`/trips/${tripId}`, { replace: true })
-          }}
+          onDelete={() => dayApplication.deleteTripDay(tripId, dayId)}
+          onDeleted={() => navigate(`/trips/${tripId}`, { replace: true })}
         />
       )}
     </section>

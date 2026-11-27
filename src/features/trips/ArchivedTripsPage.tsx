@@ -32,13 +32,19 @@ export default function ArchivedTripsPage() {
   const [restoringId, setRestoringId] = useState<string>()
   const [confirmDeleteId, setConfirmDeleteId] = useState<string>()
   const [deletingId, setDeletingId] = useState<string>()
+  const [notice, setNotice] = useState('')
 
   const handleDelete = async (trip: Trip): Promise<void> => {
     if (deletingId) return
     setDeletingId(trip.id)
     setError('')
     try {
-      await tripApplication.deleteArchivedTrip(trip.id)
+      const outcome = await tripApplication.deleteArchivedTrip(trip.id)
+      setNotice(
+        outcome.pendingFileCleanup > 0
+          ? `Viaggio eliminato. ${outcome.pendingFileCleanup} file occupano ancora spazio: liberalo dalla pagina Backup con “Libera spazio”.`
+          : '',
+      )
       setTrips((current) => current.filter((item) => item.id !== trip.id))
       setConfirmDeleteId(undefined)
     } catch (cause) {
@@ -100,6 +106,11 @@ export default function ArchivedTripsPage() {
       {error && (
         <p className="trip-feedback trip-feedback-error" role="alert">
           {error}
+        </p>
+      )}
+      {notice && (
+        <p className="trip-feedback" role="status">
+          {notice} <Link to="/backup">Apri Backup</Link>
         </p>
       )}
       {loading && (

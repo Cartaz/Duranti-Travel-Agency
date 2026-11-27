@@ -58,7 +58,11 @@ export function createArchiveApplication(deps: ArchiveApplicationDependencies): 
       return deps.maintenance.scan()
     },
     async reclaimStorage(scan) {
-      if (scan.reclaimableMediaIds.length === 0 && scan.orphanDirectoryIds.length === 0) {
+      if (
+        scan.reclaimableMediaIds.length === 0 &&
+        scan.orphanDirectoryIds.length === 0 &&
+        scan.orphanPrivateDocumentIds.length === 0
+      ) {
         return { purgedMediaCount: 0, removedOrphanCount: 0, keptReferencedCount: 0, freedBytes: 0 }
       }
       return deps.maintenance.reclaim(scan)

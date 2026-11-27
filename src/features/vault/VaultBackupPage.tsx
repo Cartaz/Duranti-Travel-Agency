@@ -78,6 +78,7 @@ export default function VaultBackupPage() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [restoreReport, setRestoreReport] = useState<VaultRestoreResult>()
+  const [confirmDownloadSaved, setConfirmDownloadSaved] = useState(false)
   const { status: archiveStatus, recordBackupSaved, requestPersistence } = useArchiveStatus()
   const { archive } = useApplicationServices('archive')
   const [storageScan, setStorageScan] = useState<MediaStorageScan>()
@@ -374,7 +375,9 @@ export default function VaultBackupPage() {
                 type="button"
                 onClick={() => {
                   downloadVaultFile(preparedFile)
-                  void markBackupSaved()
+                  // A started download can still be cancelled in the save dialog:
+                  // only an explicit confirmation counts as a saved backup.
+                  setConfirmDownloadSaved(true)
                 }}
               >
                 Scarica file
@@ -383,6 +386,20 @@ export default function VaultBackupPage() {
                 Scarta copia temporanea
               </button>
             </div>
+            {confirmDownloadSaved && (
+              <div className="vault-actions">
+                <span>Hai salvato il file fuori dal browser?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmDownloadSaved(false)
+                    void markBackupSaved().then(() => setNotice('Backup registrato come salvato.'))
+                  }}
+                >
+                  Sì, l’ho salvato
+                </button>
+              </div>
+            )}
           </div>
         )}
       </article>

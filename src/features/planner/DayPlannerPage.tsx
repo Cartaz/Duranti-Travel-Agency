@@ -97,6 +97,7 @@ export default function DayPlannerPage({ ref, showToolbar = true }: DayPlannerPa
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [focusBlockId, setFocusBlockId] = useState<string>()
   const blockElements = useRef(new Map<string, HTMLElement>())
 
@@ -228,6 +229,11 @@ export default function DayPlannerPage({ ref, showToolbar = true }: DayPlannerPa
           {error}
         </p>
       )}
+      {notice && (
+        <p className="trip-feedback" role="status">
+          {notice} <Link to="/backup">Apri Backup</Link>
+        </p>
+      )}
       {day.journalText?.trim() && (
         <section className="planner-journal" aria-labelledby="planner-journal-title">
           <div className="planner-journal-heading">
@@ -295,6 +301,7 @@ export default function DayPlannerPage({ ref, showToolbar = true }: DayPlannerPa
               canMoveUp={index > 0}
               canMoveDown={index < blocks.length - 1}
               onChanged={refreshBlocks}
+              onNotice={setNotice}
             />
           </div>
         ))}
@@ -314,6 +321,7 @@ interface PlannerBlockEditorProps {
   canMoveUp: boolean
   canMoveDown: boolean
   onChanged: () => Promise<void>
+  onNotice: (message: string) => void
 }
 function PlannerBlockEditor(props: PlannerBlockEditorProps) {
   if (props.block.type === 'expense') return <ExpenseBlockEditor {...props} />

@@ -1,17 +1,5 @@
-const VAULT_LOCK_NAME = 'dtagency:vault'
-
-/**
- * Serializes Vault export, import staging, restore and recovery across every
- * DTAgency tab of this origin. IndexedDB and OPFS cannot share a transaction,
- * so two tabs interleaving these multi-step protocols could observe or produce
- * half-replaced state. Web Locks are not re-entrant: never call a locked entry
- * point from inside another one.
- */
-export async function withVaultLock<T>(operation: () => Promise<T>): Promise<T> {
-  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks
-  if (!locks) return operation()
-  return locks.request(VAULT_LOCK_NAME, { mode: 'exclusive' }, operation) as Promise<T>
-}
+// The lock primitive lives in lib/ so data adapters (purge) can share it.
+export { isVaultLockBusy, withVaultLock } from '../lib/vault-lock'
 
 const VAULT_CHANNEL_NAME = 'dtagency:vault'
 export type VaultBroadcast = { type: 'restored'; restoreId: string }

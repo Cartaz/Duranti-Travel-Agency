@@ -110,12 +110,30 @@ function evictOldestCacheEntries(): void {
     .forEach(({ key }) => localStorage.removeItem(key))
 }
 
+function clearSearchCache(): void {
+  const keys: string[] = []
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index)
+    if (key?.startsWith(CACHE_PREFIX)) keys.push(key)
+  }
+  keys.forEach((key) => localStorage.removeItem(key))
+}
+
 function writeCache(query: string, candidates: NominatimPlaceCandidate[]): void {
+  const entry = JSON.stringify({ storedAt: Date.now(), candidates })
   try {
-    localStorage.setItem(cacheKey(query), JSON.stringify({ storedAt: Date.now(), candidates }))
+    evictOldestCacheEntries()
+    localStorage.setItem(cacheKey(query), entry)
     evictOldestCacheEntries()
   } catch {
-    /* reproducible provider cache only */
+    // Quota exhausted: drop every cached search once and retry; the cache is
+    // only a reproducible convenience.
+    try {
+      clearSearchCache()
+      localStorage.setItem(cacheKey(query), entry)
+    } catch {
+      /* give up caching this search */
+    }
   }
 }
 

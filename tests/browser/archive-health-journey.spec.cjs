@@ -47,6 +47,10 @@ test('backup reminder, persistence request and passphrase policy are live in the
   await protectCard.getByRole('button', { name: 'Scarica file' }).click()
   await downloadPromise
 
+  // Starting a download is not proof of a saved backup: the reminder stays until confirmed.
+  await expect(page.getByText('Non hai ancora salvato un backup .dtagency')).toBeVisible()
+  await protectCard.getByRole('button', { name: 'Sì, l’ho salvato' }).click()
+  await expect(page.getByText('Backup registrato come salvato.')).toBeVisible()
   await expect(page.getByText('Non hai ancora salvato un backup .dtagency')).toHaveCount(0)
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Backup e ripristino' })).toBeVisible()
@@ -133,4 +137,30 @@ test('restore verification warnings stay on screen instead of being hidden by a 
   await report.getByRole('button', { name: 'Ricarica l’app' }).click()
   await page.getByRole('link', { name: 'Viaggi', exact: true }).click()
   await expect(page.getByRole('link', { name: 'Viaggio con avvisi' })).toBeVisible()
+})
+
+test('a tab opened while another tab holds the Vault lock explains why it is waiting', async ({ context }) => {
+  const holder = await context.newPage()
+  await holder.goto('/')
+  await expect(holder.getByRole('link', { name: 'Nuovo viaggio' })).toBeVisible()
+  await holder.evaluate(() => {
+    window.__releaseVaultLock = undefined
+    void navigator.locks.request(
+      'dtagency:vault',
+      () =>
+        new Promise((resolve) => {
+          window.__releaseVaultLock = resolve
+        }),
+    )
+  })
+  await holder.waitForFunction(() => typeof window.__releaseVaultLock === 'function')
+
+  const waiting = await context.newPage()
+  await waiting.goto('/')
+  await expect(
+    waiting.getByText('Attendo che un’altra scheda di DTAgency completi un backup o un ripristino…'),
+  ).toBeVisible()
+
+  await holder.evaluate(() => window.__releaseVaultLock())
+  await expect(waiting.getByRole('link', { name: 'Nuovo viaggio' })).toBeVisible()
 })

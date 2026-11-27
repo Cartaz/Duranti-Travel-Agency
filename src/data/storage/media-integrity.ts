@@ -1,4 +1,10 @@
+import { withVaultLock } from '../../lib/vault-lock'
 import { db } from '../db/dtagency-db'
+import {
+  deleteEncryptedDocumentDirectory,
+  describePrivateDocumentDirectory,
+  listPrivateDocumentRootEntries,
+} from '../opfs/private-document-store'
 import {
   buildMediaPath,
   deleteMediaFile,
@@ -127,19 +133,10 @@ export async function scanMediaIntegrity(): Promise<MediaIntegrityReport> {
   }
 }
 
-export async function removeOrphanMediaDirectory(id: string): Promise<void> {
-  const metadata = await db.media.get(id)
-  if (metadata) throw new Error(`Media directory ${id} is not orphaned because metadata still exists.`)
-  try {
-    await deleteMediaFile(id)
-  } catch (error) {
-    if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error
-  }
-}
-
 export interface MediaStorageScan {
   reclaimableMediaIds: string[]
   orphanDirectoryIds: string[]
+  orphanPrivateDocumentIds: string[]
   reclaimableBytes: number
   unhealthyActiveCount: number
 }
@@ -151,23 +148,53 @@ export interface MediaStorageReclaimResult {
   freedBytes: number
 }
 
-async function storedBytes(id: string): Promise<number> {
+/**
+ * A directory without metadata may belong to an upload still being written
+ * (bytes are written before the row is added), so only directories untouched
+ * for this long are treated as orphans.
+ */
+export const ORPHAN_GRACE_MS = 10 * 60 * 1000
+
+async function mediaFootprint(id: string): Promise<{ bytes: number; modified: number }> {
   try {
-    return (await readMediaFile(id)).size
+    const file = await readMediaFile(id)
+    return { bytes: file.size, modified: file.lastModified }
   } catch {
-    return 0
+    return { bytes: 0, modified: 0 }
   }
 }
 
-/** Read-only summary of space held by deleted media and orphan OPFS directories. */
-export async function scanReclaimableMediaStorage(): Promise<MediaStorageScan> {
+async function isStaleMediaOrphan(id: string, now: number): Promise<boolean> {
+  if (await db.media.get(id)) return false
+  return now - (await mediaFootprint(id)).modified >= ORPHAN_GRACE_MS
+}
+
+async function isStalePrivateOrphan(id: string, now: number): Promise<boolean> {
+  if (await db.travelerDocuments.get(id)) return false
+  return now - (await describePrivateDocumentDirectory(id)).newestModified >= ORPHAN_GRACE_MS
+}
+
+/** Read-only summary of space held by deleted media and stale orphan directories. */
+export async function scanReclaimableMediaStorage(now = Date.now()): Promise<MediaStorageScan> {
   const report = await scanMediaIntegrity()
+  const orphanDirectoryIds: string[] = []
+  for (const id of report.orphanDirectoryIds) if (await isStaleMediaOrphan(id, now)) orphanDirectoryIds.push(id)
+
+  const orphanPrivateDocumentIds: string[] = []
+  for (const entry of await listPrivateDocumentRootEntries()) {
+    if (entry.kind === 'directory' && (await isStalePrivateOrphan(entry.name, now)))
+      orphanPrivateDocumentIds.push(entry.name)
+  }
+
   let reclaimableBytes = 0
-  for (const id of [...report.tombstonesWithFileIds, ...report.orphanDirectoryIds])
-    reclaimableBytes += await storedBytes(id)
+  for (const id of [...report.tombstonesWithFileIds, ...orphanDirectoryIds])
+    reclaimableBytes += (await mediaFootprint(id)).bytes
+  for (const id of orphanPrivateDocumentIds) reclaimableBytes += (await describePrivateDocumentDirectory(id)).bytes
+
   return {
     reclaimableMediaIds: report.tombstonesWithFileIds,
-    orphanDirectoryIds: report.orphanDirectoryIds,
+    orphanDirectoryIds,
+    orphanPrivateDocumentIds,
     reclaimableBytes,
     unhealthyActiveCount:
       report.missingFileIds.length +
@@ -179,10 +206,13 @@ export async function scanReclaimableMediaStorage(): Promise<MediaStorageScan> {
 
 /**
  * Explicit, user-confirmed reclamation. Every deletion re-checks the current
- * state: purge refuses active or still-referenced rows, and orphan removal
- * refuses any directory that has regained metadata since the scan.
+ * state under the Vault lock: purge refuses active or referenced rows, and an
+ * orphan directory is kept if metadata reappeared or it was written recently.
  */
-export async function reclaimMediaStorage(scan: MediaStorageScan): Promise<MediaStorageReclaimResult> {
+export async function reclaimMediaStorage(
+  scan: MediaStorageScan,
+  now = Date.now(),
+): Promise<MediaStorageReclaimResult> {
   const result: MediaStorageReclaimResult = {
     purgedMediaCount: 0,
     removedOrphanCount: 0,
@@ -190,7 +220,7 @@ export async function reclaimMediaStorage(scan: MediaStorageScan): Promise<Media
     freedBytes: 0,
   }
   for (const id of scan.reclaimableMediaIds) {
-    const bytes = await storedBytes(id)
+    const { bytes } = await mediaFootprint(id)
     const outcome = await mediaFileRepository.purge(id)
     if (outcome === 'purged') {
       result.purgedMediaCount += 1
@@ -200,11 +230,32 @@ export async function reclaimMediaStorage(scan: MediaStorageScan): Promise<Media
     }
   }
   for (const id of scan.orphanDirectoryIds) {
-    if (await db.media.get(id)) continue // metadata reappeared since the scan: not an orphan any more
-    const bytes = await storedBytes(id)
-    await removeOrphanMediaDirectory(id)
-    result.removedOrphanCount += 1
-    result.freedBytes += bytes
+    const removed = await withVaultLock(async () => {
+      if (!(await isStaleMediaOrphan(id, now))) return undefined
+      const { bytes } = await mediaFootprint(id)
+      try {
+        await deleteMediaFile(id)
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error
+      }
+      return bytes
+    })
+    if (removed !== undefined) {
+      result.removedOrphanCount += 1
+      result.freedBytes += removed
+    }
+  }
+  for (const id of scan.orphanPrivateDocumentIds) {
+    const removed = await withVaultLock(async () => {
+      if (!(await isStalePrivateOrphan(id, now))) return undefined
+      const { bytes } = await describePrivateDocumentDirectory(id)
+      await deleteEncryptedDocumentDirectory(id)
+      return bytes
+    })
+    if (removed !== undefined) {
+      result.removedOrphanCount += 1
+      result.freedBytes += removed
+    }
   }
   return result
 }

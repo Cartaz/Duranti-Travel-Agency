@@ -1,3 +1,4 @@
+import { withVaultLock } from '../../lib/vault-lock'
 import type { Media } from '../../domain/entities'
 import { db } from '../db/dtagency-db'
 import { assertEntityBase } from '../db/validate'
@@ -248,7 +249,13 @@ export class MediaRepository {
    * reclaim. Rows still referenced by another record (even a tombstoned one) are
    * kept, because Vault semantic validation requires every reference to resolve.
    */
-  async purge(id: string): Promise<PurgeMediaResult> {
+  purge(id: string): Promise<PurgeMediaResult> {
+    // Serialized with Vault export/restore in every tab: never delete bytes a
+    // concurrent snapshot or restore is reading or has just written.
+    return withVaultLock(() => this.purgeUnlocked(id))
+  }
+
+  private async purgeUnlocked(id: string): Promise<PurgeMediaResult> {
     const outcome = await db.transaction('rw', db.media, db.reservations, db.trips, async () => {
       const current = await db.media.get(id)
       if (!current) return 'not-found' as const

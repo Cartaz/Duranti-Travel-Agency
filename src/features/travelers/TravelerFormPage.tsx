@@ -203,10 +203,8 @@ export default function TravelerFormPage({ mode }: { mode: 'create' | 'edit' }) 
           confirmTitle="Eliminare questo viaggiatore?"
           confirmMessage="Profilo, partecipazioni e documenti d’identità cifrati verranno eliminati da questo dispositivo. Potrai recuperarli solo da un backup .dtagency precedente."
           confirmLabel="Elimina viaggiatore e documenti"
-          onDelete={async () => {
-            await travelers.deleteTraveler(travelerId)
-            navigate('/travelers', { replace: true })
-          }}
+          onDelete={() => travelers.deleteTraveler(travelerId)}
+          onDeleted={() => navigate('/travelers', { replace: true })}
         />
       )}
     </section>

@@ -200,7 +200,9 @@ function AppShellLayout({ readiness }: { readiness: AppShellReadiness }) {
                 {persistenceBusy ? 'Richiesta…' : 'Proteggi l’archivio'}
               </button>
             )}
-            {(status?.backupDue || status?.persistence !== 'persistent') && <NavLink to="/backup">Apri backup</NavLink>}
+            {status && (status.backupDue || status.persistence !== 'persistent') && (
+              <NavLink to="/backup">Apri backup</NavLink>
+            )}
             <button type="button" onClick={() => setReadinessVisible(false)}>
               Chiudi
             </button>

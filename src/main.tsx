@@ -18,7 +18,7 @@ import { tripApplication } from './composition/trips'
 import { bootstrapApplication } from './data/bootstrap'
 import { ApplicationProvider } from './ui/application-context'
 import BootstrapFailure from './ui/BootstrapFailure'
-import { onVaultRestoredElsewhere } from './vault/lock'
+import { isVaultLockBusy, onVaultRestoredElsewhere } from './vault/lock'
 import { abandonInterruptedVaultRestore, hasInterruptedVaultRestore } from './vault/restore'
 import type { AppShellReadiness } from './ui/layout/AppShell'
 import './styles.css'
@@ -41,8 +41,26 @@ function readinessFromBootstrap(bootstrap: BootstrapState): AppShellReadiness {
   }
 }
 
+let failureRenderCount = 0
+
+async function renderOpeningState(): Promise<void> {
+  // Bootstrap waits for the cross-tab Vault lock; say why instead of showing a blank page.
+  const busy = await isVaultLockBusy().catch(() => false)
+  root.render(
+    <main className="bootstrap-failure" role="status">
+      <h1>DTAgency</h1>
+      <p>
+        {busy
+          ? 'Attendo che un’altra scheda di DTAgency completi un backup o un ripristino…'
+          : 'Apro l’archivio locale…'}
+      </p>
+    </main>,
+  )
+}
+
 async function startApplication(): Promise<void> {
   try {
+    await renderOpeningState()
     const bootstrap = await bootstrapApplication()
     root.render(
       <React.StrictMode>
@@ -73,6 +91,7 @@ async function startApplication(): Promise<void> {
     const interruptedRestore = await hasInterruptedVaultRestore().catch(() => false)
     root.render(
       <BootstrapFailure
+        key={(failureRenderCount += 1)}
         message={error instanceof Error ? error.message : String(error)}
         interruptedRestore={interruptedRestore}
         onRetry={() => void startApplication()}

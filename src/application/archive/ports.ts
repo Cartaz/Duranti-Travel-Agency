@@ -29,6 +29,8 @@ export interface ArchiveApplicationDependencies {
 export interface MediaStorageScan {
   reclaimableMediaIds: string[]
   orphanDirectoryIds: string[]
+  /** Encrypted document directories without metadata (e.g. an interrupted purge). */
+  orphanPrivateDocumentIds: string[]
   reclaimableBytes: number
   /** Active media whose bytes are missing, unreadable or inconsistent. */
   unhealthyActiveCount: number

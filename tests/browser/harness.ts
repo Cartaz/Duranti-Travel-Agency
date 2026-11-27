@@ -9,7 +9,11 @@ import { dayApplication } from '../../src/composition/days'
 import { travelerApplication } from '../../src/composition/travelers'
 import { tripApplication } from '../../src/composition/trips'
 import { reservationBlockRepository } from '../../src/data/repositories/reservation-block-repository'
-import { reclaimMediaStorage, scanReclaimableMediaStorage } from '../../src/data/storage/media-integrity'
+import {
+  ORPHAN_GRACE_MS,
+  reclaimMediaStorage,
+  scanReclaimableMediaStorage,
+} from '../../src/data/storage/media-integrity'
 import { prepareVaultExport, loadPreparedVaultFile } from '../../src/vault/export'
 import { stageVaultImport } from '../../src/vault/validated-import'
 import {
@@ -726,20 +730,33 @@ await run('Storage reclamation frees deleted and orphan media but keeps active b
     deletedAt: now,
   })
   await writeMediaFile('orphan-media', new Blob(['orphan']))
+  const root = await navigator.storage.getDirectory()
+  const privateDocuments = await (
+    await (await root.getDirectoryHandle('dtagency', { create: true })).getDirectoryHandle('private', { create: true })
+  ).getDirectoryHandle('traveler-documents', { create: true })
+  const orphanDocument = await privateDocuments.getDirectoryHandle('orphan-document', { create: true })
+  await writeOpfsFile(orphanDocument, 'attachment.bin', new Blob(['secret']))
 
-  const scan = await scanReclaimableMediaStorage()
+  // Fresh directories may belong to an upload still in progress: not reclaimable yet.
+  const fresh = await scanReclaimableMediaStorage()
+  assert(fresh.orphanDirectoryIds.length === 0, 'A freshly written media directory was treated as an orphan.')
+  assert(fresh.orphanPrivateDocumentIds.length === 0, 'A freshly written document directory was treated as an orphan.')
+
+  const later = Date.now() + ORPHAN_GRACE_MS + 60_000
+  const scan = await scanReclaimableMediaStorage(later)
   assert(
     scan.reclaimableMediaIds.join() === 'deleted-media',
     `Unexpected reclaimable ids ${scan.reclaimableMediaIds.join()}.`,
   )
   assert(scan.orphanDirectoryIds.join() === 'orphan-media', `Unexpected orphan ids ${scan.orphanDirectoryIds.join()}.`)
-  assert(scan.reclaimableBytes === 13 + 6, `Unexpected reclaimable bytes ${scan.reclaimableBytes}.`)
+  assert(scan.orphanPrivateDocumentIds.join() === 'orphan-document', 'Orphan document directory was not found.')
+  assert(scan.reclaimableBytes === 13 + 6 + 6, `Unexpected reclaimable bytes ${scan.reclaimableBytes}.`)
 
-  const result = await reclaimMediaStorage(scan)
-  assert(result.purgedMediaCount === 1 && result.removedOrphanCount === 1, 'Reclamation did not remove both items.')
-  assert(result.freedBytes === 19, `Unexpected freed bytes ${result.freedBytes}.`)
+  const result = await reclaimMediaStorage(scan, later)
+  assert(result.purgedMediaCount === 1 && result.removedOrphanCount === 2, 'Reclamation did not remove every item.')
+  assert(result.freedBytes === 25, `Unexpected freed bytes ${result.freedBytes}.`)
   assert((await readText(await readMediaFile(seeded.mediaId))) === seeded.mediaText, 'Active media bytes were removed.')
-  const after = await scanReclaimableMediaStorage()
+  const after = await scanReclaimableMediaStorage(later)
   assert(
     after.reclaimableMediaIds.length === 0 && after.orphanDirectoryIds.length === 0,
     'Reclamation left items behind.',
@@ -881,6 +898,56 @@ await run('Deleting a traveler removes memberships and documents but keeps expen
     'Deleted traveler is still a participant.',
   )
   await assertVaultStillValidates()
+})
+
+async function holdVaultLock(): Promise<() => void> {
+  let release!: () => void
+  let acquired!: () => void
+  const ready = new Promise<void>((resolve) => {
+    acquired = resolve
+  })
+  void navigator.locks.request('dtagency:vault', () => {
+    acquired()
+    return new Promise<void>((resolve) => {
+      release = resolve
+    })
+  })
+  await ready
+  return release
+}
+
+await run('Media purge waits for the cross-tab Vault lock', async () => {
+  await resetEnvironment()
+  const seeded = await seedRoundTripState()
+  const media = await db.media.get(seeded.mediaId)
+  const now = new Date().toISOString()
+  await db.media.put({ ...media!, deletedAt: now, updatedAt: now })
+
+  const release = await holdVaultLock()
+  let finished = false
+  const purge = mediaFileRepository.purge(seeded.mediaId).then((result) => {
+    finished = true
+    return result
+  })
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  assert(!finished, 'Purge ran while another context held the Vault lock.')
+  assert(Boolean(await db.media.get(seeded.mediaId)), 'Purge removed the row while the lock was held.')
+  release()
+  assert((await purge) === 'purged', 'Purge did not complete after the lock was released.')
+})
+
+await run('Staging sweep skips instead of waiting when the Vault lock is busy', async () => {
+  await resetEnvironment()
+  const release = await holdVaultLock()
+  try {
+    const result = await Promise.race([
+      sweepStaleVaultStaging(Date.now() + STALE_VAULT_STAGING_MS * 2),
+      new Promise<'blocked'>((resolve) => setTimeout(() => resolve('blocked'), 1_000)),
+    ])
+    assert(result !== 'blocked', 'Sweep waited for the busy Vault lock.')
+  } finally {
+    release()
+  }
 })
 
 try {
