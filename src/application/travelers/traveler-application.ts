@@ -1,5 +1,6 @@
 import type { Traveler, TripTraveler } from '../../domain/entities'
 import { normalizeOptionalDateOnly } from '../../domain/date-only.ts'
+import { purgeDeletedFiles, type DeletionOutcome } from '../shared/purge.ts'
 import type { TravelerApplicationDependencies, TravelerRole } from './ports'
 
 export type { TravelerRole }
@@ -32,6 +33,8 @@ export interface TravelerApplication {
   listTripParticipants(tripId: string): Promise<TripParticipant[]>
   attachTravelerToTrip(tripId: string, travelerId: string, role: TravelerRole): Promise<TripTraveler>
   detachTravelerFromTrip(tripId: string, travelerId: string): Promise<void>
+  /** Deletes the profile, its trip memberships and its encrypted documents. */
+  deleteTraveler(travelerId: string): Promise<DeletionOutcome>
 }
 
 const roles = new Set<TravelerRole>(['owner', 'companion', 'child', 'other'])
@@ -138,6 +141,10 @@ export function createTravelerApplication(deps: TravelerApplicationDependencies)
     const result = await deps.memberships.detachMembership(tripId, travelerId)
     if (result === 'not-found') throw new Error('Il viaggiatore non risulta associato a questo viaggio.')
   }
+  async function deleteTraveler(travelerId: string): Promise<DeletionOutcome> {
+    const { documentIds } = await deps.deletion.softDeleteTravelerWithLinks(travelerId)
+    return purgeDeletedFiles(documentIds, (id) => deps.documents.purge(id))
+  }
   return {
     travelerToDraft,
     listTravelers,
@@ -147,5 +154,6 @@ export function createTravelerApplication(deps: TravelerApplicationDependencies)
     listTripParticipants,
     attachTravelerToTrip,
     detachTravelerFromTrip,
+    deleteTraveler,
   }
 }

@@ -13,7 +13,7 @@ export function normalizeCurrencyCode(value: string): string {
   return currency
 }
 
-export function currencyFractionDigits(currencyInput: string): number {
+function currencyFractionDigits(currencyInput: string): number {
   const currency = normalizeCurrencyCode(currencyInput)
   const { minimumFractionDigits } = new Intl.NumberFormat('en-US', {
     style: 'currency',

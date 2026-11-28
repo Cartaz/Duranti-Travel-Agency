@@ -1,5 +1,7 @@
-import { useRef, useState, type FormEvent } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import type { ArchiveStatus } from '../../application/archive/archive-application'
+import { ArchiveStatusProvider, useArchiveStatus } from '../archive-status'
 import './app-shell.css'
 
 function navClassName({ isActive }: { isActive: boolean }): string {
@@ -9,7 +11,6 @@ function navClassName({ isActive }: { isActive: boolean }): string {
 type ValidatableControl = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 
 export interface AppShellReadiness {
-  storageWarning?: 'best-effort' | 'unverified'
   recoveryNotice?: 'rolled-back' | 'finalized'
 }
 
@@ -76,15 +77,27 @@ function readableValidationMessage(control: ValidatableControl): string {
   return control.validationMessage || `Controlla “${label}”.`
 }
 
-function readinessMessages(readiness: AppShellReadiness): string[] {
+function formatBackupDate(value: string): string {
+  return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(value))
+}
+
+function readinessMessages(readiness: AppShellReadiness, status: ArchiveStatus | undefined): string[] {
   const messages: string[] = []
-  if (readiness.storageWarning === 'best-effort') {
+  if (status?.persistence === 'best-effort') {
     messages.push(
-      'Il browser conserva questi dati in modalità best-effort: in condizioni di spazio ridotto potrebbe rimuoverli. Mantieni un backup .dtagency aggiornato fuori dal browser.',
+      'Il browser conserva questi dati in modalità best-effort: in condizioni di spazio ridotto potrebbe rimuoverli. Chiedi al browser di proteggere l’archivio e mantieni un backup .dtagency aggiornato fuori dal browser.',
     )
-  } else if (readiness.storageWarning === 'unverified') {
+  } else if (status?.persistence === 'unsupported' || status?.persistence === 'unknown') {
     messages.push(
       'Non è stato possibile verificare se questo browser protegge stabilmente l’archivio locale. Mantieni un backup .dtagency aggiornato fuori dal browser.',
+    )
+  }
+
+  if (status?.backupDue) {
+    messages.push(
+      status.lastBackupAt
+        ? `L’ultimo backup .dtagency salvato risale al ${formatBackupDate(status.lastBackupAt)}. Salvane uno aggiornato fuori dal browser.`
+        : 'Non hai ancora salvato un backup .dtagency di questi viaggi fuori dal browser.',
     )
   }
 
@@ -101,10 +114,45 @@ function readinessMessages(readiness: AppShellReadiness): string[] {
 }
 
 export default function AppShell({ readiness = {} }: { readiness?: AppShellReadiness }) {
+  return (
+    <ArchiveStatusProvider>
+      <AppShellLayout readiness={readiness} />
+    </ArchiveStatusProvider>
+  )
+}
+
+function AppShellLayout({ readiness }: { readiness: AppShellReadiness }) {
   const [validationNotice, setValidationNotice] = useState('')
   const [readinessVisible, setReadinessVisible] = useState(true)
   const validationLockRef = useRef(false)
-  const statusMessages = readinessMessages(readiness)
+  const { status, refresh, requestPersistence } = useArchiveStatus()
+  const { pathname } = useLocation()
+  const didMountRef = useRef(false)
+  // Trips may have been created or deleted on the previous page: keep the reminder accurate.
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true
+      return
+    }
+    refresh()
+  }, [pathname, refresh])
+  const [persistenceBusy, setPersistenceBusy] = useState(false)
+  const [persistenceDenied, setPersistenceDenied] = useState(false)
+  const statusMessages = readinessMessages(readiness, status)
+  if (persistenceDenied && status?.persistence === 'best-effort') {
+    statusMessages.push(
+      'Il browser non ha concesso la protezione dell’archivio. Su iPhone installa DTAgency nella schermata Home e salva regolarmente un backup.',
+    )
+  }
+
+  const protectArchive = async (): Promise<void> => {
+    setPersistenceBusy(true)
+    try {
+      setPersistenceDenied((await requestPersistence()) !== 'persistent')
+    } finally {
+      setPersistenceBusy(false)
+    }
+  }
 
   const handleInvalid = (event: FormEvent<HTMLElement>): void => {
     event.preventDefault()
@@ -157,7 +205,14 @@ export default function AppShell({ readiness = {} }: { readiness?: AppShellReadi
             ))}
           </div>
           <div className="app-readiness-actions">
-            {readiness.storageWarning && <NavLink to="/backup">Apri backup</NavLink>}
+            {status?.persistence === 'best-effort' && (
+              <button type="button" disabled={persistenceBusy} onClick={() => void protectArchive()}>
+                {persistenceBusy ? 'Richiesta…' : 'Proteggi l’archivio'}
+              </button>
+            )}
+            {status && (status.backupDue || status.persistence !== 'persistent') && (
+              <NavLink to="/backup">Apri backup</NavLink>
+            )}
             <button type="button" onClick={() => setReadinessVisible(false)}>
               Chiudi
             </button>

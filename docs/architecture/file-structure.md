@@ -1,4 +1,6 @@
-# Proposed file structure
+# File structure
+
+> Historical proposal from the project bootstrap. The implemented layout differs: see the layer descriptions in [`README.md`](./README.md) and the boundaries enforced by `scripts/architecture-policy.mjs` (`src/domain`, `src/application`, `src/composition`, `src/data`, `src/vault`, `src/security`, `src/ui`, `src/features`, `src/lib`). Keep this file only as decision context.
 
 ```text
 src/

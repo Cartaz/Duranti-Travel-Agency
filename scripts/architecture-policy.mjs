@@ -85,7 +85,7 @@ const plannerPagePaths = new Set([
 // Keeping the allowlist at file granularity prevents a whole feature directory from
 // becoming an implicit service locator for unrelated UI.
 const presentationCompositionImports = new Map([
-  ['src/features/planner/DayPlannerPage.tsx', new Set(['expenses', 'itinerary', 'places', 'reservations'])],
+  ['src/features/planner/DayPlannerPage.tsx', new Set(['expenses', 'itinerary', 'reservations'])],
   ['src/features/planner/GuidedDayPlannerPage.tsx', new Set(['media', 'templates'])],
   ['src/features/days/DayFormPage.tsx', new Set(['templates'])],
   ['src/features/trips/TripDetailPage.tsx', new Set(['days', 'expenses', 'itinerary', 'travelers'])],

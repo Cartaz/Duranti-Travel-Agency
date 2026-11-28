@@ -9,6 +9,7 @@ import {
   type VaultTableSnapshot,
 } from './format'
 import type { StagedVaultImport } from './import'
+import { announceVaultRestore, withVaultLock } from './lock'
 
 const ROOT_DIRECTORY = 'dtagency'
 const MEDIA_DIRECTORY = 'media'
@@ -22,6 +23,9 @@ const RESTORE_JOURNAL_FILE = 'current.json'
 const BACKUP_MANIFEST_FILE = 'manifest.json'
 const BACKUP_FILES_DIRECTORY = 'files'
 const RESTORE_JOURNAL_VERSION = 1 as const
+const EXPORT_STAGING_DIRECTORY = 'vault-staging'
+/** Temporary Vault copies older than this are treated as abandoned. */
+export const STALE_VAULT_STAGING_MS = 6 * 60 * 60 * 1000
 const SAFE_IDENTIFIER = /^[A-Za-z0-9_-]+$/
 
 type RestorePhase = 'files-mutating' | 'files-promoted' | 'committed'
@@ -610,6 +614,11 @@ async function databaseSha256(tables: VaultTableSnapshot[]): Promise<string> {
   }
 }
 
+/** Canonical SHA-256 of the live database, as used by the restore journal. */
+export function fingerprintLiveDatabase(): Promise<string> {
+  return currentDatabaseSha256()
+}
+
 async function currentDatabaseSha256(): Promise<string> {
   return databaseSha256(await snapshotDatabase())
 }
@@ -661,7 +670,11 @@ async function rollbackJournal(journal: RestoreJournal): Promise<void> {
   await cleanupRestoreArtifacts(journal)
 }
 
-export async function recoverInterruptedVaultRestore(): Promise<VaultRestoreRecoveryResult> {
+export function recoverInterruptedVaultRestore(): Promise<VaultRestoreRecoveryResult> {
+  return withVaultLock(recoverInterruptedVaultRestoreUnlocked)
+}
+
+async function recoverInterruptedVaultRestoreUnlocked(): Promise<VaultRestoreRecoveryResult> {
   if (!hasOpfsSupport()) return 'none'
   const journal = await readRestoreJournal()
   if (!journal) return 'none'
@@ -682,7 +695,18 @@ export async function recoverInterruptedVaultRestore(): Promise<VaultRestoreReco
   return 'rolled-back'
 }
 
-export async function commitStagedVaultImport(
+export function commitStagedVaultImport(
+  staged: StagedVaultImport,
+  options: CommitStagedVaultImportOptions,
+): Promise<VaultRestoreResult> {
+  return withVaultLock(async () => {
+    const result = await commitStagedVaultImportUnlocked(staged, options)
+    announceVaultRestore(result.restoreId)
+    return result
+  })
+}
+
+async function commitStagedVaultImportUnlocked(
   staged: StagedVaultImport,
   options: CommitStagedVaultImportOptions,
 ): Promise<VaultRestoreResult> {
@@ -697,7 +721,7 @@ export async function commitStagedVaultImport(
     bytesCompleted: 0,
     bytesTotal: staged.sourceBytes,
   })
-  await recoverInterruptedVaultRestore()
+  await recoverInterruptedVaultRestoreUnlocked()
 
   const restoreId = crypto.randomUUID()
   const createdAt = new Date().toISOString()
@@ -824,4 +848,102 @@ export async function commitStagedVaultImport(
     verificationErrors,
     cleanupComplete,
   }
+}
+
+/** True when a restore journal is present, even if it can no longer be parsed. */
+export async function hasInterruptedVaultRestore(): Promise<boolean> {
+  if (!hasOpfsSupport()) return false
+  const directory = await getRestoreStateDirectory(false)
+  if (!directory) return false
+  try {
+    await directory.getFileHandle(RESTORE_JOURNAL_FILE)
+    return true
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'NotFoundError') return false
+    throw error
+  }
+}
+
+/**
+ * Last-resort escape hatch when automatic recovery keeps failing: forget the
+ * journal so the app can start with whatever live state exists. The rollback
+ * copy under vault-restore-backup/ is deliberately kept, because during the
+ * files-mutating phase it may be the only copy of the previous media.
+ */
+export function abandonInterruptedVaultRestore(): Promise<void> {
+  return withVaultLock(async () => {
+    lockLocalEncryption()
+    await deleteRestoreJournal()
+  })
+}
+
+export interface VaultStagingSweepResult {
+  removedExports: number
+  removedImportStages: number
+}
+
+async function newestFileTimestamp(directory: FileSystemDirectoryHandle): Promise<number> {
+  let newest = 0
+  for (const [, handle] of await getDirectoryEntries(directory)) {
+    const timestamp =
+      handle.kind === 'file'
+        ? (await (handle as FileSystemFileHandle).getFile()).lastModified
+        : await newestFileTimestamp(handle as FileSystemDirectoryHandle)
+    newest = Math.max(newest, timestamp)
+  }
+  return newest
+}
+
+/**
+ * Removes prepared exports and import stages abandoned by a closed tab or a
+ * crash. Entries younger than maxAgeMs are kept because another open tab may
+ * still be waiting for the user to save or confirm them; the stage referenced
+ * by a restore journal is never touched.
+ */
+export async function sweepStaleVaultStaging(
+  now = Date.now(),
+  maxAgeMs = STALE_VAULT_STAGING_MS,
+): Promise<VaultStagingSweepResult> {
+  // Opportunistic: when another tab is busy with the Vault, skip and retry next launch.
+  const skipped: VaultStagingSweepResult = { removedExports: 0, removedImportStages: 0 }
+  const result = await withVaultLock(
+    async () => {
+      const result: VaultStagingSweepResult = { removedExports: 0, removedImportStages: 0 }
+      if (!hasOpfsSupport()) return result
+      const appRoot = await getExistingDirectory(await getRootDirectory(), ROOT_DIRECTORY)
+      if (!appRoot) return result
+
+      const exports = await getExistingDirectory(appRoot, EXPORT_STAGING_DIRECTORY)
+      if (exports) {
+        for (const [name, handle] of await getDirectoryEntries(exports)) {
+          const timestamp =
+            handle.kind === 'file'
+              ? (await (handle as FileSystemFileHandle).getFile()).lastModified
+              : await newestFileTimestamp(handle as FileSystemDirectoryHandle)
+          if (now - timestamp < maxAgeMs) continue
+          await removeEntryIfExists(exports, name, handle.kind === 'directory')
+          result.removedExports += 1
+        }
+      }
+
+      const imports = await getExistingDirectory(appRoot, IMPORT_STAGING_DIRECTORY)
+      if (imports) {
+        // An unreadable journal means recovery still owns some stage: keep them all.
+        const journal = await readRestoreJournal()
+        for (const [name, handle] of await getDirectoryEntries(imports)) {
+          if (name === journal?.stageId) continue
+          const timestamp =
+            handle.kind === 'directory'
+              ? await newestFileTimestamp(handle as FileSystemDirectoryHandle)
+              : (await (handle as FileSystemFileHandle).getFile()).lastModified
+          if (now - timestamp < maxAgeMs) continue
+          await removeEntryIfExists(imports, name, handle.kind === 'directory')
+          result.removedImportStages += 1
+        }
+      }
+      return result
+    },
+    { ifAvailable: true },
+  )
+  return result ?? skipped
 }

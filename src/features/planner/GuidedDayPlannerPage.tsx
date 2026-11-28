@@ -4,7 +4,7 @@ import type { PlannerBlockType } from '../../application/planner/planner-applica
 import { useApplicationServices } from '../../ui/application-context'
 import DayMediaGallery from '../media/DayMediaGallery'
 import DayTemplateSaver from '../templates/DayTemplateSaver'
-import DayPlannerPage from './DayPlannerPage'
+import DayPlannerPage, { type DayPlannerHandle } from './DayPlannerPage'
 import './planner-quick-add.css'
 
 interface AddChoice {
@@ -35,15 +35,13 @@ function choiceLabel(type: PlannerBlockType): string {
 
 export default function GuidedDayPlannerPage() {
   const { tripId, dayId } = useParams<{ tripId: string; dayId: string }>()
-  const { trips: tripApplication, planner: plannerApplication } = useApplicationServices('trips', 'planner')
-  const [revision, setRevision] = useState(0)
+  const { trips: tripApplication } = useApplicationServices('trips')
   const [busyType, setBusyType] = useState<PlannerBlockType>()
   const [canEdit, setCanEdit] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
-  const [pendingScroll, setPendingScroll] = useState(false)
   const detailsRef = useRef<HTMLDetailsElement>(null)
-  const wrapperRef = useRef<HTMLDivElement>(null)
+  const plannerRef = useRef<DayPlannerHandle>(null)
 
   useEffect(() => {
     if (!tripId) {
@@ -64,41 +62,13 @@ export default function GuidedDayPlannerPage() {
     return () => {
       cancelled = true
     }
-  }, [revision, tripApplication, tripId])
+  }, [tripApplication, tripId])
 
   useEffect(() => {
     if (!status) return
     const timer = window.setTimeout(() => setStatus(''), 3500)
     return () => window.clearTimeout(timer)
   }, [status])
-
-  useEffect(() => {
-    if (!pendingScroll) return
-    const root = wrapperRef.current
-    if (!root) return
-
-    const scrollToNewest = (): boolean => {
-      const blocks = root.querySelectorAll<HTMLElement>('.planner-canvas .planner-block')
-      const newest = blocks.item(blocks.length - 1)
-      if (!newest) return false
-      newest.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      setPendingScroll(false)
-      return true
-    }
-
-    if (scrollToNewest()) return
-
-    const observer = new MutationObserver(() => {
-      if (scrollToNewest()) observer.disconnect()
-    })
-    observer.observe(root, { childList: true, subtree: true })
-    const timeout = window.setTimeout(() => observer.disconnect(), 4000)
-
-    return () => {
-      observer.disconnect()
-      window.clearTimeout(timeout)
-    }
-  }, [pendingScroll, revision])
 
   const add = async (type: PlannerBlockType): Promise<void> => {
     if (!tripId || !dayId || busyType) return
@@ -107,11 +77,10 @@ export default function GuidedDayPlannerPage() {
     setStatus('')
 
     try {
-      await plannerApplication.createPlannerBlock(tripId, dayId, type)
+      if (!plannerRef.current) throw new Error('Il planner della giornata non è ancora pronto.')
+      await plannerRef.current.addBlock(type)
       setStatus(`${choiceLabel(type)} aggiunto. Compila i dettagli nel nuovo blocco.`)
-      setPendingScroll(true)
-      setRevision((current) => current + 1)
-      detailsRef.current?.removeAttribute('open')
+      if (detailsRef.current) detailsRef.current.open = false
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile aggiungere questo elemento alla giornata.')
     } finally {
@@ -120,8 +89,8 @@ export default function GuidedDayPlannerPage() {
   }
 
   return (
-    <div className="guided-day-planner" ref={wrapperRef}>
-      <DayPlannerPage key={revision} />
+    <div className="guided-day-planner">
+      <DayPlannerPage ref={plannerRef} showToolbar={false} />
 
       {tripId && dayId && <DayMediaGallery tripId={tripId} dayId={dayId} readOnly={!canEdit} />}
 

@@ -1,3 +1,4 @@
+import { openFileInNewTab } from '../../lib/browser-file'
 import { useEffect, useState, type FormEvent } from 'react'
 import type { Block, Media, Place, Reservation } from '../../domain/entities'
 import {
@@ -113,6 +114,7 @@ export default function ReservationBlockEditor({
   canMoveUp,
   canMoveDown,
   onChanged,
+  onNotice,
 }: {
   block: Block
   tripId: string
@@ -123,6 +125,8 @@ export default function ReservationBlockEditor({
   canMoveUp: boolean
   canMoveDown: boolean
   onChanged: () => Promise<void>
+  /** Shows a page-level notice that outlives this editor (e.g. after deletion). */
+  onNotice?: (message: string) => void
 }) {
   const { planner, reservations } = useApplicationServices('planner', 'reservations')
   const blockType = reservationBlockType(block)
@@ -277,13 +281,7 @@ export default function ReservationBlockEditor({
     setError('')
     try {
       const file = await reservations.readPlannerReservationAttachment(attachment)
-      const objectUrl = URL.createObjectURL(file)
-      const anchor = document.createElement('a')
-      anchor.href = objectUrl
-      anchor.target = '_blank'
-      anchor.rel = 'noopener noreferrer'
-      anchor.click()
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+      openFileInNewTab(file)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile aprire l’allegato.')
     } finally {
@@ -296,7 +294,11 @@ export default function ReservationBlockEditor({
     setSaving(true)
     setError('')
     try {
-      await reservations.deletePlannerReservationBlock(tripId, dayId, block.id)
+      const outcome = await reservations.deletePlannerReservationBlock(tripId, dayId, block.id)
+      if (outcome.pendingFileCleanup > 0)
+        onNotice?.(
+          'Prenotazione eliminata. L’allegato occupa ancora spazio: liberalo dalla pagina Backup con “Libera spazio”.',
+        )
       setRemoveTarget(undefined)
       await onChanged()
     } catch (cause) {

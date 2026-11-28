@@ -5,7 +5,7 @@ import type {
   TripExpenseSummary as TripExpenseSummaryData,
 } from '../../application/expenses/expense-summary'
 import { useApplicationServices } from '../../ui/application-context'
-import { formatMinorCurrency } from './currency'
+import { formatMinorCurrency } from '../../lib/currency'
 import './expenses.css'
 
 function Breakdown({

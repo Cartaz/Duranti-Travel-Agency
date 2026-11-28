@@ -1,12 +1,12 @@
 import type { EncryptedPayloadV1 } from '../domain/entities'
 import { db } from '../data/db/dtagency-db'
+import { MIN_PASSPHRASE_LENGTH } from '../lib/passphrase-policy'
 
 const SECURITY_KEY_META = 'security.rootKey.v1'
 const PBKDF2_ITERATIONS = 600_000
 const PBKDF2_SALT_BYTES = 16
 const AES_GCM_IV_BYTES = 12
 const AES_GCM_TAG_LENGTH = 128
-const MIN_PASSPHRASE_LENGTH = 12
 
 interface RootKeyEnvelopeV1 {
   version: 1

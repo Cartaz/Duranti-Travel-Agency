@@ -59,6 +59,21 @@ jobs:
       - name: Browser persistence integration tests
         run: npm run test:browser
 
+      - name: Start production preview server
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 --strictPort > /tmp/dtagency-preview.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl -sS http://127.0.0.1:4173/Duranti-Travel-Agency/ -o /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/dtagency-preview.log
+          exit 1
+
+      - name: Production build smoke tests (CSP, service worker, offline)
+        run: npm run test:production
+
       - name: Configure Pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/configure-pages@v5

@@ -1,4 +1,5 @@
 import { reservationIdForBlock } from '../../domain/block-content'
+import { purgeDeletedFiles, type DeletionOutcome } from '../shared/purge.ts'
 import type { Block, Media, Place, Reservation } from '../../domain/entities'
 import { reservationTypeForBlockType } from '../../domain/reservation-itinerary-mapping'
 import { validateIanaTimezoneInput, validateLocalDateTimeInput } from '../shared/temporal-input'
@@ -139,7 +140,7 @@ export interface ReservationApplication {
   ): Promise<ReservationAttachmentResult>
   removePlannerReservationAttachment(tripId: string, dayId: string, blockId: string): Promise<Reservation>
   savePlannerReservation(tripId: string, dayId: string, blockId: string, input: ReservationDraft): Promise<Reservation>
-  deletePlannerReservationBlock(tripId: string, dayId: string, blockId: string): Promise<void>
+  deletePlannerReservationBlock(tripId: string, dayId: string, blockId: string): Promise<DeletionOutcome>
 }
 export function createReservationApplication(deps: ReservationApplicationDependencies): ReservationApplication {
   const contextDependencies = { trips: deps.trips, days: deps.days }
@@ -321,9 +322,14 @@ export function createReservationApplication(deps: ReservationApplicationDepende
     await deps.transactions.saveReservationForBlock(blockId, tripId, dayId, reservation)
     return reservation
   }
-  async function deletePlannerReservationBlock(tripId: string, dayId: string, blockId: string): Promise<void> {
+  async function deletePlannerReservationBlock(
+    tripId: string,
+    dayId: string,
+    blockId: string,
+  ): Promise<DeletionOutcome> {
     await assertReservationDayContext(tripId, dayId, true)
-    await deps.transactions.softDeleteReservationBlock(blockId, tripId, dayId)
+    const detachedMediaId = await deps.transactions.softDeleteReservationBlock(blockId, tripId, dayId)
+    return purgeDeletedFiles(detachedMediaId ? [detachedMediaId] : [], (id) => deps.media.purge(id))
   }
   return {
     reservationToDraft,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type FormEvent, type Ref } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Block, Day, Place, Trip } from '../../domain/entities'
 import type { DayItineraryItem } from '../../application/itinerary/itinerary-application'
@@ -12,7 +12,7 @@ import InlineConfirm from '../../ui/InlineConfirm'
 import { useApplicationServices } from '../../ui/application-context'
 import ExpenseBlockEditor from '../expenses/ExpenseBlockEditor'
 import DayItinerarySummary from '../itinerary/DayItinerarySummary'
-import { googleMapsUrlForPlace } from '../places/maps-url'
+import { googleMapsUrlForPlace } from '../../domain/maps-url'
 import ReservationBlockEditor from '../reservations/ReservationBlockEditor'
 import './planner.css'
 
@@ -76,7 +76,18 @@ function placeDraftFromFormState(state: PlaceFormState): PlaceDraft {
   }
 }
 
-export default function DayPlannerPage() {
+/** Lets a composing page add blocks through the planner's own state and refresh flow. */
+export interface DayPlannerHandle {
+  addBlock(type: PlannerBlockType): Promise<void>
+}
+
+export interface DayPlannerPageProps {
+  ref?: Ref<DayPlannerHandle>
+  /** Hide the built-in block toolbar when the composing page offers its own add flow. */
+  showToolbar?: boolean
+}
+
+export default function DayPlannerPage({ ref, showToolbar = true }: DayPlannerPageProps = {}) {
   const { tripId, dayId } = useParams<{ tripId: string; dayId: string }>()
   const { trips, days, planner, itinerary } = useApplicationServices('trips', 'days', 'planner', 'itinerary')
   const [trip, setTrip] = useState<Trip>()
@@ -86,6 +97,9 @@ export default function DayPlannerPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [focusBlockId, setFocusBlockId] = useState<string>()
+  const blockElements = useRef(new Map<string, HTMLElement>())
 
   const refreshBlocks = useCallback(async (): Promise<void> => {
     if (!tripId || !dayId) return
@@ -129,13 +143,33 @@ export default function DayPlannerPage() {
     }
   }, [dayId, days, itinerary, planner, tripId, trips])
 
+  const createBlock = useCallback(
+    async (type: PlannerBlockType): Promise<void> => {
+      if (!tripId || !dayId) return
+      const created = await planner.createPlannerBlock(tripId, dayId, type)
+      await refreshBlocks()
+      setFocusBlockId(created.id)
+    },
+    [dayId, planner, refreshBlocks, tripId],
+  )
+
+  useImperativeHandle(ref, () => ({ addBlock: createBlock }), [createBlock])
+
+  // Bring a newly created block into view once it has been rendered.
+  useEffect(() => {
+    if (!focusBlockId) return
+    const element = blockElements.current.get(focusBlockId)
+    if (!element) return
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setFocusBlockId(undefined)
+  }, [blocks, focusBlockId])
+
   const addBlock = async (type: PlannerBlockType): Promise<void> => {
-    if (!tripId || !dayId || busy) return
+    if (busy) return
     setBusy(true)
     setError('')
     try {
-      await planner.createPlannerBlock(tripId, dayId, type)
-      await refreshBlocks()
+      await createBlock(type)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossibile aggiungere il blocco.')
     } finally {
@@ -195,6 +229,11 @@ export default function DayPlannerPage() {
           {error}
         </p>
       )}
+      {notice && (
+        <p className="trip-feedback" role="status">
+          {notice} <Link to="/backup">Apri Backup</Link>
+        </p>
+      )}
       {day.journalText?.trim() && (
         <section className="planner-journal" aria-labelledby="planner-journal-title">
           <div className="planner-journal-heading">
@@ -220,7 +259,7 @@ export default function DayPlannerPage() {
         readOnly={readOnly}
         onChanged={refreshBlocks}
       />
-      {!readOnly && (
+      {!readOnly && showToolbar && (
         <section className="planner-toolbar" aria-label="Aggiungi blocco">
           <div>
             <p className="eyebrow">Nuovo blocco</p>
@@ -243,19 +282,28 @@ export default function DayPlannerPage() {
           </div>
         )}
         {blocks.map((block, index) => (
-          <PlannerBlockEditor
+          <div
             key={block.id}
-            block={block}
-            tripId={trip.id}
-            dayId={day.id}
-            dayDate={day.date}
-            tripEndDate={trip.endDate}
-            tripCurrency={trip.currency}
-            readOnly={readOnly}
-            canMoveUp={index > 0}
-            canMoveDown={index < blocks.length - 1}
-            onChanged={refreshBlocks}
-          />
+            className="planner-block-slot"
+            ref={(element) => {
+              if (element) blockElements.current.set(block.id, element)
+              else blockElements.current.delete(block.id)
+            }}
+          >
+            <PlannerBlockEditor
+              block={block}
+              tripId={trip.id}
+              dayId={day.id}
+              dayDate={day.date}
+              tripEndDate={trip.endDate}
+              tripCurrency={trip.currency}
+              readOnly={readOnly}
+              canMoveUp={index > 0}
+              canMoveDown={index < blocks.length - 1}
+              onChanged={refreshBlocks}
+              onNotice={setNotice}
+            />
+          </div>
         ))}
       </section>
     </section>
@@ -273,6 +321,7 @@ interface PlannerBlockEditorProps {
   canMoveUp: boolean
   canMoveDown: boolean
   onChanged: () => Promise<void>
+  onNotice: (message: string) => void
 }
 function PlannerBlockEditor(props: PlannerBlockEditorProps) {
   if (props.block.type === 'expense') return <ExpenseBlockEditor {...props} />
@@ -301,10 +350,13 @@ function PlannerBasicBlockEditor({
   const [saving, setSaving] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [error, setError] = useState('')
+  // Reset the local draft only when the persisted block actually changed. A list
+  // refresh returns new objects for unchanged blocks and must keep unsaved edits.
+  const persistedVersion = `${block.id}:${block.updatedAt}`
   useEffect(() => {
     setDraft(planner.readPlannerBlockDraft(block))
     setConfirmingRemove(false)
-  }, [block, planner])
+  }, [persistedVersion, planner])
   const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault()
     if (readOnly || saving) return

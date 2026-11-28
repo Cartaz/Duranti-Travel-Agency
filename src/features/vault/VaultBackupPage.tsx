@@ -1,5 +1,13 @@
-import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { MIN_PASSPHRASE_LENGTH, passphrasePolicyError } from '../../lib/passphrase-policy'
+import {
+  reclaimableItemCount,
+  type MediaStorageReclaimResult,
+  type MediaStorageScan,
+} from '../../application/archive/archive-application'
+import { useApplicationServices } from '../../ui/application-context'
+import { useArchiveStatus } from '../../ui/archive-status'
 import InlineConfirm from '../../ui/InlineConfirm'
 import {
   discardPreparedVault,
@@ -14,9 +22,11 @@ import {
   type StagedVaultImport,
   type VaultImportProgress,
 } from '../../vault/validated-import'
-import { commitStagedVaultImport, type VaultRestoreProgress } from '../../vault/restore'
+import { commitStagedVaultImport, type VaultRestoreProgress, type VaultRestoreResult } from '../../vault/restore'
 import { canShareVaultFile, downloadVaultFile, isDTAgencyVaultFile, shareVaultFile } from '../../vault/share'
 import './vault-backup.css'
+
+const PREPARED_VAULT_GRACE_MS = 60_000
 
 function humanBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -71,6 +81,78 @@ export default function VaultBackupPage() {
 
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const [restoreReport, setRestoreReport] = useState<VaultRestoreResult>()
+  const [confirmDownloadSaved, setConfirmDownloadSaved] = useState(false)
+  const { status: archiveStatus, recordBackupSaved, requestPersistence } = useArchiveStatus()
+  const { archive } = useApplicationServices('archive')
+  const [storageScan, setStorageScan] = useState<MediaStorageScan>()
+  const [storageResult, setStorageResult] = useState<MediaStorageReclaimResult>()
+  const [storageBusy, setStorageBusy] = useState(false)
+  const [confirmReclaim, setConfirmReclaim] = useState(false)
+
+  const handleScanStorage = async (): Promise<void> => {
+    clearFeedback()
+    setStorageBusy(true)
+    setStorageResult(undefined)
+    setConfirmReclaim(false)
+    try {
+      setStorageScan(await archive.scanStorage())
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile analizzare lo spazio occupato.')
+    } finally {
+      setStorageBusy(false)
+    }
+  }
+
+  const handleReclaimStorage = async (): Promise<void> => {
+    if (!storageScan) return
+    clearFeedback()
+    setStorageBusy(true)
+    try {
+      setStorageResult(await archive.reclaimStorage(storageScan))
+      setStorageScan(undefined)
+      setConfirmReclaim(false)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossibile liberare lo spazio.')
+    } finally {
+      setStorageBusy(false)
+    }
+  }
+
+  // Temporary Vault copies can be as large as every stored photo and video.
+  // Release them when the user leaves this page instead of leaving them in OPFS.
+  const pendingArtifactsRef = useRef<{ prepared?: PreparedVaultExport; staged?: StagedVaultImport }>({})
+  pendingArtifactsRef.current = { prepared, staged }
+  useEffect(
+    () => () => {
+      const pending = pendingArtifactsRef.current
+      // A download or share started just before leaving may still be reading the
+      // OPFS-backed file, so give it the same grace period as object URLs.
+      const prepared = pending.prepared
+      if (prepared) {
+        window.setTimeout(() => void discardPreparedVault(prepared).catch(() => undefined), PREPARED_VAULT_GRACE_MS)
+      }
+      if (pending.staged) void discardStagedVaultImport(pending.staged).catch(() => undefined)
+    },
+    [],
+  )
+
+  /** Records the saved backup; a failure is shown, never reported as success. */
+  const markBackupSaved = async (): Promise<boolean> => {
+    try {
+      await recordBackupSaved()
+    } catch (cause) {
+      setError(
+        `Il backup è stato consegnato, ma non riesco a registrarne la data su questo dispositivo: ${
+          cause instanceof Error ? cause.message : String(cause)
+        }`,
+      )
+      return false
+    }
+    // Moving data outside the browser is the moment the user cares most about durability.
+    if (archiveStatus?.persistence === 'best-effort') await requestPersistence().catch(() => undefined)
+    return true
+  }
 
   const canShare = useMemo(() => Boolean(preparedFile && canShareVaultFile(preparedFile)), [preparedFile])
 
@@ -82,8 +164,9 @@ export default function VaultBackupPage() {
   const handlePrepare = async (event: FormEvent): Promise<void> => {
     event.preventDefault()
     clearFeedback()
-    if (exportPassword.length < 8) {
-      setError('Usa una password di almeno 8 caratteri per il backup.')
+    const policyError = passphrasePolicyError(exportPassword)
+    if (policyError) {
+      setError(policyError)
       return
     }
     if (exportPassword !== exportPasswordConfirm) {
@@ -129,7 +212,7 @@ export default function VaultBackupPage() {
     clearFeedback()
     try {
       await shareVaultFile(preparedFile)
-      setNotice('Backup consegnato al foglio di condivisione del dispositivo.')
+      if (await markBackupSaved()) setNotice('Backup consegnato al foglio di condivisione del dispositivo.')
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
       setError(cause instanceof Error ? cause.message : 'Impossibile condividere il backup.')
@@ -204,15 +287,15 @@ export default function VaultBackupPage() {
     setImportBusy(true)
     try {
       const result = await commitStagedVaultImport(staged, { mode: 'replace', onProgress: setRestoreProgress })
+      setStaged(undefined)
+      setConfirmRestore(false)
       if (!result.databaseVerified || !result.filesVerified || result.verificationErrors.length > 0) {
-        setNotice(
-          `Ripristino completato con ${result.verificationErrors.length} avvisi di verifica. Ricarico l’app per leggere i dati ripristinati.`,
-        )
+        // Keep the verification report on screen: an automatic reload would hide it.
+        setRestoreReport(result)
       } else {
         setNotice('Ripristino completato e verificato. Ricarico l’app con i dati ripristinati.')
+        window.setTimeout(() => window.location.reload(), 700)
       }
-      setConfirmRestore(false)
-      window.setTimeout(() => window.location.reload(), 700)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Il ripristino non è riuscito.')
     } finally {
@@ -258,7 +341,7 @@ export default function VaultBackupPage() {
             <input
               type="password"
               autoComplete="new-password"
-              minLength={8}
+              minLength={MIN_PASSPHRASE_LENGTH}
               required
               value={exportPassword}
               onChange={(event) => setExportPassword(event.target.value)}
@@ -269,7 +352,7 @@ export default function VaultBackupPage() {
             <input
               type="password"
               autoComplete="new-password"
-              minLength={8}
+              minLength={MIN_PASSPHRASE_LENGTH}
               required
               value={exportPasswordConfirm}
               onChange={(event) => setExportPasswordConfirm(event.target.value)}
@@ -298,13 +381,37 @@ export default function VaultBackupPage() {
                   Salva / Condividi
                 </button>
               )}
-              <button type="button" onClick={() => downloadVaultFile(preparedFile)}>
+              <button
+                type="button"
+                onClick={() => {
+                  downloadVaultFile(preparedFile)
+                  // A started download can still be cancelled in the save dialog:
+                  // only an explicit confirmation counts as a saved backup.
+                  setConfirmDownloadSaved(true)
+                }}
+              >
                 Scarica file
               </button>
               <button type="button" className="vault-subtle" onClick={() => void handleDiscardPrepared()}>
                 Scarta copia temporanea
               </button>
             </div>
+            {confirmDownloadSaved && (
+              <div className="vault-actions">
+                <span>Hai salvato il file fuori dal browser?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmDownloadSaved(false)
+                    void markBackupSaved().then((recorded) => {
+                      if (recorded) setNotice('Backup registrato come salvato.')
+                    })
+                  }}
+                >
+                  Sì, l’ho salvato
+                </button>
+              </div>
+            )}
           </div>
         )}
       </article>
@@ -350,6 +457,33 @@ export default function VaultBackupPage() {
           </p>
         )}
 
+        {restoreReport && (
+          <div className="vault-result vault-restore-report" role="alert">
+            <strong>Ripristino completato con avvisi di verifica</strong>
+            <span>
+              I dati del backup sono stati applicati, ma alcune verifiche successive non sono andate a buon fine.
+              Conserva il file .dtagency originale e controlla viaggi e media prima di continuare.
+            </span>
+            <ul>
+              {!restoreReport.databaseVerified && (
+                <li>L’impronta del database ripristinato non corrisponde al backup.</li>
+              )}
+              {!restoreReport.filesVerified && <li>L’inventario dei file ripristinati non corrisponde al backup.</li>}
+              {restoreReport.verificationErrors.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+              {!restoreReport.cleanupComplete && (
+                <li>Alcuni file temporanei del ripristino non sono stati rimossi; verranno ripuliti in seguito.</li>
+              )}
+            </ul>
+            <div className="vault-actions">
+              <button type="button" onClick={() => window.location.reload()}>
+                Ricarica l’app
+              </button>
+            </div>
+          </div>
+        )}
+
         {staged && (
           <div className="vault-result vault-staged">
             <strong>Backup verificato</strong>
@@ -385,7 +519,7 @@ export default function VaultBackupPage() {
             ) : (
               <InlineConfirm
                 title="Sostituire tutti i dati correnti?"
-                message="Viaggi, giornate, prenotazioni, media e altri dati locali verranno sostituiti con quelli contenuti nel backup. DTAgency crea prima un rollback tecnico, ma questa operazione va confermata consapevolmente."
+                message="Viaggi, giornate, prenotazioni, media e altri dati locali verranno sostituiti con quelli contenuti nel backup. DTAgency crea prima un rollback tecnico, ma questa operazione va confermata consapevolmente. Chiudi DTAgency nelle altre schede o finestre prima di continuare."
                 confirmLabel="Sostituisci e ripristina"
                 busy={importBusy}
                 onConfirm={() => void handleRestore()}
@@ -393,6 +527,71 @@ export default function VaultBackupPage() {
               />
             )}
           </div>
+        )}
+      </article>
+
+      <article className="vault-card vault-storage-card">
+        <div>
+          <p className="eyebrow">3 · Spazio</p>
+          <h2>Libera spazio sul dispositivo</h2>
+          <p>
+            Foto, video e allegati eliminati possono occupare ancora spazio. Controlla quanto puoi recuperare: nulla
+            viene cancellato finché non confermi.
+          </p>
+        </div>
+        <div className="vault-actions">
+          <button type="button" disabled={storageBusy} onClick={() => void handleScanStorage()}>
+            {storageBusy && !confirmReclaim ? 'Controllo…' : 'Controlla spazio recuperabile'}
+          </button>
+        </div>
+        {storageScan && (
+          <div className="vault-result" role="status">
+            {reclaimableItemCount(storageScan) === 0 ? (
+              <strong>Non c’è spazio da recuperare.</strong>
+            ) : (
+              <>
+                <strong>{humanBytes(storageScan.reclaimableBytes)} recuperabili</strong>
+                <span>
+                  {storageScan.reclaimableMediaIds.length + storageScan.reclaimableDocumentIds.length} elementi
+                  eliminati · {storageScan.orphanDirectoryIds.length + storageScan.orphanPrivateDocumentIds.length} file
+                  senza riferimenti
+                </span>
+              </>
+            )}
+            {storageScan.unhealthyActiveCount > 0 && (
+              <span>
+                Attenzione: {storageScan.unhealthyActiveCount} media attivi risultano mancanti o incoerenti. Conserva i
+                tuoi backup .dtagency.
+              </span>
+            )}
+            {reclaimableItemCount(storageScan) > 0 &&
+              (!confirmReclaim ? (
+                <div className="vault-actions">
+                  <button type="button" disabled={storageBusy} onClick={() => setConfirmReclaim(true)}>
+                    Libera spazio
+                  </button>
+                </div>
+              ) : (
+                <InlineConfirm
+                  title="Eliminare definitivamente questi file?"
+                  message="I file di contenuti già eliminati verranno rimossi dal dispositivo e non potranno essere recuperati, salvo da un backup .dtagency precedente."
+                  confirmLabel="Elimina definitivamente"
+                  busy={storageBusy}
+                  onConfirm={() => void handleReclaimStorage()}
+                  onCancel={() => setConfirmReclaim(false)}
+                />
+              ))}
+          </div>
+        )}
+        {storageResult && (
+          <p className="vault-feedback" role="status">
+            Liberati {humanBytes(storageResult.freedBytes)} ·{' '}
+            {storageResult.purgedMediaCount + storageResult.removedOrphanCount} file rimossi
+            {storageResult.keptReferencedCount > 0
+              ? ` · ${storageResult.keptReferencedCount} conservati perché ancora collegati`
+              : ''}
+            .
+          </p>
         )}
       </article>
     </section>

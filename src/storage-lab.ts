@@ -145,9 +145,6 @@ async function clearOpfsLab(): Promise<void> {
   }
   for (const name of names) await root.removeEntry(name)
 }
-export async function removeOpfsProbe() {
-  await clearOpfsLab()
-}
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, [
     'deriveKey',

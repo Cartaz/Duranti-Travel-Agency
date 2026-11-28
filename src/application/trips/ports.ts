@@ -8,8 +8,19 @@ export interface TripRepositoryPort {
   updateEditable(value: Trip): Promise<Trip>
 }
 
+export interface TripDeletionPort {
+  softDeleteArchivedTripWithContent(tripId: string): Promise<{ mediaIds: string[] }>
+}
+
+export interface TripMediaPurgePort {
+  purge(id: string): Promise<unknown>
+  purgeMany?(ids: string[]): Promise<Map<string, unknown>>
+}
+
 export interface TripApplicationDependencies {
   trips: TripRepositoryPort
+  deletion: TripDeletionPort
+  media: TripMediaPurgePort
   now(): string
   newId(): string
 }

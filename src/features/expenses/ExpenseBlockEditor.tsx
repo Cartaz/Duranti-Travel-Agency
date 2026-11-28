@@ -3,7 +3,7 @@ import type { ExpenseDraft } from '../../application/expenses/expense-applicatio
 import type { Block, Expense, Traveler } from '../../domain/entities'
 import InlineConfirm from '../../ui/InlineConfirm'
 import { useApplicationServices } from '../../ui/application-context'
-import { formatMinorCurrency } from './currency'
+import { formatMinorCurrency } from '../../lib/currency'
 import './expenses.css'
 
 type MoveDirection = 'up' | 'down'

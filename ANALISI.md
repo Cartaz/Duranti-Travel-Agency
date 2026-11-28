@@ -214,8 +214,24 @@ Quali fasi vuoi che esegua? Il mio consiglio è di partire da **1 + 2 + 3** in q
 
 ## 6. Stato di avanzamento
 
-| Fase | Stato | PR |
+| Fase | Stato | Dove |
 |---|---|---|
-| 1. Sbloccare CI e test | Completata | PR "audit: CI gate, formatting, layout-independent contracts" |
-| 5. Leggibilità (Prettier) | Completata (anticipata per facilitare le fasi successive) | stessa PR |
-| 2, 3, 4, 6, 7 | In corso | PR successiva |
+| 1. Sbloccare CI e test | Completata | PR #28 |
+| 5. Leggibilità (Prettier) | Completata, anticipata per rendere leggibili le fasi successive | PR #28 |
+| 2. Codice morto | Completata: rimossi 3 file morti, gli export inutilizzati e lo shim `currency`; un solo builder per l'URL di Maps (`domain/`) e un solo helper di download (`lib/`); attivati `noUnusedLocals`/`noUnusedParameters` | PR successiva |
+| 3. Sicurezza dei dati | Completata: A3 (persistenza su richiesta, promemoria backup), A4 (report del restore visibile), M1 (cleanup alla chiusura della pagina più sweep al bootstrap), M3 (schermata di recovery), B3 (policy password unica) | PR successiva |
+| 4. Test e documentazione | Completata: test eseguibili per formato e crittografia del Vault, recovery `files-promoted`, sweep, purge, reclamation e cascate; README, AGENTS, README di Vault, migrazioni e security allineati; nuovo ADR-005 | PR successiva |
+| 6. Refactor mirati | Completata: M2 (Libera spazio), M4 (Web Lock più BroadcastChannel), M5 (purge con la riga prima del file), M8 (planner senza remount né observer), B1/B9 (lab solo in dev, route lazy, chunk vendor) | PR successiva |
+| 7. Funzionalità mancanti | Completata: M10 (eliminazione di giornate, viaggi archiviati e viaggiatori), B6 (icone PNG e `apple-touch-icon`), B7 (CSP in produzione), B4 (validazione di Nominatim e cache limitata) | PR successiva |
+
+### Problemi aggiuntivi emersi durante la correzione (verificati)
+
+- **Purge e validazione del Vault**: il validatore richiede che ogni riferimento esista, anche quello di una riga eliminata. Purgare un allegato ancora collegato a una prenotazione eliminata avrebbe reso **non ripristinabili** tutti i backup successivi. Ora il purge rifiuta i media ancora referenziati e le cascate scollegano gli allegati (ADR-005).
+- **Bozze perse**: l'editor dei blocchi testo, titolo e checklist azzerava le modifiche non salvate a ogni ricarica della lista, perché l'effetto dipendeva dall'identità dell'oggetto. Ora dipende da `id` + `updatedAt`. Coperto da `planner-quick-add-journey`.
+- **Barra di navigazione su iPhone**: `styles.css` (caricato dopo) ripristinava la griglia a 2 colonne, la barra andava su due righe e copriva l'ultimo controllo di ogni pagina, incluso "Nuovo viaggio" nella home.
+- **Password del backup**: la UI accettava 8 caratteri ma `deriveVaultKey` ne richiedeva 12. Con 8-11 caratteri l'export falliva con un errore tecnico in inglese.
+
+### Non eseguito (richiede una tua decisione)
+
+- **B8**: eliminare i ~65 branch remoti `chatgpt/*` già mergiati e chiudere la PR draft #15. Sono azioni distruttive fuori dal codice e non le ho fatte.
+- Le 4 vulnerabilità *moderate* di `glob` dentro `workbox-build` restano: si risolvono solo con una major che `workbox-build` 7.x non consente. Sono solo in fase di build.

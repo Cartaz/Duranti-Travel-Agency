@@ -2,6 +2,7 @@ import { placeIdForBlock } from '../../domain/block-content'
 import type { Block, Place } from '../../domain/entities'
 import { assertTripDayContext } from '../shared/trip-day-context'
 import type { PlaceApplicationDependencies } from './ports'
+import { buildGoogleMapsSearchUrl } from '../../domain/maps-url'
 
 export interface PlaceDraft {
   name: string
@@ -38,20 +39,6 @@ function validateOptionalText(value: string | undefined, label: string, maxLengt
   const cleaned = cleanOptional(value)
   if (cleaned && cleaned.length > maxLength) throw new Error(`${label}: valore troppo lungo.`)
   return cleaned
-}
-function buildGoogleMapsSearchUrl(source: PlaceDraft): string {
-  const hasCoordinates = Number.isFinite(source.latitude) && Number.isFinite(source.longitude)
-  const query = hasCoordinates
-    ? `${source.latitude},${source.longitude}`
-    : [source.name, source.formattedAddress, source.city, source.countryCode]
-        .map((value) => value?.trim())
-        .filter((value): value is string => Boolean(value))
-        .join(', ')
-  if (!query) throw new Error('Il luogo non contiene abbastanza informazioni per aprire Google Maps.')
-  const url = new URL('https://www.google.com/maps/search/')
-  url.searchParams.set('api', '1')
-  url.searchParams.set('query', query)
-  return url.toString()
 }
 function normalizeDraft(input: PlaceDraft): PlaceDraft {
   const name = input.name.trim()

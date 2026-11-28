@@ -1,6 +1,6 @@
 import type { Block, EntityBase } from '../../domain/entities'
 
-export class ValidationError extends Error {
+class ValidationError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'ValidationError'
@@ -32,10 +32,6 @@ export function assertBlock(value: unknown): asserts value is Block {
   ) {
     throw new ValidationError('Block: invalid block shape')
   }
-}
-
-export function assertImportRecord(value: unknown): asserts value is EntityBase {
-  assertEntityBase(value, 'Imported record')
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,3 +1,4 @@
+import { withVaultLock } from './lock'
 import { DB_NAME, DB_VERSION, db } from '../data/db/dtagency-db'
 import {
   MAX_VAULT_MANIFEST_BYTES,
@@ -209,9 +210,16 @@ function emitProgress(callback: PrepareVaultExportOptions['onProgress'], progres
   callback?.(progress)
 }
 
-export async function prepareVaultExport(
+export function prepareVaultExport(
   passphrase: string,
   options: PrepareVaultExportOptions = {},
+): Promise<PreparedVaultExport> {
+  return withVaultLock(() => prepareVaultExportUnlocked(passphrase, options))
+}
+
+async function prepareVaultExportUnlocked(
+  passphrase: string,
+  options: PrepareVaultExportOptions,
 ): Promise<PreparedVaultExport> {
   const archiveId = crypto.randomUUID()
   const createdAt = new Date().toISOString()

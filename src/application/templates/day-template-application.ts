@@ -3,7 +3,7 @@ import { normalizeDayDraft, type DayDraft } from '../days/day-application'
 import { requireTripDay } from '../shared/trip-day-context'
 import type { DayTemplateApplicationDependencies } from './ports'
 
-export const DAY_TEMPLATE_CATEGORY = 'day'
+const DAY_TEMPLATE_CATEGORY = 'day'
 export const MAX_DAY_TEMPLATE_NAME_LENGTH = 120
 export const MAX_DAY_TEMPLATE_DESCRIPTION_LENGTH = 400
 

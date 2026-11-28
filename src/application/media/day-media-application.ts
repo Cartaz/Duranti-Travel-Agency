@@ -4,8 +4,8 @@ import { assertTripDayContext } from '../shared/trip-day-context'
 import type { DayMediaApplicationDependencies } from './ports'
 
 export const DAY_MEDIA_ACCEPT = 'image/*,video/*'
-export const MAX_DAY_IMAGE_BYTES = 25 * 1024 * 1024
-export const MAX_DAY_VIDEO_BYTES = 250 * 1024 * 1024
+const MAX_DAY_IMAGE_BYTES = 25 * 1024 * 1024
+const MAX_DAY_VIDEO_BYTES = 250 * 1024 * 1024
 export const MAX_DAY_MEDIA_CAPTION_LENGTH = 500
 
 export interface DayMediaPlaceOption {

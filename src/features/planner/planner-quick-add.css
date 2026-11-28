@@ -1,7 +1,3 @@
-.guided-day-planner .planner-toolbar {
-  display: none;
-}
-
 .planner-quick-add {
   position: fixed;
   z-index: 45;

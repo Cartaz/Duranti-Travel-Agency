@@ -4,9 +4,27 @@ import { readMediaFile, writeMediaFile } from '../../src/data/opfs/opfs-store'
 import { dayRepository } from '../../src/data/repositories/day-repository'
 import { plannerBlockRepository } from '../../src/data/repositories/block-repository'
 import { itineraryRepository } from '../../src/data/repositories/itinerary-repository'
+import { mediaFileRepository } from '../../src/data/repositories/media-repository'
+import { dayApplication } from '../../src/composition/days'
+import { travelerApplication } from '../../src/composition/travelers'
+import { tripApplication } from '../../src/composition/trips'
+import { reservationBlockRepository } from '../../src/data/repositories/reservation-block-repository'
+import {
+  ORPHAN_GRACE_MS,
+  reclaimMediaStorage,
+  scanReclaimableMediaStorage,
+} from '../../src/data/storage/media-integrity'
 import { prepareVaultExport, loadPreparedVaultFile } from '../../src/vault/export'
-import { stageVaultImport } from '../../src/vault/import'
-import { commitStagedVaultImport, recoverInterruptedVaultRestore } from '../../src/vault/restore'
+import { stageVaultImport } from '../../src/vault/validated-import'
+import {
+  abandonInterruptedVaultRestore,
+  commitStagedVaultImport,
+  fingerprintLiveDatabase,
+  hasInterruptedVaultRestore,
+  recoverInterruptedVaultRestore,
+  STALE_VAULT_STAGING_MS,
+  sweepStaleVaultStaging,
+} from '../../src/vault/restore'
 
 interface BrowserTestResult {
   name: string
@@ -39,6 +57,10 @@ async function run(name: string, test: () => Promise<void>): Promise<void> {
       error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
     })
   }
+}
+
+async function ensureInstallationRow(): Promise<void> {
+  await db.appMeta.put({ key: 'installationId', value: 'browser-harness' })
 }
 
 async function removeOpfsRoot(): Promise<void> {
@@ -130,14 +152,20 @@ async function tamperManifestCiphertext(file: File): Promise<File> {
   return new File([bytes], 'tampered.dtagency', { type: file.type })
 }
 
-async function createInterruptedRestoreFixture(): Promise<string> {
+interface InterruptedRestoreFixtureOptions {
+  phase?: 'files-mutating' | 'files-promoted'
+  targetDatabaseSha256?: string
+  liveText?: string
+}
+
+async function createInterruptedRestoreFixture(options: InterruptedRestoreFixtureOptions = {}): Promise<string> {
   const restoreId = 'browser-restore-1'
   const stageId = 'browser-stage-1'
   const archiveId = 'browser-archive-1'
   const mediaId = 'browser-recovery-media'
   const originalText = 'original-before-interrupted-restore'
 
-  await writeMediaFile(mediaId, new Blob(['mutated-during-restore'], { type: 'text/plain' }))
+  await writeMediaFile(mediaId, new Blob([options.liveText ?? 'mutated-during-restore'], { type: 'text/plain' }))
 
   const root = await navigator.storage.getDirectory()
   const dtagency = await root.getDirectoryHandle('dtagency', { create: true })
@@ -174,8 +202,8 @@ async function createInterruptedRestoreFixture(): Promise<string> {
       restoreId,
       stageId,
       archiveId,
-      targetDatabaseSha256: '0'.repeat(64),
-      phase: 'files-mutating',
+      targetDatabaseSha256: options.targetDatabaseSha256 ?? '0'.repeat(64),
+      phase: options.phase ?? 'files-mutating',
       createdAt: timestamp,
       updatedAt: timestamp,
     }),
@@ -464,6 +492,521 @@ await run('Interrupted files-mutating restore rolls OPFS back from journal backu
     (await readText(await readMediaFile(mediaId))) === 'original-before-interrupted-restore',
     'Recovery did not restore original OPFS bytes.',
   )
+})
+
+async function seedReservationWithAttachment(): Promise<{ blockId: string; reservationId: string; mediaId: string }> {
+  const now = new Date().toISOString()
+  const tripId = 'purge-trip'
+  const dayId = 'purge-day'
+  const blockId = 'purge-block'
+  const reservationId = 'purge-reservation'
+  const mediaId = 'purge-attachment'
+  const opfsPath = await writeMediaFile(mediaId, new Blob(['ticket-bytes'], { type: 'application/pdf' }))
+  await db.trips.add({
+    id: tripId,
+    title: 'Purge trip',
+    status: 'planned',
+    startDate: '2026-12-01',
+    endDate: '2026-12-02',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.days.add({ id: dayId, tripId, date: '2026-12-01', sequence: 1, createdAt: now, updatedAt: now })
+  await db.blocks.add({
+    id: blockId,
+    tripId,
+    dayId,
+    type: 'activity',
+    position: 1,
+    content: { reservationId },
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.reservations.add({
+    id: reservationId,
+    tripId,
+    dayId,
+    type: 'activity',
+    title: 'Museo',
+    attachmentMediaId: mediaId,
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.media.add({
+    id: mediaId,
+    tripId,
+    dayId,
+    blockId,
+    kind: 'document',
+    mimeType: 'application/pdf',
+    originalName: 'ticket.pdf',
+    sizeBytes: utf8('ticket-bytes').byteLength,
+    opfsPath,
+    createdAt: now,
+    updatedAt: now,
+  })
+  return { blockId, reservationId, mediaId }
+}
+
+async function assertVaultStillValidates(): Promise<void> {
+  const passphrase = 'browser-integration-passphrase-2026'
+  const prepared = await prepareVaultExport(passphrase)
+  const staged = await stageVaultImport(await loadPreparedVaultFile(prepared), passphrase)
+  assert(staged.manifest.database.tables.length > 0, 'Vault staging returned no tables.')
+}
+
+async function opfsEntryExists(segments: string[]): Promise<boolean> {
+  let current = await navigator.storage.getDirectory()
+  for (const [index, segment] of segments.entries()) {
+    try {
+      if (index === segments.length - 1) {
+        try {
+          await current.getFileHandle(segment)
+        } catch {
+          await current.getDirectoryHandle(segment)
+        }
+        return true
+      }
+      current = await current.getDirectoryHandle(segment)
+    } catch {
+      return false
+    }
+  }
+  return true
+}
+
+await run('files-promoted restore whose database commit won is finalized, not rolled back', async () => {
+  await resetEnvironment()
+  await ensureInstallationRow()
+  const mediaId = await createInterruptedRestoreFixture({
+    phase: 'files-promoted',
+    targetDatabaseSha256: await fingerprintLiveDatabase(),
+    liveText: 'restored-bytes-from-vault',
+  })
+  const result = await recoverInterruptedVaultRestore()
+  assert(result === 'finalized-committed', `Expected finalized-committed recovery, got ${result}.`)
+  assert(
+    (await readText(await readMediaFile(mediaId))) === 'restored-bytes-from-vault',
+    'Finalization replaced restored OPFS bytes with the rollback copy.',
+  )
+  assert(!(await hasInterruptedVaultRestore()), 'Finalized restore left its journal behind.')
+  assert(
+    !(await opfsEntryExists(['dtagency', 'vault-restore-backup', 'browser-restore-1'])),
+    'Rollback copy was not cleaned up.',
+  )
+})
+
+await run('files-promoted restore whose database commit lost rolls files back', async () => {
+  await resetEnvironment()
+  const mediaId = await createInterruptedRestoreFixture({
+    phase: 'files-promoted',
+    liveText: 'restored-bytes-from-vault',
+  })
+  const result = await recoverInterruptedVaultRestore()
+  assert(result === 'rolled-back', `Expected rolled-back recovery, got ${result}.`)
+  assert(
+    (await readText(await readMediaFile(mediaId))) === 'original-before-interrupted-restore',
+    'Rollback did not restore the original OPFS bytes.',
+  )
+})
+
+await run('Unrecoverable restore journal can be abandoned without deleting the rollback copy', async () => {
+  await resetEnvironment()
+  await createInterruptedRestoreFixture()
+  const root = await navigator.storage.getDirectory()
+  const backup = await (
+    await (await root.getDirectoryHandle('dtagency')).getDirectoryHandle('vault-restore-backup')
+  ).getDirectoryHandle('browser-restore-1')
+  await backup.removeEntry('manifest.json')
+
+  let failed = false
+  try {
+    await recoverInterruptedVaultRestore()
+  } catch {
+    failed = true
+  }
+  assert(failed, 'Recovery with a corrupt rollback copy unexpectedly succeeded.')
+  assert(await hasInterruptedVaultRestore(), 'Interrupted restore was not detected.')
+
+  await abandonInterruptedVaultRestore()
+  assert(!(await hasInterruptedVaultRestore()), 'Abandon left the journal in place.')
+  assert(
+    await opfsEntryExists(['dtagency', 'vault-restore-backup', 'browser-restore-1', 'files', '00000000.bin']),
+    'Abandon deleted the rollback copy.',
+  )
+  assert((await recoverInterruptedVaultRestore()) === 'none', 'Recovery still found a journal after abandon.')
+})
+
+await run('Stale Vault staging is swept while fresh and journaled stages survive', async () => {
+  await resetEnvironment()
+  const root = await navigator.storage.getDirectory()
+  const dtagency = await root.getDirectoryHandle('dtagency', { create: true })
+  const exports = await dtagency.getDirectoryHandle('vault-staging', { create: true })
+  await writeOpfsFile(exports, 'DTAgency-abandoned.dtagency', new Blob(['encrypted-export']))
+  const imports = await dtagency.getDirectoryHandle('vault-import-staging', { create: true })
+  for (const stageId of ['abandoned-stage', 'journaled-stage']) {
+    const stage = await imports.getDirectoryHandle(stageId, { create: true })
+    await writeOpfsFile(stage, 'created', new Blob([]))
+  }
+  const state = await dtagency.getDirectoryHandle('vault-restore-state', { create: true })
+  const timestamp = new Date().toISOString()
+  await writeOpfsFile(
+    state,
+    'current.json',
+    JSON.stringify({
+      version: 1,
+      restoreId: 'sweep-restore',
+      stageId: 'journaled-stage',
+      archiveId: 'sweep-archive',
+      targetDatabaseSha256: '0'.repeat(64),
+      phase: 'committed',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    }),
+  )
+
+  const fresh = await sweepStaleVaultStaging(Date.now())
+  assert(fresh.removedExports === 0 && fresh.removedImportStages === 0, 'Fresh staging was swept.')
+
+  const stale = await sweepStaleVaultStaging(Date.now() + STALE_VAULT_STAGING_MS + 60_000)
+  assert(stale.removedExports === 1, `Expected one stale export removed, got ${stale.removedExports}.`)
+  assert(stale.removedImportStages === 1, `Expected one stale import stage removed, got ${stale.removedImportStages}.`)
+  assert(!(await opfsEntryExists(['dtagency', 'vault-import-staging', 'abandoned-stage'])), 'Abandoned stage survived.')
+  assert(await opfsEntryExists(['dtagency', 'vault-import-staging', 'journaled-stage']), 'Journaled stage was swept.')
+})
+
+await run('Purge keeps tombstoned media that a record still references', async () => {
+  await resetEnvironment()
+  const { mediaId, reservationId } = await seedReservationWithAttachment()
+  const now = new Date().toISOString()
+  const media = await db.media.get(mediaId)
+  await db.media.put({ ...media!, deletedAt: now, updatedAt: now })
+  const reservation = await db.reservations.get(reservationId)
+  await db.reservations.put({ ...reservation!, deletedAt: now, updatedAt: now })
+
+  assert((await mediaFileRepository.purge(mediaId)) === 'referenced', 'Referenced media was purged.')
+  assert(Boolean(await db.media.get(mediaId)), 'Referenced media row disappeared.')
+  assert((await readText(await readMediaFile(mediaId))) === 'ticket-bytes', 'Referenced media bytes disappeared.')
+  await assertVaultStillValidates()
+})
+
+await run('Deleting a reservation block detaches its attachment so it can be purged safely', async () => {
+  await resetEnvironment()
+  const { blockId, reservationId, mediaId } = await seedReservationWithAttachment()
+  const detached = await reservationBlockRepository.softDeleteReservationBlock(blockId, 'purge-trip', 'purge-day')
+  assert(detached === mediaId, `Expected detached attachment ${mediaId}, got ${detached}.`)
+  const reservation = await db.reservations.get(reservationId)
+  assert(
+    Boolean(reservation?.deletedAt) && reservation?.attachmentMediaId === undefined,
+    'Tombstoned reservation still links the attachment.',
+  )
+
+  assert((await mediaFileRepository.purge(mediaId)) === 'purged', 'Detached attachment was not purged.')
+  assert(!(await db.media.get(mediaId)), 'Purged media row survived.')
+  let fileGone = false
+  try {
+    await readMediaFile(mediaId)
+  } catch {
+    fileGone = true
+  }
+  assert(fileGone, 'Purged media bytes survived.')
+  await assertVaultStillValidates()
+})
+
+await run('Storage reclamation frees deleted and orphan media but keeps active bytes', async () => {
+  await resetEnvironment()
+  const seeded = await seedRoundTripState()
+  const now = new Date().toISOString()
+  const deletedPath = await writeMediaFile('deleted-media', new Blob(['deleted-bytes']))
+  await db.media.add({
+    id: 'deleted-media',
+    tripId: seeded.tripId,
+    kind: 'document',
+    mimeType: 'text/plain',
+    sizeBytes: 13,
+    opfsPath: deletedPath,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: now,
+  })
+  await writeMediaFile('orphan-media', new Blob(['orphan']))
+  const root = await navigator.storage.getDirectory()
+  const privateDocuments = await (
+    await (await root.getDirectoryHandle('dtagency', { create: true })).getDirectoryHandle('private', { create: true })
+  ).getDirectoryHandle('traveler-documents', { create: true })
+  const orphanDocument = await privateDocuments.getDirectoryHandle('orphan-document', { create: true })
+  await writeOpfsFile(orphanDocument, 'attachment.bin', new Blob(['secret']))
+
+  // Fresh directories may belong to an upload still in progress: not reclaimable yet.
+  const fresh = await scanReclaimableMediaStorage()
+  assert(fresh.orphanDirectoryIds.length === 0, 'A freshly written media directory was treated as an orphan.')
+  assert(fresh.orphanPrivateDocumentIds.length === 0, 'A freshly written document directory was treated as an orphan.')
+
+  const later = Date.now() + ORPHAN_GRACE_MS + 60_000
+  const scan = await scanReclaimableMediaStorage(later)
+  assert(
+    scan.reclaimableMediaIds.join() === 'deleted-media',
+    `Unexpected reclaimable ids ${scan.reclaimableMediaIds.join()}.`,
+  )
+  assert(scan.orphanDirectoryIds.join() === 'orphan-media', `Unexpected orphan ids ${scan.orphanDirectoryIds.join()}.`)
+  assert(scan.orphanPrivateDocumentIds.join() === 'orphan-document', 'Orphan document directory was not found.')
+  assert(scan.reclaimableBytes === 13 + 6 + 6, `Unexpected reclaimable bytes ${scan.reclaimableBytes}.`)
+
+  const result = await reclaimMediaStorage(scan, later)
+  assert(result.purgedMediaCount === 1 && result.removedOrphanCount === 2, 'Reclamation did not remove every item.')
+  assert(result.freedBytes === 25, `Unexpected freed bytes ${result.freedBytes}.`)
+  assert((await readText(await readMediaFile(seeded.mediaId))) === seeded.mediaText, 'Active media bytes were removed.')
+  const after = await scanReclaimableMediaStorage(later)
+  assert(
+    after.reclaimableMediaIds.length === 0 && after.orphanDirectoryIds.length === 0,
+    'Reclamation left items behind.',
+  )
+  await assertVaultStillValidates()
+})
+
+async function seedDayContent(): Promise<{ mediaIds: string[] }> {
+  const { mediaId: attachmentId } = await seedReservationWithAttachment()
+  const now = new Date().toISOString()
+  const photoPath = await writeMediaFile('purge-day-photo', new Blob(['photo-bytes'], { type: 'image/jpeg' }))
+  await db.media.add({
+    id: 'purge-day-photo',
+    tripId: 'purge-trip',
+    dayId: 'purge-day',
+    kind: 'image',
+    mimeType: 'image/jpeg',
+    sizeBytes: 11,
+    opfsPath: photoPath,
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.itineraries.add({
+    id: 'purge-itinerary',
+    tripId: 'purge-trip',
+    dayId: 'purge-day',
+    blockId: 'purge-block',
+    reservationId: 'purge-reservation',
+    title: 'Museo',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.expenses.add({
+    id: 'purge-expense',
+    tripId: 'purge-trip',
+    dayId: 'purge-day',
+    amountMinor: 1200,
+    currency: 'EUR',
+    paidByTravelerId: 'purge-traveler',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.travelers.add({
+    id: 'purge-traveler',
+    firstName: 'Anna',
+    lastName: 'Rossi',
+    displayName: 'Anna Rossi',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.tripTravelers.add({
+    id: 'purge-membership',
+    tripId: 'purge-trip',
+    travelerId: 'purge-traveler',
+    role: 'owner',
+    createdAt: now,
+    updatedAt: now,
+  })
+  return { mediaIds: [attachmentId, 'purge-day-photo'] }
+}
+
+async function assertAllTombstoned(
+  table: { get(id: string): Promise<{ deletedAt?: string } | undefined> },
+  ids: string[],
+  label: string,
+): Promise<void> {
+  for (const id of ids) assert(Boolean((await table.get(id))?.deletedAt), `${label} ${id} was not tombstoned.`)
+}
+
+await run('Deleting a day tombstones its content, purges its files and keeps the Vault valid', async () => {
+  await resetEnvironment()
+  const { mediaIds } = await seedDayContent()
+  const outcome = await dayApplication.deleteTripDay('purge-trip', 'purge-day')
+  assert(outcome.pendingFileCleanup === 0, `Unexpected pending cleanup ${outcome.pendingFileCleanup}.`)
+  await assertAllTombstoned(db.days, ['purge-day'], 'Day')
+  await assertAllTombstoned(db.blocks, ['purge-block'], 'Block')
+  await assertAllTombstoned(db.reservations, ['purge-reservation'], 'Reservation')
+  await assertAllTombstoned(db.itineraries, ['purge-itinerary'], 'Itinerary')
+  await assertAllTombstoned(db.expenses, ['purge-expense'], 'Expense')
+  assert(
+    (await db.reservations.get('purge-reservation'))?.attachmentMediaId === undefined,
+    'Deleted reservation kept its attachment link.',
+  )
+  for (const id of mediaIds) assert(!(await db.media.get(id)), `Media ${id} was not purged.`)
+  assert(!(await db.trips.get('purge-trip'))?.deletedAt, 'Deleting a day deleted its trip.')
+  assert((await dayApplication.listTripDays('purge-trip')).length === 0, 'Deleted day is still listed.')
+  await assertVaultStillValidates()
+})
+
+await run('Deleting an archived trip cascades to every row and keeps the Vault valid', async () => {
+  await resetEnvironment()
+  await seedDayContent()
+  let rejected = false
+  try {
+    await tripApplication.deleteArchivedTrip('purge-trip')
+  } catch {
+    rejected = true
+  }
+  assert(rejected, 'A non-archived trip was deleted.')
+  await tripApplication.archiveTrip('purge-trip')
+  await tripApplication.deleteArchivedTrip('purge-trip')
+  await assertAllTombstoned(db.trips, ['purge-trip'], 'Trip')
+  await assertAllTombstoned(db.days, ['purge-day'], 'Day')
+  await assertAllTombstoned(db.tripTravelers, ['purge-membership'], 'Membership')
+  await assertAllTombstoned(db.expenses, ['purge-expense'], 'Expense')
+  assert(!(await db.travelers.get('purge-traveler'))?.deletedAt, 'Deleting a trip deleted a traveler profile.')
+  assert((await tripApplication.listArchivedTrips()).length === 0, 'Deleted trip is still archived.')
+  await assertVaultStillValidates()
+})
+
+await run('Deleting a traveler removes memberships and documents but keeps expense history valid', async () => {
+  await resetEnvironment()
+  await seedDayContent()
+  const now = new Date().toISOString()
+  await db.travelerDocuments.add({
+    id: 'purge-document',
+    travelerId: 'purge-traveler',
+    type: 'passport',
+    encryptedPayload: {
+      version: 1,
+      algorithm: 'AES-GCM',
+      tagLength: 128,
+      ivB64: 'AAAAAAAAAAAAAAAA',
+      ciphertextB64: 'AAAA',
+    },
+    createdAt: now,
+    updatedAt: now,
+  })
+  const outcome = await travelerApplication.deleteTraveler('purge-traveler')
+  assert(outcome.pendingFileCleanup === 0, `Unexpected pending cleanup ${outcome.pendingFileCleanup}.`)
+  await assertAllTombstoned(db.travelers, ['purge-traveler'], 'Traveler')
+  await assertAllTombstoned(db.tripTravelers, ['purge-membership'], 'Membership')
+  assert(!(await db.travelerDocuments.get('purge-document')), 'Traveler document was not purged.')
+  const expense = await db.expenses.get('purge-expense')
+  assert(expense?.paidByTravelerId === 'purge-traveler' && !expense.deletedAt, 'Expense history was altered.')
+  assert((await travelerApplication.listTravelers()).length === 0, 'Deleted traveler is still listed.')
+  assert(
+    (await travelerApplication.listTripParticipants('purge-trip')).length === 0,
+    'Deleted traveler is still a participant.',
+  )
+  await assertVaultStillValidates()
+})
+
+async function holdVaultLock(): Promise<() => void> {
+  let release!: () => void
+  let acquired!: () => void
+  const ready = new Promise<void>((resolve) => {
+    acquired = resolve
+  })
+  void navigator.locks.request('dtagency:vault', () => {
+    acquired()
+    return new Promise<void>((resolve) => {
+      release = resolve
+    })
+  })
+  await ready
+  return release
+}
+
+await run('Reclamation frees tombstoned documents and never advertises referenced media', async () => {
+  await resetEnvironment()
+  const { mediaId, reservationId } = await seedReservationWithAttachment()
+  const now = new Date().toISOString()
+  const media = await db.media.get(mediaId)
+  await db.media.put({ ...media!, deletedAt: now, updatedAt: now })
+  const reservation = await db.reservations.get(reservationId)
+  await db.reservations.put({ ...reservation!, deletedAt: now, updatedAt: now })
+
+  await db.travelers.add({
+    id: 'gone-traveler',
+    firstName: 'A',
+    lastName: 'B',
+    displayName: 'A B',
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: now,
+  })
+  await db.travelerDocuments.add({
+    id: 'gone-document',
+    travelerId: 'gone-traveler',
+    type: 'passport',
+    encryptedPayload: {
+      version: 1,
+      algorithm: 'AES-GCM',
+      tagLength: 128,
+      ivB64: 'AAAAAAAAAAAAAAAA',
+      ciphertextB64: 'AAAA',
+    },
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: now,
+  })
+  const root = await navigator.storage.getDirectory()
+  const documents = await (
+    await (await root.getDirectoryHandle('dtagency', { create: true })).getDirectoryHandle('private', { create: true })
+  ).getDirectoryHandle('traveler-documents', { create: true })
+  await writeOpfsFile(
+    await documents.getDirectoryHandle('gone-document', { create: true }),
+    'scan.bin',
+    new Blob(['passport']),
+  )
+
+  const scan = await scanReclaimableMediaStorage()
+  assert(scan.reclaimableMediaIds.length === 0, 'Referenced media was advertised as reclaimable.')
+  assert(scan.reclaimableDocumentIds.join() === 'gone-document', 'Tombstoned document was not found.')
+  assert(scan.reclaimableBytes === 8, `Unexpected reclaimable bytes ${scan.reclaimableBytes}.`)
+
+  const result = await reclaimMediaStorage(scan)
+  assert(result.purgedMediaCount === 1 && result.freedBytes === 8, 'Tombstoned document was not purged.')
+  assert(!(await db.travelerDocuments.get('gone-document')), 'Document row survived reclamation.')
+  assert(
+    !(await opfsEntryExists(['dtagency', 'private', 'traveler-documents', 'gone-document'])),
+    'Document bytes survived.',
+  )
+  assert(Boolean(await db.media.get(mediaId)), 'Referenced media row was removed.')
+  await assertVaultStillValidates()
+})
+
+await run('Media purge waits for the cross-tab Vault lock', async () => {
+  await resetEnvironment()
+  const seeded = await seedRoundTripState()
+  const media = await db.media.get(seeded.mediaId)
+  const now = new Date().toISOString()
+  await db.media.put({ ...media!, deletedAt: now, updatedAt: now })
+
+  const release = await holdVaultLock()
+  let finished = false
+  const purge = mediaFileRepository.purge(seeded.mediaId).then((result) => {
+    finished = true
+    return result
+  })
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  assert(!finished, 'Purge ran while another context held the Vault lock.')
+  assert(Boolean(await db.media.get(seeded.mediaId)), 'Purge removed the row while the lock was held.')
+  release()
+  assert((await purge) === 'purged', 'Purge did not complete after the lock was released.')
+})
+
+await run('Staging sweep skips instead of waiting when the Vault lock is busy', async () => {
+  await resetEnvironment()
+  const release = await holdVaultLock()
+  try {
+    const result = await Promise.race([
+      sweepStaleVaultStaging(Date.now() + STALE_VAULT_STAGING_MS * 2),
+      new Promise<'blocked'>((resolve) => setTimeout(() => resolve('blocked'), 1_000)),
+    ])
+    assert(result !== 'blocked', 'Sweep waited for the busy Vault lock.')
+  } finally {
+    release()
+  }
 })
 
 try {

@@ -1,3 +1,4 @@
+import { saveFileToDevice } from '../lib/browser-file'
 import { VAULT_FILE_EXTENSION, VAULT_MIME_TYPE } from './format'
 
 export function canShareVaultFile(file: File): boolean {
@@ -17,16 +18,7 @@ export function shareVaultFile(file: File): Promise<void> {
 }
 
 export function downloadVaultFile(file: File): void {
-  const url = URL.createObjectURL(file)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = file.name
-  anchor.rel = 'noopener'
-  anchor.style.display = 'none'
-  document.body.append(anchor)
-  anchor.click()
-  anchor.remove()
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  saveFileToDevice(file, file.name)
 }
 
 export function isDTAgencyVaultFile(file: File): boolean {
