@@ -12,7 +12,8 @@ import {
   mediaFileExists,
   readMediaFile,
 } from '../opfs/opfs-store'
-import { mediaFileRepository } from '../repositories/media-repository'
+import { listReferencedMediaIds, mediaFileRepository } from '../repositories/media-repository'
+import { secureTravelerDocumentRepository } from '../repositories/traveler-document-repository'
 
 export interface MediaSizeMismatch {
   id: string
@@ -137,6 +138,7 @@ export interface MediaStorageScan {
   reclaimableMediaIds: string[]
   orphanDirectoryIds: string[]
   orphanPrivateDocumentIds: string[]
+  reclaimableDocumentIds: string[]
   reclaimableBytes: number
   unhealthyActiveCount: number
 }
@@ -155,23 +157,39 @@ export interface MediaStorageReclaimResult {
  */
 export const ORPHAN_GRACE_MS = 10 * 60 * 1000
 
-async function mediaFootprint(id: string): Promise<{ bytes: number; modified: number }> {
+/** `modified` is undefined when the bytes cannot be read (e.g. mid-write). */
+async function mediaFootprint(id: string): Promise<{ bytes: number; modified?: number }> {
   try {
     const file = await readMediaFile(id)
     return { bytes: file.size, modified: file.lastModified }
   } catch {
-    return { bytes: 0, modified: 0 }
+    return { bytes: 0 }
   }
+}
+
+async function privateFootprint(id: string): Promise<{ bytes: number; modified?: number }> {
+  try {
+    const { bytes, newestModified } = await describePrivateDocumentDirectory(id)
+    return { bytes, modified: newestModified > 0 ? newestModified : undefined }
+  } catch {
+    return { bytes: 0 }
+  }
+}
+
+// Only provably old directories count: an unreadable or empty directory may
+// be an upload whose bytes are being written right now.
+function provablyStale(modified: number | undefined, now: number): boolean {
+  return modified !== undefined && now - modified >= ORPHAN_GRACE_MS
 }
 
 async function isStaleMediaOrphan(id: string, now: number): Promise<boolean> {
   if (await db.media.get(id)) return false
-  return now - (await mediaFootprint(id)).modified >= ORPHAN_GRACE_MS
+  return provablyStale((await mediaFootprint(id)).modified, now)
 }
 
 async function isStalePrivateOrphan(id: string, now: number): Promise<boolean> {
   if (await db.travelerDocuments.get(id)) return false
-  return now - (await describePrivateDocumentDirectory(id)).newestModified >= ORPHAN_GRACE_MS
+  return provablyStale((await privateFootprint(id)).modified, now)
 }
 
 /** Read-only summary of space held by deleted media and stale orphan directories. */
@@ -186,15 +204,25 @@ export async function scanReclaimableMediaStorage(now = Date.now()): Promise<Med
       orphanPrivateDocumentIds.push(entry.name)
   }
 
+  // Tombstoned media still referenced by a row would be refused by purge: do not advertise it.
+  const referenced = await listReferencedMediaIds()
+  const reclaimableMediaIds = report.tombstonesWithFileIds.filter((id) => !referenced.has(id))
+
+  // Tombstoned traveler documents whose purge did not complete still hold encrypted bytes.
+  const reclaimableDocumentIds = (await db.travelerDocuments.toArray())
+    .filter((document) => Boolean(document.deletedAt))
+    .map((document) => document.id)
+
   let reclaimableBytes = 0
-  for (const id of [...report.tombstonesWithFileIds, ...orphanDirectoryIds])
-    reclaimableBytes += (await mediaFootprint(id)).bytes
-  for (const id of orphanPrivateDocumentIds) reclaimableBytes += (await describePrivateDocumentDirectory(id)).bytes
+  for (const id of [...reclaimableMediaIds, ...orphanDirectoryIds]) reclaimableBytes += (await mediaFootprint(id)).bytes
+  for (const id of [...orphanPrivateDocumentIds, ...reclaimableDocumentIds])
+    reclaimableBytes += (await privateFootprint(id)).bytes
 
   return {
-    reclaimableMediaIds: report.tombstonesWithFileIds,
+    reclaimableMediaIds,
     orphanDirectoryIds,
     orphanPrivateDocumentIds,
+    reclaimableDocumentIds,
     reclaimableBytes,
     unhealthyActiveCount:
       report.missingFileIds.length +
@@ -219,14 +247,23 @@ export async function reclaimMediaStorage(
     keptReferencedCount: 0,
     freedBytes: 0,
   }
+  const mediaFootprints = new Map<string, number>()
+  for (const id of scan.reclaimableMediaIds) mediaFootprints.set(id, (await mediaFootprint(id)).bytes)
+  const mediaOutcomes = await mediaFileRepository.purgeMany(scan.reclaimableMediaIds)
   for (const id of scan.reclaimableMediaIds) {
-    const { bytes } = await mediaFootprint(id)
-    const outcome = await mediaFileRepository.purge(id)
+    const outcome = mediaOutcomes.get(id)
     if (outcome === 'purged') {
       result.purgedMediaCount += 1
-      result.freedBytes += bytes
+      result.freedBytes += mediaFootprints.get(id) ?? 0
     } else if (outcome === 'referenced') {
       result.keptReferencedCount += 1
+    }
+  }
+  for (const id of scan.reclaimableDocumentIds) {
+    const { bytes } = await privateFootprint(id)
+    if ((await secureTravelerDocumentRepository.purge(id)) === 'purged') {
+      result.purgedMediaCount += 1
+      result.freedBytes += bytes
     }
   }
   for (const id of scan.orphanDirectoryIds) {
@@ -248,7 +285,7 @@ export async function reclaimMediaStorage(
   for (const id of scan.orphanPrivateDocumentIds) {
     const removed = await withVaultLock(async () => {
       if (!(await isStalePrivateOrphan(id, now))) return undefined
-      const { bytes } = await describePrivateDocumentDirectory(id)
+      const { bytes } = await privateFootprint(id)
       await deleteEncryptedDocumentDirectory(id)
       return bytes
     })

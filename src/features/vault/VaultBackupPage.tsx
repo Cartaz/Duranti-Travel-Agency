@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { MIN_PASSPHRASE_LENGTH, passphrasePolicyError } from '../../lib/passphrase-policy'
-import type { MediaStorageReclaimResult, MediaStorageScan } from '../../application/archive/archive-application'
+import {
+  reclaimableItemCount,
+  type MediaStorageReclaimResult,
+  type MediaStorageScan,
+} from '../../application/archive/archive-application'
 import { useApplicationServices } from '../../ui/application-context'
 import { useArchiveStatus } from '../../ui/archive-status'
 import InlineConfirm from '../../ui/InlineConfirm'
@@ -133,14 +137,21 @@ export default function VaultBackupPage() {
     [],
   )
 
-  const markBackupSaved = async (): Promise<void> => {
+  /** Records the saved backup; a failure is shown, never reported as success. */
+  const markBackupSaved = async (): Promise<boolean> => {
     try {
       await recordBackupSaved()
-      // Moving data outside the browser is the moment the user cares most about durability.
-      if (archiveStatus?.persistence === 'best-effort') await requestPersistence()
     } catch (cause) {
-      console.error('DTAgency could not record the backup date.', cause)
+      setError(
+        `Il backup è stato consegnato, ma non riesco a registrarne la data su questo dispositivo: ${
+          cause instanceof Error ? cause.message : String(cause)
+        }`,
+      )
+      return false
     }
+    // Moving data outside the browser is the moment the user cares most about durability.
+    if (archiveStatus?.persistence === 'best-effort') await requestPersistence().catch(() => undefined)
+    return true
   }
 
   const canShare = useMemo(() => Boolean(preparedFile && canShareVaultFile(preparedFile)), [preparedFile])
@@ -201,8 +212,7 @@ export default function VaultBackupPage() {
     clearFeedback()
     try {
       await shareVaultFile(preparedFile)
-      await markBackupSaved()
-      setNotice('Backup consegnato al foglio di condivisione del dispositivo.')
+      if (await markBackupSaved()) setNotice('Backup consegnato al foglio di condivisione del dispositivo.')
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
       setError(cause instanceof Error ? cause.message : 'Impossibile condividere il backup.')
@@ -393,7 +403,9 @@ export default function VaultBackupPage() {
                   type="button"
                   onClick={() => {
                     setConfirmDownloadSaved(false)
-                    void markBackupSaved().then(() => setNotice('Backup registrato come salvato.'))
+                    void markBackupSaved().then((recorded) => {
+                      if (recorded) setNotice('Backup registrato come salvato.')
+                    })
                   }}
                 >
                   Sì, l’ho salvato
@@ -534,13 +546,14 @@ export default function VaultBackupPage() {
         </div>
         {storageScan && (
           <div className="vault-result" role="status">
-            {storageScan.reclaimableMediaIds.length + storageScan.orphanDirectoryIds.length === 0 ? (
+            {reclaimableItemCount(storageScan) === 0 ? (
               <strong>Non c’è spazio da recuperare.</strong>
             ) : (
               <>
                 <strong>{humanBytes(storageScan.reclaimableBytes)} recuperabili</strong>
                 <span>
-                  {storageScan.reclaimableMediaIds.length} file eliminati · {storageScan.orphanDirectoryIds.length} file
+                  {storageScan.reclaimableMediaIds.length + storageScan.reclaimableDocumentIds.length} elementi
+                  eliminati · {storageScan.orphanDirectoryIds.length + storageScan.orphanPrivateDocumentIds.length} file
                   senza riferimenti
                 </span>
               </>
@@ -551,7 +564,7 @@ export default function VaultBackupPage() {
                 tuoi backup .dtagency.
               </span>
             )}
-            {storageScan.reclaimableMediaIds.length + storageScan.orphanDirectoryIds.length > 0 &&
+            {reclaimableItemCount(storageScan) > 0 &&
               (!confirmReclaim ? (
                 <div className="vault-actions">
                   <button type="button" disabled={storageBusy} onClick={() => setConfirmReclaim(true)}>

@@ -32,6 +32,7 @@ export interface DayMediaMetadataUpdate {
 export type SoftDeleteMediaResult = 'not-found' | 'already-deleted' | 'tombstoned'
 export type RestoreMediaResult = 'not-found' | 'already-active' | 'restored'
 export type PurgeMediaResult = 'not-found' | 'purged' | 'referenced'
+export type BatchPurgeMediaResult = PurgeMediaResult | 'error'
 
 async function requireEditableMediaContext(media: Pick<Media, 'tripId' | 'dayId' | 'blockId'>): Promise<void> {
   if (!media.tripId && !media.dayId && !media.blockId) return
@@ -63,6 +64,15 @@ async function requireEditableMediaContext(media: Pick<Media, 'tripId' | 'dayId'
 
 // No index exists for these columns (adding one needs a DB v3 + Vault snapshot
 // migration). Both tables stay small and purge is an explicit, rare operation.
+/** Media ids still referenced by any row, tombstoned or not (one pass, for scans). */
+export async function listReferencedMediaIds(): Promise<Set<string>> {
+  const [reservations, trips] = await Promise.all([db.reservations.toArray(), db.trips.toArray()])
+  const ids = new Set<string>()
+  for (const row of reservations) if (row.attachmentMediaId) ids.add(row.attachmentMediaId)
+  for (const row of trips) if (row.coverMediaId) ids.add(row.coverMediaId)
+  return ids
+}
+
 async function isMediaReferenced(id: string): Promise<boolean> {
   const [reservation, trip] = await Promise.all([
     db.reservations.filter((row) => row.attachmentMediaId === id).first(),
@@ -253,6 +263,53 @@ export class MediaRepository {
     // Serialized with Vault export/restore in every tab: never delete bytes a
     // concurrent snapshot or restore is reading or has just written.
     return withVaultLock(() => this.purgeUnlocked(id))
+  }
+
+  /**
+   * Batch variant of `purge` that checks references once per batch instead of
+   * scanning reservations and trips once per media id. Per-item failures (e.g.
+   * an active row or an OPFS deletion error) are reported as `'error'` without
+   * aborting the rest of the batch.
+   */
+  purgeMany(ids: string[]): Promise<Map<string, BatchPurgeMediaResult>> {
+    const uniqueIds = [...new Set(ids)]
+    if (uniqueIds.length === 0) return Promise.resolve(new Map())
+    return withVaultLock(() => this.purgeManyUnlocked(uniqueIds))
+  }
+
+  private async purgeManyUnlocked(ids: string[]): Promise<Map<string, BatchPurgeMediaResult>> {
+    const outcomes = new Map<string, BatchPurgeMediaResult>()
+    const toDelete: string[] = []
+
+    await db.transaction('rw', db.media, db.reservations, db.trips, async () => {
+      const [rows, referenced] = await Promise.all([db.media.bulkGet(ids), listReferencedMediaIds()])
+      for (let index = 0; index < ids.length; index += 1) {
+        const id = ids[index]
+        const current = rows[index]
+        if (!current) {
+          outcomes.set(id, 'not-found')
+        } else if (!current.deletedAt) {
+          outcomes.set(id, 'error')
+        } else if (referenced.has(id)) {
+          outcomes.set(id, 'referenced')
+        } else {
+          toDelete.push(id)
+          outcomes.set(id, 'purged')
+        }
+      }
+      if (toDelete.length > 0) await db.media.bulkDelete(toDelete)
+    })
+
+    for (const id of toDelete) {
+      try {
+        await deleteMediaFile(id)
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'NotFoundError')) {
+          outcomes.set(id, 'error')
+        }
+      }
+    }
+    return outcomes
   }
 
   private async purgeUnlocked(id: string): Promise<PurgeMediaResult> {

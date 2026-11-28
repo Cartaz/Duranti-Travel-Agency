@@ -1,5 +1,5 @@
-import { useRef, useState, type FormEvent } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import type { ArchiveStatus } from '../../application/archive/archive-application'
 import { ArchiveStatusProvider, useArchiveStatus } from '../archive-status'
 import './app-shell.css'
@@ -125,7 +125,17 @@ function AppShellLayout({ readiness }: { readiness: AppShellReadiness }) {
   const [validationNotice, setValidationNotice] = useState('')
   const [readinessVisible, setReadinessVisible] = useState(true)
   const validationLockRef = useRef(false)
-  const { status, requestPersistence } = useArchiveStatus()
+  const { status, refresh, requestPersistence } = useArchiveStatus()
+  const { pathname } = useLocation()
+  const didMountRef = useRef(false)
+  // Trips may have been created or deleted on the previous page: keep the reminder accurate.
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true
+      return
+    }
+    refresh()
+  }, [pathname, refresh])
   const [persistenceBusy, setPersistenceBusy] = useState(false)
   const [persistenceDenied, setPersistenceDenied] = useState(false)
   const statusMessages = readinessMessages(readiness, status)

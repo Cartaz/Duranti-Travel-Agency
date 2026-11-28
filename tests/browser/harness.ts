@@ -916,6 +916,65 @@ async function holdVaultLock(): Promise<() => void> {
   return release
 }
 
+await run('Reclamation frees tombstoned documents and never advertises referenced media', async () => {
+  await resetEnvironment()
+  const { mediaId, reservationId } = await seedReservationWithAttachment()
+  const now = new Date().toISOString()
+  const media = await db.media.get(mediaId)
+  await db.media.put({ ...media!, deletedAt: now, updatedAt: now })
+  const reservation = await db.reservations.get(reservationId)
+  await db.reservations.put({ ...reservation!, deletedAt: now, updatedAt: now })
+
+  await db.travelers.add({
+    id: 'gone-traveler',
+    firstName: 'A',
+    lastName: 'B',
+    displayName: 'A B',
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: now,
+  })
+  await db.travelerDocuments.add({
+    id: 'gone-document',
+    travelerId: 'gone-traveler',
+    type: 'passport',
+    encryptedPayload: {
+      version: 1,
+      algorithm: 'AES-GCM',
+      tagLength: 128,
+      ivB64: 'AAAAAAAAAAAAAAAA',
+      ciphertextB64: 'AAAA',
+    },
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: now,
+  })
+  const root = await navigator.storage.getDirectory()
+  const documents = await (
+    await (await root.getDirectoryHandle('dtagency', { create: true })).getDirectoryHandle('private', { create: true })
+  ).getDirectoryHandle('traveler-documents', { create: true })
+  await writeOpfsFile(
+    await documents.getDirectoryHandle('gone-document', { create: true }),
+    'scan.bin',
+    new Blob(['passport']),
+  )
+
+  const scan = await scanReclaimableMediaStorage()
+  assert(scan.reclaimableMediaIds.length === 0, 'Referenced media was advertised as reclaimable.')
+  assert(scan.reclaimableDocumentIds.join() === 'gone-document', 'Tombstoned document was not found.')
+  assert(scan.reclaimableBytes === 8, `Unexpected reclaimable bytes ${scan.reclaimableBytes}.`)
+
+  const result = await reclaimMediaStorage(scan)
+  assert(result.purgedMediaCount === 1 && result.freedBytes === 8, 'Tombstoned document was not purged.')
+  assert(!(await db.travelerDocuments.get('gone-document')), 'Document row survived reclamation.')
+  assert(
+    !(await opfsEntryExists(['dtagency', 'private', 'traveler-documents', 'gone-document'])),
+    'Document bytes survived.',
+  )
+  assert(Boolean(await db.media.get(mediaId)), 'Referenced media row was removed.')
+  await assertVaultStillValidates()
+})
+
 await run('Media purge waits for the cross-tab Vault lock', async () => {
   await resetEnvironment()
   const seeded = await seedRoundTripState()

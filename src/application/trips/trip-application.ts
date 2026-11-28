@@ -183,7 +183,11 @@ export function createTripApplication(dependencies: TripApplicationDependencies)
 
     async deleteArchivedTrip(tripId: string): Promise<DeletionOutcome> {
       const { mediaIds } = await deletion.softDeleteArchivedTripWithContent(tripId)
-      return purgeDeletedFiles(mediaIds, (id) => media.purge(id))
+      return purgeDeletedFiles(
+        mediaIds,
+        (id) => media.purge(id),
+        media.purgeMany ? (ids) => media.purgeMany!(ids) : undefined,
+      )
     },
   }
 }

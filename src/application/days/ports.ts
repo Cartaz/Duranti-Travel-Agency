@@ -13,6 +13,7 @@ export interface DayDeletionPort {
 
 export interface DayMediaPurgePort {
   purge(id: string): Promise<unknown>
+  purgeMany?(ids: string[]): Promise<Map<string, unknown>>
 }
 
 export interface DayApplicationDependencies {

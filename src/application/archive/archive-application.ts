@@ -28,6 +28,16 @@ export interface ArchiveApplication {
   reclaimStorage(scan: MediaStorageScan): Promise<MediaStorageReclaimResult>
 }
 
+/** Number of items a storage scan can actually free. */
+export function reclaimableItemCount(scan: MediaStorageScan): number {
+  return (
+    scan.reclaimableMediaIds.length +
+    scan.orphanDirectoryIds.length +
+    scan.orphanPrivateDocumentIds.length +
+    scan.reclaimableDocumentIds.length
+  )
+}
+
 export function isBackupDue(hasActiveTrips: boolean, lastBackupAt: string | undefined, now: string): boolean {
   if (!hasActiveTrips) return false
   if (!lastBackupAt) return true
@@ -58,11 +68,7 @@ export function createArchiveApplication(deps: ArchiveApplicationDependencies): 
       return deps.maintenance.scan()
     },
     async reclaimStorage(scan) {
-      if (
-        scan.reclaimableMediaIds.length === 0 &&
-        scan.orphanDirectoryIds.length === 0 &&
-        scan.orphanPrivateDocumentIds.length === 0
-      ) {
+      if (reclaimableItemCount(scan) === 0) {
         return { purgedMediaCount: 0, removedOrphanCount: 0, keptReferencedCount: 0, freedBytes: 0 }
       }
       return deps.maintenance.reclaim(scan)

@@ -31,6 +31,8 @@ export interface MediaStorageScan {
   orphanDirectoryIds: string[]
   /** Encrypted document directories without metadata (e.g. an interrupted purge). */
   orphanPrivateDocumentIds: string[]
+  /** Tombstoned encrypted documents whose bytes were not purged yet. */
+  reclaimableDocumentIds: string[]
   reclaimableBytes: number
   /** Active media whose bytes are missing, unreadable or inconsistent. */
   unhealthyActiveCount: number

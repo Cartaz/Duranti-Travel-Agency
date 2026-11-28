@@ -82,7 +82,11 @@ export function createDayApplication(deps: DayApplicationDependencies): DayAppli
 
   async function deleteTripDay(tripId: string, dayId: string): Promise<DeletionOutcome> {
     const { mediaIds } = await deps.deletion.softDeleteDayWithContent(tripId, dayId)
-    return purgeDeletedFiles(mediaIds, (id) => deps.media.purge(id))
+    return purgeDeletedFiles(
+      mediaIds,
+      (id) => deps.media.purge(id),
+      deps.media.purgeMany ? (ids) => deps.media.purgeMany!(ids) : undefined,
+    )
   }
 
   return { listTripDays, getTripDay, createTripDay, updateTripDay, deleteTripDay }

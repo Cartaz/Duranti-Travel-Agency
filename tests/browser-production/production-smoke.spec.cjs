@@ -42,3 +42,20 @@ test('the storage lab is not reachable in production', async ({ page }) => {
   await page.goto('./#/lab')
   await expect(page).toHaveURL(/#\/$/)
 })
+
+test.describe('without the service worker', () => {
+  // Requests answered by the service worker bypass Playwright routing.
+  test.use({ serviceWorkers: 'block' })
+
+  test('a page chunk that fails to load offers a reload instead of blanking the app', async ({ page }) => {
+    await page.goto('./')
+    await expect(page.getByRole('link', { name: 'Nuovo viaggio' })).toBeVisible()
+    await page.route('**/assets/VaultBackupPage-*.js', (route) => route.abort())
+    await page.getByRole('link', { name: 'Backup', exact: true }).click()
+    await expect(page.getByText('Impossibile aprire questa pagina.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ricarica l’app' })).toBeVisible()
+    // The shell and navigation survive; other pages still open.
+    await page.getByRole('link', { name: 'Luoghi', exact: true }).click()
+    await expect(page.getByText('Impossibile aprire questa pagina.')).toHaveCount(0)
+  })
+})

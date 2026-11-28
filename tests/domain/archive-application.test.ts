@@ -8,6 +8,9 @@ function harness(options: {
   granted?: boolean
   lastSavedAt?: string
   trips?: boolean
+  reclaimable?: string[]
+  reclaimableDocuments?: string[]
+  orphanPrivateDocuments?: string[]
 }) {
   let lastSavedAt = options.lastSavedAt
   let persistence = options.persistence ?? 'best-effort'
@@ -17,15 +20,16 @@ function harness(options: {
       scan: async () => ({
         reclaimableMediaIds: options.reclaimable ?? [],
         orphanDirectoryIds: [],
-        orphanPrivateDocumentIds: [],
+        orphanPrivateDocumentIds: options.orphanPrivateDocuments ?? [],
+        reclaimableDocumentIds: options.reclaimableDocuments ?? [],
         reclaimableBytes: 0,
         unhealthyActiveCount: 0,
       }),
       reclaim: async (scan) => {
-        reclaimed.push(scan.reclaimableMediaIds)
+        reclaimed.push([...scan.reclaimableMediaIds, ...scan.reclaimableDocumentIds, ...scan.orphanPrivateDocumentIds])
         return {
-          purgedMediaCount: scan.reclaimableMediaIds.length,
-          removedOrphanCount: 0,
+          purgedMediaCount: scan.reclaimableMediaIds.length + scan.reclaimableDocumentIds.length,
+          removedOrphanCount: scan.orphanDirectoryIds.length + scan.orphanPrivateDocumentIds.length,
           keptReferencedCount: 0,
           freedBytes: 0,
         }
@@ -84,4 +88,10 @@ test('storage reclamation is skipped when the scan found nothing to free', async
   const reclaimed = await busy.application.reclaimStorage(await busy.application.scanStorage())
   assert.equal(reclaimed.purgedMediaCount, 1)
   assert.deepEqual(busy.reclaimed, [['media-1']])
+
+  const docs = harness({ reclaimableDocuments: ['doc-1'], orphanPrivateDocuments: ['orphan-doc-1'] })
+  const reclaimedDocs = await docs.application.reclaimStorage(await docs.application.scanStorage())
+  assert.equal(reclaimedDocs.purgedMediaCount, 1)
+  assert.equal(reclaimedDocs.removedOrphanCount, 1)
+  assert.deepEqual(docs.reclaimed, [['doc-1', 'orphan-doc-1']])
 })

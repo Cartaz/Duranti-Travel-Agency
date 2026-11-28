@@ -14,6 +14,7 @@ export interface TripDeletionPort {
 
 export interface TripMediaPurgePort {
   purge(id: string): Promise<unknown>
+  purgeMany?(ids: string[]): Promise<Map<string, unknown>>
 }
 
 export interface TripApplicationDependencies {

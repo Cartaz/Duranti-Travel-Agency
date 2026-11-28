@@ -4,6 +4,8 @@ import { useApplicationServices } from './application-context'
 
 interface ArchiveStatusValue {
   status?: ArchiveStatus
+  /** Re-reads persistence, backup date and whether trips exist. */
+  refresh(): void
   requestPersistence(): Promise<StoragePersistenceState>
   recordBackupSaved(): Promise<void>
 }
@@ -19,6 +21,9 @@ export function ArchiveStatusProvider({ children }: PropsWithChildren) {
   const { archive } = useApplicationServices('archive')
   const [status, setStatus] = useState<ArchiveStatus>()
 
+  const [revision, setRevision] = useState(0)
+  const refresh = useCallback(() => setRevision((current) => current + 1), [])
+
   useEffect(() => {
     let cancelled = false
     void archive
@@ -26,11 +31,15 @@ export function ArchiveStatusProvider({ children }: PropsWithChildren) {
       .then((next) => {
         if (!cancelled) setStatus(next)
       })
-      .catch((error: unknown) => console.error('DTAgency archive status is unavailable.', error))
+      .catch((error: unknown) => {
+        console.error('DTAgency archive status is unavailable.', error)
+        // Unknown durability must still be visible as a warning, not hidden.
+        if (!cancelled) setStatus((current) => ({ backupDue: false, ...current, persistence: 'unknown' }))
+      })
     return () => {
       cancelled = true
     }
-  }, [archive])
+  }, [archive, revision])
 
   const requestPersistence = useCallback(async () => {
     const persistence = await archive.requestPersistence()
@@ -44,8 +53,8 @@ export function ArchiveStatusProvider({ children }: PropsWithChildren) {
   }, [archive])
 
   const value = useMemo(
-    () => ({ status, requestPersistence, recordBackupSaved }),
-    [status, requestPersistence, recordBackupSaved],
+    () => ({ status, refresh, requestPersistence, recordBackupSaved }),
+    [status, refresh, requestPersistence, recordBackupSaved],
   )
   return <ArchiveStatusContext.Provider value={value}>{children}</ArchiveStatusContext.Provider>
 }
